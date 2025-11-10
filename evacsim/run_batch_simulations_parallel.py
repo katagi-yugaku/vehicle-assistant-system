@@ -289,6 +289,14 @@ def get_repo() -> git.Repo:
     except git.exc.InvalidGitRepositoryError:
         raise RuntimeError("このスクリプトはGitリポジトリ内で実行されていません。")
 
+def checkout_branch_safe(repo: git.Repo, branch_name: str) -> None:
+    try:
+        repo.git.checkout(branch_name)
+        print(f"[OK] checkout {branch_name}")
+    except Exception as e:
+        print(f"[WARN] checkout 失敗: {e}")
+
+
 def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
 
@@ -583,6 +591,9 @@ def compute_average_arrival_times(runvehID_arrival_time_dict_per_run_lists):
 if __name__ == "__main__":
     #  python3 -m scenarios.its102.map_one.simulation.runner_simulator --nogui scenarios/its102/configs/1.toml 0.5
     # Git リポジトリ検出＆最新化＋作業ブランチへ
+    repo = None
+    work_branch = None
+    base_branch = "main"
     try:
         repo = get_repo()
         work_branch = ensure_on_unique_work_branch(
@@ -597,183 +608,188 @@ if __name__ == "__main__":
         repo = None
         work_branch = None
 
-    # シナリオの TOML 一覧（例: its102/configs/*.toml）
-    scenario_name = sys.argv[1]  # 例: "its102"
-    script_name_with_system = f"scenarios.{scenario_name}.map_one.simulation.runner_simulator" ###実際にはmap_oneは飛ばしたい
-    SCENARIO_DIR = Path(f"scenarios/{scenario_name}/configs")   # プロジェクト直下からの相対
-    RESULTS_ROOT = Path(f"scenarios/{scenario_name}/map_one/results")
-    scenario_config_paths = sorted(SCENARIO_DIR.glob("*.toml"))
-    all_results = {}  # {scenario_name: {...既存のavg_* 構造...}}
-    
-    # 並列ワーカー数
-    MAX_WORKERS = int(os.environ.get("MAX_WORKERS", max(1, (os.cpu_count() or 2) - 1)))
-
-    for config_path in scenario_config_paths:
-        print(f"=== [Scenario={config_path.name}] system 全ジョブを並列実行（workers={MAX_WORKERS}） ===")
-        # 結果バッファ（early_rate ごとに veh/chg/cnt を貯める）
-        system_runs = {
-            early_rate: {"vehicle_results": [], "count_metrics_list": []}
-            for early_rate in early_rate_list
-        }
-
-        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = []
-            for early_rate in early_rate_list:
-                for run_index in range(NUM_RUNS):
-                    futures.append(
-                        executor.submit(_run_once, "system", config_path, early_rate, run_index, script_name_with_system)
-                    )
-            for future in as_completed(futures):
-                mode, returned_config_path, returned_early_rate, returned_run_index, result_tuple = future.result()
-                if result_tuple is None:
-                    # エラーまたは中断時のスキップ（必要ならログ化可能）
-                    continue
-
-                vehicle_arrival_time_dict, count_metrics_dict = result_tuple
-                system_runs[returned_early_rate]["vehicle_results"].append(vehicle_arrival_time_dict)
-                system_runs[returned_early_rate]["count_metrics_list"].append(count_metrics_dict)
-        # print(f"system 全ジョブ完了")
-        # === system 集計（平均化） ===
-        average_arrival_times_by_early_rate: dict[float, list[float]] = {}
-        average_changed_vehicle_counts_by_early_rate: dict[float, float] = {}
-        average_count_metrics_by_early_rate: dict[float, dict[str, float]] = {
-            early_rate: {count_key: 0.0 for count_key in COUNT_KEYS}
-            for early_rate in early_rate_list
-        }
-
-        for early_rate in early_rate_list:
-            vehicle_runs_per_early_rate = system_runs[early_rate]["vehicle_results"]
-            count_metrics_per_early_rate = system_runs[early_rate]["count_metrics_list"]
-
-            # 各 early_rate の全試行で平均到着時間を計算
-            if vehicle_runs_per_early_rate:
-                averaged_arrival_time_dict = compute_average_arrival_times(vehicle_runs_per_early_rate)
-                average_arrival_times_by_early_rate[early_rate] = list(averaged_arrival_time_dict.values())
-            else:
-                average_arrival_times_by_early_rate[early_rate] = []
-
-            # 各カウント系メトリクスの平均値を算出
-            if count_metrics_per_early_rate:
-                for count_key in COUNT_KEYS:
-                    count_values = [metrics.get(count_key, 0.0) for metrics in count_metrics_per_early_rate]
-                    average_count_metrics_by_early_rate[early_rate][count_key] = (
-                        sum(count_values) / len(count_values)
-                    ) if count_values else 0.0
-                # === nosystem も同じ early_rate_list × NUM_RUNS で並列実行 ===
-        script_name_with_nosystem = f"scenarios.{scenario_name}.map_one.simulation.runner_simulator_nosystem"
-
-        print(f"=== [Scenario={config_path.name}] nosystem 全ジョブを並列実行（workers={MAX_WORKERS}） ===")
-        nosystem_runs_by_early_rate = {
-            early_rate_value: {
-                "vehicle_results": [],
-                "count_metrics_list": [],
-            }
-            for early_rate_value in early_rate_list
-        }
-
-        with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures_nosystem = []
-            for early_rate_value in early_rate_list:
-                for run_index in range(NUM_RUNS):
-                    futures_nosystem.append(
-                        executor.submit(
-                            _run_once,
-                            "nosystem",
-                            config_path,
-                            early_rate_value,
-                            run_index,
-                            script_name_with_nosystem,
-                        )
-                    )
-
-            for future in as_completed(futures_nosystem):
-                (
-                    returned_mode,
-                    returned_config_path,
-                    returned_early_rate,
-                    returned_run_index,
-                    result_tuple,
-                ) = future.result()
-
-                if result_tuple is None:
-                    continue
-
-                vehicle_arrival_time_dict, count_metrics_dict = result_tuple
-                nosystem_runs_by_early_rate[returned_early_rate]["vehicle_results"].append(
-                    vehicle_arrival_time_dict
-                )
-                nosystem_runs_by_early_rate[returned_early_rate]["count_metrics_list"].append(
-                    count_metrics_dict
-                )
-
-        # === nosystem 集計（平均化） ===
-        average_arrival_times_nosystem_by_early_rate: dict[float, list[float]] = {}
-        average_count_metrics_nosystem_by_early_rate: dict[float, dict[str, float]] = {
-            early_rate_value: {count_key: 0.0 for count_key in COUNT_KEYS}
-            for early_rate_value in early_rate_list
-        }
-
-        for early_rate_value in early_rate_list:
-            vehicle_runs_for_nosystem = nosystem_runs_by_early_rate[early_rate_value]["vehicle_results"]
-            count_metrics_runs_for_nosystem = nosystem_runs_by_early_rate[early_rate_value]["count_metrics_list"]
-
-            if vehicle_runs_for_nosystem:
-                averaged_arrival_time_dict_nosystem = compute_average_arrival_times(
-                    vehicle_runs_for_nosystem
-                )
-                average_arrival_times_nosystem_by_early_rate[early_rate_value] = list(
-                    averaged_arrival_time_dict_nosystem.values()
-                )
-            else:
-                average_arrival_times_nosystem_by_early_rate[early_rate_value] = []
-
-            if count_metrics_runs_for_nosystem:
-                for count_key in COUNT_KEYS:
-                    values_for_key = [m.get(count_key, 0.0) for m in count_metrics_runs_for_nosystem]
-                    average_count_metrics_nosystem_by_early_rate[early_rate_value][count_key] = (
-                        sum(values_for_key) / len(values_for_key)
-                    ) if values_for_key else 0.0
-
-        # === このシナリオの結果を統合して格納（system / nosystem分離で上書き防止） ===
-        all_results[config_path.stem] = {
-            "system": {
-                "average_arrival_times": average_arrival_times_by_early_rate,
-                "average_count_metrics": average_count_metrics_by_early_rate,
-            },
-            "nosystem": {
-                "average_arrival_times": average_arrival_times_nosystem_by_early_rate,
-                "average_count_metrics": average_count_metrics_nosystem_by_early_rate,
-            },
-        }
-    print(f"=== system シナリオ完了 ===")
-    print(f"all_results: {all_results}")    
-    save_outputs(all_results)
-    # === results/<scenario_id>/ 以下の生成物だけを選択コミット＆push ===
+    # シナリオの TOML 一覧（例: its102/configs/*.toml
     try:
-        if repo is None:
-            raise RuntimeError("Git repo 未取得のためスキップ")
+        scenario_name = sys.argv[1]  # 例: "its102"
+        script_name_with_system = f"scenarios.{scenario_name}.map_one.simulation.runner_simulator" ###実際にはmap_oneは飛ばしたい
+        SCENARIO_DIR = Path(f"scenarios/{scenario_name}/configs")   # プロジェクト直下からの相対
+        RESULTS_ROOT = Path(f"scenarios/{scenario_name}/map_one/results")
+        scenario_config_paths = sorted(SCENARIO_DIR.glob("*.toml"))
+        all_results = {}  # {scenario_name: {...既存のavg_* 構造...}}
 
-        results_root = RESULTS_ROOT.resolve()
-        scenario_ids = list(all_results.keys())
+        # 並列ワーカー数
+        MAX_WORKERS = int(os.environ.get("MAX_WORKERS", max(1, (os.cpu_count() or 2) - 1)))
 
-        paths: List[Path] = []
-        for sid in scenario_ids:
-            d = results_root / sid
-            paths.extend(d.glob("log_*.txt"))
-            paths.extend(d.glob("cdf_*.pdf"))
+        for config_path in scenario_config_paths:
+            print(f"=== [Scenario={config_path.name}] system 全ジョブを並列実行（workers={MAX_WORKERS}） ===")
+            # 結果バッファ（early_rate ごとに veh/chg/cnt を貯める）
+            system_runs = {
+                early_rate: {"vehicle_results": [], "count_metrics_list": []}
+                for early_rate in early_rate_list
+            }
 
-        # add & commit（現在の作業ブランチに対して）
-        git_add_commit_push(
-            repo=repo,
-            paths=paths,
-            remote_name="origin",
-            branch=None,  # None の場合は HEAD を push（後段の push_current_branch が制御）
-            message=f"results: add logs & CDF for {', '.join(scenario_ids)}"
-        )
+            with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                futures = []
+                for early_rate in early_rate_list:
+                    for run_index in range(NUM_RUNS):
+                        futures.append(
+                            executor.submit(_run_once, "system", config_path, early_rate, run_index, script_name_with_system)
+                        )
+                for future in as_completed(futures):
+                    mode, returned_config_path, returned_early_rate, returned_run_index, result_tuple = future.result()
+                    if result_tuple is None:
+                        # エラーまたは中断時のスキップ（必要ならログ化可能）
+                        continue
 
-        # 上の関数は commit まで。push は tracking の有無で挙動を分けたいので別関数で。
-        push_current_branch(repo=repo, remote_name="origin")
-    except Exception as e:
-        print(f"git add/commit/push skipped: {e}")
+                    vehicle_arrival_time_dict, count_metrics_dict = result_tuple
+                    system_runs[returned_early_rate]["vehicle_results"].append(vehicle_arrival_time_dict)
+                    system_runs[returned_early_rate]["count_metrics_list"].append(count_metrics_dict)
+            # print(f"system 全ジョブ完了")
+            # === system 集計（平均化） ===
+            average_arrival_times_by_early_rate: dict[float, list[float]] = {}
+            average_changed_vehicle_counts_by_early_rate: dict[float, float] = {}
+            average_count_metrics_by_early_rate: dict[float, dict[str, float]] = {
+                early_rate: {count_key: 0.0 for count_key in COUNT_KEYS}
+                for early_rate in early_rate_list
+            }
+
+            for early_rate in early_rate_list:
+                vehicle_runs_per_early_rate = system_runs[early_rate]["vehicle_results"]
+                count_metrics_per_early_rate = system_runs[early_rate]["count_metrics_list"]
+
+                # 各 early_rate の全試行で平均到着時間を計算
+                if vehicle_runs_per_early_rate:
+                    averaged_arrival_time_dict = compute_average_arrival_times(vehicle_runs_per_early_rate)
+                    average_arrival_times_by_early_rate[early_rate] = list(averaged_arrival_time_dict.values())
+                else:
+                    average_arrival_times_by_early_rate[early_rate] = []
+
+                # 各カウント系メトリクスの平均値を算出
+                if count_metrics_per_early_rate:
+                    for count_key in COUNT_KEYS:
+                        count_values = [metrics.get(count_key, 0.0) for metrics in count_metrics_per_early_rate]
+                        average_count_metrics_by_early_rate[early_rate][count_key] = (
+                            sum(count_values) / len(count_values)
+                        ) if count_values else 0.0
+                    # === nosystem も同じ early_rate_list × NUM_RUNS で並列実行 ===
+            script_name_with_nosystem = f"scenarios.{scenario_name}.map_one.simulation.runner_simulator_nosystem"
+
+            print(f"=== [Scenario={config_path.name}] nosystem 全ジョブを並列実行（workers={MAX_WORKERS}） ===")
+            nosystem_runs_by_early_rate = {
+                early_rate_value: {
+                    "vehicle_results": [],
+                    "count_metrics_list": [],
+                }
+                for early_rate_value in early_rate_list
+            }
+
+            with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                futures_nosystem = []
+                for early_rate_value in early_rate_list:
+                    for run_index in range(NUM_RUNS):
+                        futures_nosystem.append(
+                            executor.submit(
+                                _run_once,
+                                "nosystem",
+                                config_path,
+                                early_rate_value,
+                                run_index,
+                                script_name_with_nosystem,
+                            )
+                        )
+
+                for future in as_completed(futures_nosystem):
+                    (
+                        returned_mode,
+                        returned_config_path,
+                        returned_early_rate,
+                        returned_run_index,
+                        result_tuple,
+                    ) = future.result()
+
+                    if result_tuple is None:
+                        continue
+
+                    vehicle_arrival_time_dict, count_metrics_dict = result_tuple
+                    nosystem_runs_by_early_rate[returned_early_rate]["vehicle_results"].append(
+                        vehicle_arrival_time_dict
+                    )
+                    nosystem_runs_by_early_rate[returned_early_rate]["count_metrics_list"].append(
+                        count_metrics_dict
+                    )
+
+            # === nosystem 集計（平均化） ===
+            average_arrival_times_nosystem_by_early_rate: dict[float, list[float]] = {}
+            average_count_metrics_nosystem_by_early_rate: dict[float, dict[str, float]] = {
+                early_rate_value: {count_key: 0.0 for count_key in COUNT_KEYS}
+                for early_rate_value in early_rate_list
+            }
+
+            for early_rate_value in early_rate_list:
+                vehicle_runs_for_nosystem = nosystem_runs_by_early_rate[early_rate_value]["vehicle_results"]
+                count_metrics_runs_for_nosystem = nosystem_runs_by_early_rate[early_rate_value]["count_metrics_list"]
+
+                if vehicle_runs_for_nosystem:
+                    averaged_arrival_time_dict_nosystem = compute_average_arrival_times(
+                        vehicle_runs_for_nosystem
+                    )
+                    average_arrival_times_nosystem_by_early_rate[early_rate_value] = list(
+                        averaged_arrival_time_dict_nosystem.values()
+                    )
+                else:
+                    average_arrival_times_nosystem_by_early_rate[early_rate_value] = []
+
+                if count_metrics_runs_for_nosystem:
+                    for count_key in COUNT_KEYS:
+                        values_for_key = [m.get(count_key, 0.0) for m in count_metrics_runs_for_nosystem]
+                        average_count_metrics_nosystem_by_early_rate[early_rate_value][count_key] = (
+                            sum(values_for_key) / len(values_for_key)
+                        ) if values_for_key else 0.0
+
+            # === このシナリオの結果を統合して格納（system / nosystem分離で上書き防止） ===
+            all_results[config_path.stem] = {
+                "system": {
+                    "average_arrival_times": average_arrival_times_by_early_rate,
+                    "average_count_metrics": average_count_metrics_by_early_rate,
+                },
+                "nosystem": {
+                    "average_arrival_times": average_arrival_times_nosystem_by_early_rate,
+                    "average_count_metrics": average_count_metrics_nosystem_by_early_rate,
+                },
+            }
+        print(f"=== system シナリオ完了 ===")
+        print(f"all_results: {all_results}")    
+        save_outputs(all_results)
+        # === results/<scenario_id>/ 以下の生成物だけを選択コミット＆push ===
+        try:
+            if repo is None:
+                raise RuntimeError("Git repo 未取得のためスキップ")
+
+            results_root = RESULTS_ROOT.resolve()
+            scenario_ids = list(all_results.keys())
+
+            paths: List[Path] = []
+            for sid in scenario_ids:
+                d = results_root / sid
+                paths.extend(d.glob("log_*.txt"))
+                paths.extend(d.glob("cdf_*.pdf"))
+
+            # add & commit（現在の作業ブランチに対して）
+            git_add_commit_push(
+                repo=repo,
+                paths=paths,
+                remote_name="origin",
+                branch=None,  # None の場合は HEAD を push（後段の push_current_branch が制御）
+                message=f"results: add logs & CDF for {', '.join(scenario_ids)}"
+            )
+
+            # 上の関数は commit まで。push は tracking の有無で挙動を分けたいので別関数で。
+            push_current_branch(repo=repo, remote_name="origin")
+        except Exception as e:
+            print(f"git add/commit/push skipped: {e}")
+    finally:
+        # --- 必ず main に戻る ---
+        if repo is not None:
+            checkout_branch_safe(repo, base_branch)
 
 
