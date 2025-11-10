@@ -95,6 +95,109 @@ class SimulationConfig:
     def from_dict(d: dict) -> "SimulationConfig":
         return SimulationConfig(**d)
 
+# ===== Git branch helpers =====
+def get_current_branch_name(repo: git.Repo) -> Optional[str]:
+    try:
+        return repo.active_branch.name
+    except Exception:
+        return None  # detached HEAD など
+
+def branch_exists_local(repo: git.Repo, name: str) -> bool:
+    return any(h.name.split("/")[-1] == name for h in repo.heads)
+
+def branch_exists_remote(repo: git.Repo, name: str, remote_name: str = "origin") -> bool:
+    try:
+        remote = repo.remote(remote_name)
+        remote.fetch(prune=True)
+        return any(ref.name.split("/")[-1] == name for ref in remote.refs)
+    except Exception:
+        return False
+
+def make_unique_branch_name(repo: git.Repo, base_prefix: str = "sim") -> str:
+    """
+    例: sim/2025-11-10_18-22-05_001
+    既存と被れば 002, 003 ... を自動付与。
+    """
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    idx = 1
+    while True:
+        candidate = f"{base_prefix}/{ts}_{idx:03d}"
+        if not branch_exists_local(repo, candidate) and not branch_exists_remote(repo, candidate):
+            return candidate
+        idx += 1
+
+def ensure_on_unique_work_branch(repo: git.Repo,
+                                 remote_name: str = "origin",
+                                 base_branch: str = "main",
+                                 prefix: str = "sim") -> str:
+    """
+    - 現在 main にいたら pull --rebase --autostash
+    - main をベースに一意の作業ブランチを作成して checkout
+    - 作業ブランチ名を返す
+    """
+    cur = get_current_branch_name(repo)
+    if cur == base_branch:
+        try:
+            repo.git.pull("--rebase", "--autostash", remote_name, base_branch)
+            print(f"[OK] git pull --rebase --autostash {remote_name} {base_branch}")
+        except Exception as e:
+            print(f"[WARN] pull 失敗（続行）: {e}")
+
+    # 未コミットがあると checkout できないので自動 stash（安全にしたいなら手動に変更可）
+    if repo.is_dirty(untracked_files=True):
+        try:
+            repo.git.stash("push", "-u", "-m", "auto-stash before sim branch checkout")
+            print("[OK] auto-stash 完了")
+        except Exception as e:
+            print(f"[WARN] auto-stash 失敗（続行）: {e}")
+
+    work_branch = make_unique_branch_name(repo, base_prefix=prefix)
+
+    # ベースを main に固定してブランチ作成
+    try:
+        repo.git.checkout(base_branch)
+    except Exception:
+        pass
+    repo.git.checkout("-b", work_branch)
+    print(f"[OK] 作業ブランチ作成: {work_branch} (base={base_branch})")
+    return work_branch
+
+def push_current_branch(repo: git.Repo, remote_name: str, branch: Optional[str] = None) -> None:
+    """
+    現在のブランチ（または指定ブランチ）を push。
+    初回は -u で upstream 設定。2回目以降は通常 push。
+    """
+    if branch is None:
+        branch = get_current_branch_name(repo)
+    if not branch:
+        print("[ERROR] push するブランチが特定できません（detached HEAD?）")
+        return
+
+    remote = repo.remote(remote_name)
+
+    # 変更がなければスキップ
+    if not repo.is_dirty(untracked_files=True):
+        print("[INFO] 変更なし: push スキップ")
+        return
+
+    # upstream 未設定なら -u で設定
+    try:
+        tracking = repo.active_branch.tracking_branch()
+    except Exception:
+        tracking = None
+
+    try:
+        if tracking is None:
+            # 初回
+            repo.git.push("-u", remote_name, branch)
+        else:
+            # 2回目以降
+            remote.push(branch)
+    except Exception as e:
+        print(f"[ERROR] push 失敗: {e}")
+        return
+    print(f"[OK] push 完了: {remote_name}/{branch}")
+
 def git_add_commit_push(repo: git.Repo, paths: List[Path], remote_name: str, branch: Optional[str], message: Optional[str]):
     if not paths:
         print("[INFO] No files to commit; skip git operations.")
@@ -123,7 +226,7 @@ def git_add_commit_push(repo: git.Repo, paths: List[Path], remote_name: str, bra
         print("[INFO] Nothing to commit; working tree clean.")
         return
 
-    commit_msg = message or f"Add {len(paths)} file(s) at {dt.datetime.now():%Y-%m-%d %H:%M}"
+    commit_msg = message or f"Add {len(paths)} file(s) at {datetime.now():%Y-%m-%d %H:%M}"
     repo.index.commit(commit_msg)
     print(f"[OK] commit: {commit_msg}")
 
@@ -174,8 +277,17 @@ def git_pull(repo: git.Repo, remote_name: str = "origin", branch: Optional[str] 
     except Exception as e:
         print(f"git pull 失敗（処理続行）: {e}")
 
-
-RESULTS_ROOT = Path("scenarios/its102/map_one/results")
+def get_repo() -> git.Repo:
+    """
+    現在のスクリプトのパスから、最も近いGitリポジトリを自動検出して返す。
+    """
+    current_path = Path(__file__).resolve()
+    try:
+        repo = git.Repo(current_path, search_parent_directories=True)
+        print(f"使用中のGitリポジトリ: {repo.working_tree_dir}")
+        return repo
+    except git.exc.InvalidGitRepositoryError:
+        raise RuntimeError("このスクリプトはGitリポジトリ内で実行されていません。")
 
 def ensure_dir(p: Path) -> None:
     p.mkdir(parents=True, exist_ok=True)
@@ -445,7 +557,6 @@ def _run_once(mode: str, config_path: str, early_rate: float, run_index: int, sc
         result_tuple = run_simulation_with_nosystem(script_name, config_path, early_rate, log_suffix=f"_{run_index}")
     return (mode, config_path, early_rate, run_index, result_tuple)
 
-
 def compute_average_arrival_times(runvehID_arrival_time_dict_per_run_lists):
     """
     runvehID_arrival_time_dict_per_run_lists: 各シミュレーション(run)の
@@ -471,18 +582,26 @@ def compute_average_arrival_times(runvehID_arrival_time_dict_per_run_lists):
 # __main__ の system 側ループを “並列化” 版に置き換え
 if __name__ == "__main__":
     #  python3 -m scenarios.its102.map_one.simulation.runner_simulator --nogui scenarios/its102/configs/1.toml 0.5
-
+    # Git リポジトリ検出＆最新化＋作業ブランチへ
     try:
-        repo = git.Repo("/Users/kashiisamutakeshi/vehicle-assistant-system")
-        git_pull(repo=repo, remote_name="origin", branch="main")  # branchは必要に応じて
+        repo = get_repo()
+        work_branch = ensure_on_unique_work_branch(
+            repo=repo,
+            remote_name="origin",
+            base_branch="main",
+            prefix="sim"  # 好みで "runs", "results" などに変更可
+        )
+        print(f"[INFO] 現在の作業ブランチ: {work_branch}")
     except Exception as e:
-        print(f"⚠️ git pull skipped: {e}")
-
+        print(f"[WARN] Git 初期化ステップをスキップ: {e}")
+        repo = None
+        work_branch = None
 
     # シナリオの TOML 一覧（例: its102/configs/*.toml）
     scenario_name = sys.argv[1]  # 例: "its102"
     script_name_with_system = f"scenarios.{scenario_name}.map_one.simulation.runner_simulator" ###実際にはmap_oneは飛ばしたい
     SCENARIO_DIR = Path(f"scenarios/{scenario_name}/configs")   # プロジェクト直下からの相対
+    RESULTS_ROOT = Path(f"scenarios/{scenario_name}/map_one/results")
     scenario_config_paths = sorted(SCENARIO_DIR.glob("*.toml"))
     all_results = {}  # {scenario_name: {...既存のavg_* 構造...}}
     
@@ -629,5 +748,32 @@ if __name__ == "__main__":
     print(f"=== system シナリオ完了 ===")
     print(f"all_results: {all_results}")    
     save_outputs(all_results)
-    -- git add commit pushをscenarios/its102/map_one/results のフォルダごと実行する --
+    # === results/<scenario_id>/ 以下の生成物だけを選択コミット＆push ===
+    try:
+        if repo is None:
+            raise RuntimeError("Git repo 未取得のためスキップ")
+
+        results_root = RESULTS_ROOT.resolve()
+        scenario_ids = list(all_results.keys())
+
+        paths: List[Path] = []
+        for sid in scenario_ids:
+            d = results_root / sid
+            paths.extend(d.glob("log_*.txt"))
+            paths.extend(d.glob("cdf_*.pdf"))
+
+        # add & commit（現在の作業ブランチに対して）
+        git_add_commit_push(
+            repo=repo,
+            paths=paths,
+            remote_name="origin",
+            branch=None,  # None の場合は HEAD を push（後段の push_current_branch が制御）
+            message=f"results: add logs & CDF for {', '.join(scenario_ids)}"
+        )
+
+        # 上の関数は commit まで。push は tracking の有無で挙動を分けたいので別関数で。
+        push_current_branch(repo=repo, remote_name="origin")
+    except Exception as e:
+        print(f"git add/commit/push skipped: {e}")
+
 
