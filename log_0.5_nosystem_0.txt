@@ -1,0 +1,2 @@
+{'init_ShelterA_1_1': 221.0, 'init_ShelterA_1_3': 233.0, 'init_ShelterA_1_4': 238.0, 'newveh_ShelterA_1_0_0': 391.0, 'newveh_ShelterA_1_2_1': 400.0}
+{'obtain_info_lane_change_count': 0, 'elapsed_time_lane_change_count': 0, 'normalcy_bias_count': 0, 'negative_majority_bias_count': 0, 'positive_majority_bias_count': 0, 'lane_changed_vehicle_count': 0}
