@@ -1,1 +1,15 @@
 sumo/
+# シミュレーションの出力フォルダ
+output/
+results/
+
+# ログファイル
+*.log
+
+# TraCIのトレースファイルなど
+*.trc
+*.fcd.xml
+
+# Pythonのキャッシュ
+__pycache__/
+*.pyc

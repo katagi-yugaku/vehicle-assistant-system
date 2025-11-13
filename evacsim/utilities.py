@@ -739,6 +739,52 @@ def find_vehInfo_by_vehID(vehID:str, vehInfo_list:list):
         if vehInfo.get_vehID() == vehID:
             return vehInfo
 
+def find_alternative_better_choice(current_edgeID: str, 
+                                   vehInfo:VehicleInfo, 
+                                   agent:Agent, 
+                                   shelter_list:list, 
+                                   custome_edge_list:List[CustomeEdge]):
+    from_edgeID = ""; to_edgeID=""; shelterID = ""
+    shelter_for_vehInfo: Shelter = \
+        find_shelter_by_edgeID_connect_target_shelter(
+                                                        edgeID=agent.get_near_edgeID_by_target_shelter(),
+                                                        shelter_list=shelter_list
+                                                        )
+    print(f"curret target edgeID :{agent.get_near_edgeID_by_target_shelter()}")
+    other_shelter_edgeID_list = [shelter.get_near_edgeID() for shelter in shelter_list if agent.get_near_edgeID_by_target_shelter() != shelter.get_near_edgeID()]
+    opposite_edge = get_opposie_edgeID_by_edgeID(edgeID=current_edgeID)
+    candidate_route_edges_list = []
+
+    for edgeID_by_shelter in other_shelter_edgeID_list:
+        candidate_route_edges = list(traci.simulation.findRoute(opposite_edge, edgeID_by_shelter).edges)
+        stage = traci.simulation.findRoute(opposite_edge, edgeID_by_shelter)
+        # print(f"stage :{stage.travelTime}")
+        candidate_route_edges_list.append(candidate_route_edges)
+        # 1. total_distance をここで初期化します (内側のループの外)
+        total_distance = 0.0
+        for edge_ID in candidate_route_edges:
+            try:
+                # 3. エッジIDからレーン数を取得
+                num_lanes = traci.edge.getLaneNumber(edge_ID)
+                # 4. [バグ修正] レーン数が0より大きい場合のみ、長さを計算
+                if num_lanes > 0:
+                    
+                    # 5. [効率化] 最初のレーン ("_0") のIDだけを構築
+                    first_lane_ID = f"{edge_ID}_0"
+                    
+                    # 6. 最初のレーンの長さを取得して加算
+                    edge_length = traci.lane.getLength(first_lane_ID)
+                    total_distance += edge_length
+                # else: num_lanesが0の場合 (内部エッジ等) は、長さ0として扱い、何も加算しない
+            except traci.TraCIException as e:
+                # エッジ（例：内部エッジ）によっては長さを取得できずエラーになる場合があるため
+                print(f"TraCI Error (utilities.py): Failed to get length for edge {edge_ID}. {e}")
+        # print(f"経路 '{opposite_edge}' から '{edgeID_by_shelter}' まで {total_distance} 推定所要時間 {total_distance/11.0}")
+    print(vehInfo.get_avg_evac_time_by_route_by_recive_time())
+
+    return from_edgeID, to_edgeID, shelterID
+
+
 def find_alternative_route_better(current_edgeID: str, vehInfo:VehicleInfo, agent:Agent, shelter_list:list, custome_edge_list:List[CustomeEdge], MIDDLE_EDGE_ID_LIST:list, NEAR_EDGE_MIDDLE_EDGE_LIST:list):
     from_edgeID = ""; to_edgeID=""; shelterID = ""
     shelter_for_vehInfo: Shelter = \
@@ -834,8 +880,8 @@ def find_alternative_route_better(current_edgeID: str, vehInfo:VehicleInfo, agen
             return from_edgeID, to_edgeID, shelterID
     return from_edgeID, to_edgeID, shelterID
 
-def is_has_middle_edge(current_route_edgeIDs, middle_edge_id_list):
-    return any(edge in current_route_edgeIDs for edge in middle_edge_id_list)
+def is_has_middle_edge(current_route_edgeIDs, middle_edge_ID_list):
+    return any(edge in current_route_edgeIDs for edge in middle_edge_ID_list)
 
 def is_near_shelterID_on_opposite_edges(current_ID, near_edgeID):
     # -を除いたIDが同じ場合は False（反対車線だが同じ場所なので対象外）
@@ -1027,7 +1073,7 @@ def calculate_avg_evac_time_by_route(shelter_list:List[Shelter]):
 
         # 避難時間とルートごとのデータを取得
         evac_time_with_route_by_vehID = shelter.get_evacuation_time_from_junction_multidict()
-
+        print(f"evac_time_with_route_by_vehID {evac_time_with_route_by_vehID}")
         # if shelter.get_shelterID() == "ShelterA_2" and evac_time_with_route_by_vehID is not None:
         #     print(f"避難時間とルートごとのデータ: {evac_time_with_route_by_vehID}")
         for vehID, route_with_evac_time in evac_time_with_route_by_vehID.items():
@@ -1333,11 +1379,16 @@ def is_vehID_in_congested_edge(vehID:str, THRESHOLD_SPEED):
         prev_edge_of_current_edgeID_num = len(traci.edge.getLastStepVehicleIDs(prev_edge_of_current_edgeID))
     current_edgeID_vehs_flag = len(traci.edge.getLastStepVehicleIDs(current_edgeID)) \
                                 + next_edge_of_current_edgeID_num \
-                                + prev_edge_of_current_edgeID_num > 5
+                                + prev_edge_of_current_edgeID_num > 15
+    # if current_edgeID_vehs_flag:
+    #     print(f"current_edgeID_num: {len(traci.edge.getLastStepVehicleIDs(current_edgeID))}, next_edge_of_current_edgeID_num: {next_edge_of_current_edgeID_num}, prev_edge_of_current_edgeID_num: {prev_edge_of_current_edgeID_num}")
+
     try:
         # 平均車速だとあかんな平均車両数で判定する 車線上の平均速度を取得
         # average_speed = traci.edge.getLastStepMeanSpeed(current_edgeID)
         my_speed = traci.vehicle.getSpeed(vehID)
+        # if my_speed < 5.0:
+        #     print(f"my_speed: {my_speed}, current_edgeID_vehs_flag: {current_edgeID_vehs_flag}")
         # 渋滞判定
         if my_speed < THRESHOLD_SPEED:
             if current_edgeID_vehs_flag :

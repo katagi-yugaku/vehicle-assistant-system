@@ -1,0 +1,68 @@
+# ﻿シナリオID
+scenario_id = 1
+
+# シミュレーション回数
+num_simulations = 50
+
+# 通信可能距離
+comm_range = 200.0
+
+# 生成車両数
+num_vehicles = 300
+
+# 車両生成間隔
+vehicle_interval = 5.0
+
+# 積極的経路変更者の平均
+active_route_change_mean = 60.0
+
+# 積極的経路変更者の分散
+active_route_change_var = 30.0
+
+# 慎重的経路変更者の平均
+cautious_route_change_mean = -60.0
+
+# 慎重的経路変更者の分散
+cautious_route_change_var = 20.0
+
+# 収容率閾値
+shelter_capacity_threshold = 1.0
+
+# 津波予兆開始時刻
+tsunami_sign_start_time = 300.0
+
+# 津波予兆終了時間
+tsunami_sign_end_time = 400.0
+
+# 逆走動機閾値始点
+motivation_threshold_start = 800.0
+
+# 逆走動機閾値終点
+motivation_threshold_end = 1000.0
+
+# 逆走動機最小閾値始点
+min_motivation_start = 500.0
+
+# 逆走動機最小閾値終点
+min_motivation_end = 700.0
+
+# 積極的逆走者始点
+positive_lanechange_start = 900.0
+
+# 積極的逆走者終点
+positive_lanechange_end = 1100.0
+
+# 慎重的逆走者始点
+negative_lanechange_start = 800.0
+
+# 慎重的逆走者終点
+negative_lanechange_end = 1100.0
+
+# ドライバーの視認距離
+driver_visibility_distance = 30.0
+
+# 正の同調性
+positive_majority_bias = 100.0
+
+# 負の同調性
+negative_majority_bias = 100.0
