@@ -1,5 +1,5 @@
 # ﻿シナリオID
-scenario_id = 1
+scenario_id = 2
 
 # シミュレーション回数
 num_simulations = 50
@@ -26,7 +26,7 @@ shelter_B_capacity = 200
 vehicle_interval = 5
 
 # 積極的経路変更者の平均
-active_route_change_mean = 60
+active_route_change_mean = 30
 
 # 積極的経路変更者の分散
 active_route_change_var = 30
