@@ -36,7 +36,7 @@ STATIC_ARGS = ["--nogui", "5.0", "30"]
 
 # 結果を保存するJSONファイル名
 OUTPUT_JSON_FILE = "simulation_averages.json"
-NUM_RUNS = 2
+NUM_RUNS = 50
 early_rate_list = [0.1, 0.5, 0.9]
 vehicle_interval = 5.0
 
@@ -356,10 +356,10 @@ def plot_cdfs_to_path(data_dict: dict[float, list[float]], save_path: Path) -> N
         else:
             plt.plot(arr, cdf, label=label_for(key))
 
-    plt.xlim(200, 1200)
+    plt.xlim(200, 1500)
     plt.ylim(0.05, 1.0)
-    plt.xticks(ticks=np.arange(200, 1310, 200), fontsize=20, fontweight='roman')
-    plt.yticks(ticks=np.arange(0.1, 1.1, 0.1), fontsize=20, fontweight='roman')
+    plt.xticks(ticks=np.arange(200, 1510, 100), fontsize=14, fontweight='semibold')
+    plt.yticks(ticks=np.arange(0.1, 1.1, 0.1),  fontsize=14, fontweight='semibold')
     plt.legend(loc="lower right")
     plt.tight_layout()
     plt.savefig(save_path)
