@@ -4,7 +4,8 @@ class Agent():
     def __init__(self, vehID:str, target_shelter:str, tunning_threshold:int, 
                  route_change_threshold:float, lane_change_init_threshold:float, 
                  normalcy_motivation_increase:float, motivation_decrease_due_to_inactive_neighbors:float,
-                 motivation_increase_due_to_following_neighbors:float, lane_minimum_motivation_value:float):
+                 motivation_increase_due_to_following_neighbors:float, lane_minimum_motivation_value:float,
+                 shelter_occupancy_rate_threshold:float):
         self.vehID = vehID #　車両ID
         self.target_shelter = target_shelter #　車両が向かう避難所
         self.near_edgeID_by_target_shelter = "" #　車両が向かう避難所に接続するedgeID
@@ -27,9 +28,11 @@ class Agent():
         self.arrival_time = 0.0 # 避難地到着時間
         self.lane_change_time = 0.0 # 車線変更時間
         self.reach_lane_minimum_motivation_time = 0.0 # 車線変更動機付けの最小値に到達した時間
+        self.shelter_occupancy_rate_threshold = shelter_occupancy_rate_threshold # 避難所の混雑率
         self.created_time_flg = False # エージェント作成時間設定フラグ
         self.shelter_flg = False #　駐車フラグ
         self.shelter_changed_flg = False #　避難地変更フラグ
+        self.shelter_full_flg = False # 避難所満杯フラグ
         self.evacuation_route_changed_flg = False # 避難ルート変更フラグ
         self.normalcy_lane_change_motivation_flg = False # 通常時の車線変更動機付けフラグ
         self.acceleration_flag = False # 加速フラグ
@@ -53,6 +56,15 @@ class Agent():
     # 候補避難地の初期設定
     def init_set_candidate_near_shelter(self, shelter_edge_by_IDs:dict):
         self.set_candidate_shelter(shelter_edge_by_IDs)
+    
+    # 避難地のの混雑度の初期設定
+    def init_set_shelter_occupancy_rate_dict(self):
+        shelterIDs = self.get_candidate_edge_by_shelterID().keys()
+        for shelterID in shelterIDs:
+            self.shelter_occupancy_rate_dict[shelterID] = 0.0
+    
+    def update_shelter_occupancy_rate_dict(self, shelterID:str, occupancy_rate:float):
+        self.shelter_occupancy_rate_dict[shelterID] = occupancy_rate
 
     # 避難地の候補地を更新
     def update_candidate_edge_by_shelterID(self, vehInfo:VehicleInfo):
@@ -194,6 +206,12 @@ class Agent():
         return self.arrival_time
     def set_arrival_time(self, arrival_time:int):
         self.arrival_time = arrival_time
+    
+    # 避難所の混雑率
+    def get_shelter_occupancy_rate_threshold(self):
+        return self.shelter_occupancy_rate_threshold
+    def set_shelter_occupancy_rate_threshold(self, shelter_occupancy_rate_threshold:float):
+        self.shelter_occupancy_rate_threshold = shelter_occupancy_rate_threshold
 
     # エージェント作成時間設定フラグの取得・設定
     def get_created_time_flg(self):
@@ -224,6 +242,12 @@ class Agent():
         return self.shelter_changed_flg
     def set_shelter_changed_flg(self, shelter_changed_flg:bool):
         self.shelter_changed_flg = shelter_changed_flg
+    
+    #　避難所満杯フラグの取得・設定
+    def get_shelter_full_flg(self):
+        return self.shelter_full_flg
+    def set_shelter_full_flg(self, shelter_full_flg:bool):
+        self.shelter_full_flg = shelter_full_flg
     
     # 避難ルート変更フラグの取得・設定
     def get_evacuation_route_changed_flg(self):

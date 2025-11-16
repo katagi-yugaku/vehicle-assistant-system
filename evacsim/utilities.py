@@ -43,12 +43,13 @@ from .agents.VehicleInfo import VehicleInfo
 random.seed()
 
 VEHICLE_SHELTER_DURATION_TIME = 10000
+FREE_FLOW_SPEED = 13.0  # 迂回路（Uターン時）の想定速度 (m/s)
 
 # CustomEdgeリストから特定のedgeIDを持つCustomEdgeを取得
-def get_custom_edge_by_edgeID(edgeID:str, custome_edge_list:list):
-    for custom_edge in custome_edge_list:
-        if custom_edge.get_current_edgeID() == edgeID:
-            return custom_edge
+def get_custome_edge_by_edgeID(edgeID:str, custome_edge_list:list):
+    for custome_edge in custome_edge_list:
+        if custome_edge.get_current_edgeID() == edgeID:
+            return custome_edge
 
 # CustomeEdgeのincom/outgo のなかからjuntionを除いたedgeIDリストを取得
 def get_edgeIDs_without_junction(customeEdge:CustomeEdge):
@@ -67,7 +68,7 @@ def get_around_edgeIDs(target_vehID:str, custome_edge_list:list):
     # 車両がいるedgeIDを取得
     current_edgeID = traci.vehicle.getRoadID(target_vehID)
     # 車両がいるedgeIDをもとに、周辺のedgeIDを取得する
-    current_edge:CustomeEdge = get_custom_edge_by_edgeID(current_edgeID, custome_edge_list)
+    current_edge:CustomeEdge = get_custome_edge_by_edgeID(current_edgeID, custome_edge_list)
     around_edgeIDs_with_junction = remove_junction_from_edgeID(current_edge.around_edgeIDs())
 
     return around_edgeIDs_with_junction
@@ -97,7 +98,6 @@ def get_vehicle_end_edges(custome_edge_list: list[CustomeEdge]) -> list[CustomeE
             vehicle_end_edges.append(custome_edge)
     return vehicle_end_edges
 
-# def get_vehicle_end_list_by_start_edge_dict(vehicle_start_edges:list, vehicle_end_edges:list):
 def get_vehicle_end_list_by_start_edge_dict(vehicle_start_edges: list[CustomeEdge], vehicle_end_edges: list[CustomeEdge]) -> dict[str, list[str]]:
     vehicle_end_list_by_start_edge_dict:dict = {}
     for start_edge in vehicle_start_edges:
@@ -109,7 +109,6 @@ def get_vehicle_end_list_by_start_edge_dict(vehicle_start_edges: list[CustomeEdg
     return vehicle_end_list_by_start_edge_dict
 
 def get_nearest_end_edgeID_by_start_edgeID(vehicle_end_list_by_start_edge_dict:dict):
-    print(f'vehicle_end_list_by_start_edge_dict: {vehicle_end_list_by_start_edge_dict}')
     nearest_end_edgeID_by_start_edgeID_dict:dict = {}
     for vehicle_start_edgeID, vehicle_end_edgeID_list in vehicle_end_list_by_start_edge_dict.items():
             start_edge_shape = traci.lane.getShape("{}_0".format(vehicle_start_edgeID))
@@ -124,7 +123,7 @@ def get_nearest_end_edgeID_by_start_edgeID(vehicle_end_list_by_start_edge_dict:d
             nearest_end_edgeID_by_start_edgeID_dict[vehicle_start_edgeID] = [edgeID for edgeID, _ in sorted_disatnce_by_start_edgeID]
     return nearest_end_edgeID_by_start_edgeID_dict
 
-def get_opposie_edgeID_by_edgeID(edgeID:str):
+def get_opposite_edgeID_by_edgeID(edgeID:str):
     if edgeID.startswith("-"):
         opposite_edgeID:str = edgeID.lstrip('-')
     else:
@@ -164,28 +163,42 @@ def get_prev_edge(edgeIDs: tuple, current_edgeID: str):
             return edgeIDs[idx - 1]
     return None
 
-def generate_new_veh_based_on_route_time(target_vehID:str, NEW_VEHICLE_COUNT:int, agent_list:list, vehInfo_list:list, \
-                    vehInfo_by_target_vehID:VehicleInfo, agent_by_target_vehID:Agent, 
-                    from_edgeID:str, new_shelterID:str, to_edgeID:str):
+def generate_new_veh_based_on_route_time(target_vehID:str, 
+                                         NEW_VEHICLE_COUNT:int, 
+                                         agent_list:list, 
+                                         vehInfo_list:list,
+                                         vehInfo_by_target_vehID:VehicleInfo, 
+                                         agent_by_target_vehID:Agent, 
+                                         from_edgeID:str, 
+                                         new_shelterID:str, 
+                                         to_edgeID:str,
+                                         color_mode:int):
     if from_edgeID == "" and new_shelterID == "" and to_edgeID == "":
         # print(f"避難経路が存在しません")
         return NEW_VEHICLE_COUNT
     # 現在のエッジIDを取得
-    current_edgeID = traci.vehicle.getRoadID(target_vehID)
-    opposite_edgeID = get_opposie_edgeID_by_edgeID(current_edgeID)
-    if current_edgeID == opposite_edgeID:
-        return NEW_VEHICLE_COUNT
+    # if current_edgeID == opposite_edgeID:
+    #     print(f"現在地と反対車線が同じです: {current_edgeID}")
+    #     return NEW_VEHICLE_COUNT
+    # approach_edgeIDs_by_start_edgeID = vehInfo_by_target_vehID.get_approach_edge_dict()
+    # 3. 進入路リストに現在地が含まれるか判定
+    # is_in_approach_list = any(from_edgeID in edge_list for edge_list in approach_edgeIDs_by_start_edgeID.values())
+    # 4. 経路変更の開始エッジを決定
+    # if not is_in_approach_list:
+        # 進入路にいる場合 -> Uターン不要
+        # from_edgeID = get_opposite_edgeID_by_edgeID(from_edgeID)
 
     # 候補地が全て満杯の場合はreturn
-    if is_candidate_shelter_full(agent_by_target_vehID, vehInfo_by_target_vehID):
-        # print(f"候補地が全て満杯です")
-        return NEW_VEHICLE_COUNT
+    # if is_candidate_shelter_full(agent_by_target_vehID, vehInfo_by_target_vehID):
+    #     print(f"候補地が全て満杯です")
+    #     return NEW_VEHICLE_COUNT
 
     # 経由地点を取得する
     via_edgeIDs_with_intial_end_edge:list = list(traci.simulation.findRoute(from_edgeID, to_edgeID).edges)
     if via_edgeIDs_with_intial_end_edge is None or len(via_edgeIDs_with_intial_end_edge) == 0:
-        via_edgeIDs_with_intial_end_edge:list = list(traci.simulation.findRoute(opposite_edgeID, to_edgeID).edges)
+        via_edgeIDs_with_intial_end_edge:list = list(traci.simulation.findRoute(get_opposite_edgeID_by_edgeID(from_edgeID), to_edgeID).edges)
         if via_edgeIDs_with_intial_end_edge is None or len(via_edgeIDs_with_intial_end_edge) == 0:
+            print(f"避難経路が存在しません from: {from_edgeID} to: {to_edgeID}")
             return NEW_VEHICLE_COUNT
     # target_vehIDから数字をとる
     vehID_num = target_vehID.split("_")[3]
@@ -198,15 +211,31 @@ def generate_new_veh_based_on_route_time(target_vehID:str, NEW_VEHICLE_COUNT:int
     # TODO　満杯情報を受け取った後は、当該避難地を候補地から削除
     updated_candidate_shelter = agent_by_target_vehID.get_candidate_shelter()
     # 元のvehIDを削除 新しい車両IDを追加
-    # Agentを新規に作成する
-    agent:Agent = Agent(vehID=new_veh_ID, 
-                        target_shelter=new_shelterID, 
-                        tunning_threshold=copy.deepcopy(agent_by_target_vehID.get_tunning_threshold()), 
-                        route_change_threshold=copy.deepcopy(agent_by_target_vehID.get_route_change_threshold())
-                        )
+    agent: Agent = Agent(
+                            vehID=new_veh_ID,
+                            target_shelter=new_shelterID,
+                            tunning_threshold=copy.deepcopy(agent_by_target_vehID.get_tunning_threshold()),
+                            route_change_threshold=copy.deepcopy(agent_by_target_vehID.get_route_change_threshold()),
+                            lane_change_init_threshold=copy.deepcopy(agent_by_target_vehID.get_lane_change_decision_threshold()),
+                            normalcy_motivation_increase=copy.deepcopy(agent_by_target_vehID.get_motivation_increase_from_info_receive()),
+                            motivation_decrease_due_to_inactive_neighbors=copy.deepcopy(agent_by_target_vehID.get_motivation_decrease_due_to_inactive_neighbors()),
+                            motivation_increase_due_to_following_neighbors=copy.deepcopy(agent_by_target_vehID.get_motivation_increase_due_to_following_neighbors()),
+                            lane_minimum_motivation_value=copy.deepcopy(agent_by_target_vehID.get_minimum_motivation_value()),
+                            shelter_occupancy_rate_threshold=copy.deepcopy(agent_by_target_vehID.get_shelter_occupancy_rate_threshold())
+                            )
     agent.set_near_edgeID_by_target_shelter(copy.deepcopy(agent_by_target_vehID.get_near_edgeID_by_target_shelter()))
     agent.set_candidate_edge_by_shelterID(updated_candidate_shelter)
     agent.init_set_candidate_near_shelter(shelter_edge_by_IDs=updated_candidate_shelter)
+
+    agent.set_x_elapsed_time_for_lane_change_list(copy.deepcopy(agent_by_target_vehID.get_x_elapsed_time_for_lane_change_list()))
+    agent.set_y_motivation_value_for_lane_change_list(copy.deepcopy(agent_by_target_vehID.get_y_motivation_value_for_lane_change_list()))
+    agent.set_lane_change_xy_dict(copy.deepcopy(agent_by_target_vehID.get_lane_change_xy_dict()))
+
+    agent.set_motivation_decrease_due_to_inactive_neighbors(copy.deepcopy(agent_by_target_vehID.get_motivation_decrease_due_to_inactive_neighbors()))
+    agent.set_motivation_increase_due_to_following_neighbors(copy.deepcopy(agent_by_target_vehID.get_motivation_increase_due_to_following_neighbors()))
+    agent.set_calculated_motivation_value(copy.deepcopy(agent_by_target_vehID.get_calculated_motivation_value()))
+    agent.set_near_edgeID_by_target_shelter(to_edgeID)
+    agent.set_shelter_full_flg(True)
     
     agent_list.append(agent)
 
@@ -218,24 +247,30 @@ def generate_new_veh_based_on_route_time(target_vehID:str, NEW_VEHICLE_COUNT:int
     new_vehInfo_by_target_vehID.set_shelter_congestion_info(copy.deepcopy(vehInfo_by_target_vehID.get_shelter_congestion_info()))
     new_vehInfo_by_target_vehID.set_avg_evac_time_by_route_by_recive_time(copy.deepcopy(vehInfo_by_target_vehID.get_avg_evac_time_by_route_by_recive_time()))
     vehInfo_list.append(new_vehInfo_by_target_vehID)
-    # !# agentが変更したので、フラグを立てる
     vehInfo_by_target_vehID.set_agent_changed_flag(True)
 
     # edge上の始点からどこにいるのかを取得する
     edge_position = traci.vehicle.getLanePosition(target_vehID)
     current_laneID = traci.vehicle.getLaneID(target_vehID)
-    if traci.lane.getLength(current_laneID) > 100:
-        depart_position = 200 - edge_position
-    if traci.lane.getLength(current_laneID) <= 100:
-        depart_position = 100 - edge_position
+    current_edgeID_len = traci.lane.getLength(current_laneID)
+    if current_edgeID_len > 100:
+        depart_position = current_edgeID_len - edge_position -10
+    if current_edgeID_len <= 100:
+        depart_position = current_edgeID_len - edge_position -10
     traci.vehicle.remove(target_vehID)
     new_route_ID:str = "{}_{}_{}".format("newroute", new_shelterID, NEW_VEHICLE_COUNT)
     traci.route.add(routeID=new_route_ID, edges=via_edgeIDs_with_intial_end_edge)
     traci.vehicle.add(vehID=new_veh_ID, routeID=new_route_ID, depart=deparet_time, departPos=depart_position)
     traci.vehicle.setParkingAreaStop(vehID=new_veh_ID, stopID=new_shelterID, duration=100000)
-    # traci.vehicle.setColor(new_veh_ID, (128, 249, 255, 255))
+    if color_mode == 0: # バイアスなし
+        traci.vehicle.setColor(new_veh_ID, (179, 4, 16, 255))
+    elif color_mode == 1: # 正常性バイアス
+        traci.vehicle.setColor(new_veh_ID, (31, 86, 161, 255))
+    elif color_mode == 2: # 同調性バイアス
+        traci.vehicle.setColor(new_veh_ID, (128, 128, 255, 255))
+    
     NEW_VEHICLE_COUNT += 1
-    # print(f"normacy is changed evacuation") 
+
     return NEW_VEHICLE_COUNT
 
 def generate_new_veh(
@@ -259,7 +294,7 @@ def generate_new_veh(
     """
     # === 現在位置と対向情報の取得 ===
     current_edgeID = traci.vehicle.getRoadID(target_vehID)
-    opposite_edgeID = get_opposie_edgeID_by_edgeID(current_edgeID)  # 既存関数そのまま
+    opposite_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID)  # 既存関数そのまま
 
     # 同一路線判定（対向が同じなら生成不要）
     if current_edgeID == opposite_edgeID:
@@ -577,26 +612,33 @@ def clean_vehIDs_for_row_xml(file_path:str, START_WRITTEN_LINE:int, END_WRITTEN_
     with open(file_path, 'w') as file:
         file.writelines(lines_to_keep)
 
-def init_custom_edge() -> List["CustomeEdge"]:
+def init_custome_edge() -> List["CustomeEdge"]:
     custome_edge_list: List[CustomeEdge] = []
     # 全てのedgeIDを取得する
     edgeIDs: list[str] = traci.edge.getIDList()
     # edgeIDをもとにCustomEdgeを生成
     for edgeID in edgeIDs:
-        current_edgeIDs = [custom_edge.get_current_edgeID() for custom_edge in custome_edge_list]
+        current_edgeIDs = [custome_edge.get_current_edgeID() for custome_edge in custome_edge_list]
         if edgeID not in current_edgeIDs:
-            custom_edge: CustomeEdge = CustomeEdge(edgeID)
-            custom_edge.setting_init_opposite_edgeID(edgeIDs=edgeIDs)
-            custom_edge.setting_init_start_end_junctions()
-            custome_edge_list.append(custom_edge)
+            custome_edge: CustomeEdge = CustomeEdge(edgeID)
+            custome_edge.setting_init_opposite_edgeID(edgeIDs=edgeIDs)
+            custome_edge.setting_init_start_end_junctions()
+            custome_edge_list.append(custome_edge)
     return custome_edge_list
 
 def init_shelter(shelterID:str, shelter_capacity_by_ID:dict, near_edgeID:str, shelter_list:list) -> list:
     shelter:Shelter = Shelter(shelterID=shelterID, capacity=shelter_capacity_by_ID[shelterID], near_edgeID=near_edgeID)
+    
+    # 避難所のレーンIDを取得
+    laneID_on_sheler = traci.parkingarea.getLaneID(shelterID)
+    shelter_position_elements = traci.lane.getShape(laneID_on_sheler)
+    shelter_position = ( (shelter_position_elements[0][0] + shelter_position_elements[-1][0]) / 2 , (shelter_position_elements[0][1] + shelter_position_elements[-1][1]) / 2 )
+    shelter.set_position(shelter_position)
+    
     shelter_list.append(shelter)
     return shelter_list
 
-def init_vehicleInfo_list(vehIDs: list, shelter_list: list):
+def init_vehicleInfo_list(vehIDs: list, shelter_list: list, approach_edgeIDs_by_start_edgeID: dict):
     vehInfo_list = []
     for vehID in vehIDs:
         part_vehID = vehID.split("_")[1] + "_" + vehID.split("_")[2]
@@ -612,6 +654,7 @@ def init_vehicleInfo_list(vehIDs: list, shelter_list: list):
         [vehicleInfo.init_set_congestion_level_by_shelter(shelter.get_shelterID(), 0, traci.simulation.getTime()) for shelter in shelter_list]
         [vehicleInfo.init_set_avg_evac_time_by_route_by_recive_time()]
         [vehicleInfo.init_set_tsunami_precursor_info()]
+        [vehicleInfo.set_approach_edge_dict(approach_edgeIDs_by_start_edgeID)]
         vehInfo_list.append(vehicleInfo)
     return vehInfo_list
 
@@ -633,7 +676,11 @@ def init_agent_list(vehIDs:list,
                     NEGATIVE_LANECHANGE_START:float,
                     NEGATIVE_LANECHANGE_END:float,
                     POSITIVE_MAJORITY_BIAS:float, 
-                    NEGATIVE_MAJORITY_BIAS:float):
+                    NEGATIVE_MAJORITY_BIAS:float,
+                    ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START:float,
+                    ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float,
+                    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START:float,
+                    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float):
     agent_list = []
     for vehID in vehIDs:
         # せっかちな人はこっち
@@ -642,28 +689,31 @@ def init_agent_list(vehIDs:list,
                             vehID=vehID, 
                             target_shelter=vehID.split("_")[1] + "_" + vehID.split("_")[2], 
                             tunning_threshold=random.randint(EARLY_AGENT_THRESHOLD_LIST[0], EARLY_AGENT_THRESHOLD_LIST[1]), 
-                            route_change_threshold=max(0, random.gauss(mu=ACTIVE_ROUTE_CHANGE_MEAN, sigma=ACTIVE_ROUTE_CHANGE_VAR)),
+                            route_change_threshold=np.random.normal(loc=ACTIVE_ROUTE_CHANGE_MEAN, scale=ACTIVE_ROUTE_CHANGE_VAR),
                             lane_change_init_threshold=random.uniform(MOTIVATION_THRESHOLD_START, MOTIVATION_THRESHOLD_END),
                             normalcy_motivation_increase=random.uniform(POSITIVE_LANECHANGE_START, POSITIVE_LANECHANGE_END),
                             motivation_decrease_due_to_inactive_neighbors=NEGATIVE_MAJORITY_BIAS,
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
-                            lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END)
+                            lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
+                            shelter_occupancy_rate_threshold=random.uniform(ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END)
                             )
         else:
             agent:Agent = Agent(
                             vehID=vehID, 
                             target_shelter=vehID.split("_")[1] + "_" + vehID.split("_")[2], 
                             tunning_threshold=random.randint(LATE_AGENT_THRESHOLD_LIST[0], LATE_AGENT_THRESHOLD_LIST[1]), 
-                            route_change_threshold=random.gauss(mu=CAUTIOUS_ROUTE_CHANGE_MEAN, sigma=CAUTIOUS_ROUTE_CHANGE_VAR),
+                            route_change_threshold=np.random.normal(loc=CAUTIOUS_ROUTE_CHANGE_MEAN, scale=CAUTIOUS_ROUTE_CHANGE_VAR),
                             lane_change_init_threshold=random.uniform(MOTIVATION_THRESHOLD_START, MOTIVATION_THRESHOLD_END),
                             normalcy_motivation_increase=random.uniform(NEGATIVE_LANECHANGE_START, NEGATIVE_LANECHANGE_END),
                             motivation_decrease_due_to_inactive_neighbors=NEGATIVE_MAJORITY_BIAS,
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
-                            lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END)
+                            lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
+                            shelter_occupancy_rate_threshold=random.uniform(CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END)
                             )
 
         agent.set_near_edgeID_by_target_shelter(edgeID_by_shelterID[vehID.split("_")[1] + "_" + vehID.split("_")[2]])
         agent.init_set_candidate_near_shelter(shelter_edge_by_IDs=edgeID_by_shelterID)
+        agent.init_set_shelter_occupancy_rate_dict()
         agent.set_candidate_edge_by_shelterID(edgeID_by_shelterID)
         # ここは必須
         x_values = np.arange(0, 450, 1)
@@ -743,47 +793,396 @@ def find_alternative_better_choice(current_edgeID: str,
                                    vehInfo:VehicleInfo, 
                                    agent:Agent, 
                                    shelter_list:list, 
-                                   custome_edge_list:List[CustomeEdge]):
-    from_edgeID = ""; to_edgeID=""; shelterID = ""
-    shelter_for_vehInfo: Shelter = \
-        find_shelter_by_edgeID_connect_target_shelter(
-                                                        edgeID=agent.get_near_edgeID_by_target_shelter(),
-                                                        shelter_list=shelter_list
-                                                        )
-    print(f"curret target edgeID :{agent.get_near_edgeID_by_target_shelter()}")
-    other_shelter_edgeID_list = [shelter.get_near_edgeID() for shelter in shelter_list if agent.get_near_edgeID_by_target_shelter() != shelter.get_near_edgeID()]
-    opposite_edge = get_opposie_edgeID_by_edgeID(edgeID=current_edgeID)
-    candidate_route_edges_list = []
+                                   custome_edge_list:List[CustomeEdge],
+                                   decision_mode:int
+                                   ):
+    """
+    現在の経路と、V2V情報および自由速度計算に基づく迂回経路を比較し、
+    より良い選択肢があれば経路変更情報を返す。
+    """
+    # --- 0. 定数・初期化 ---
+    FREE_FLOW_SPEED = 11.0
+    shelterID = ""
+    shelterID_to_return = vehInfo.get_target_shelter() # 最初は現在の避難地
+    to_edge_list_to_return = []
 
-    for edgeID_by_shelter in other_shelter_edgeID_list:
-        candidate_route_edges = list(traci.simulation.findRoute(opposite_edge, edgeID_by_shelter).edges)
-        stage = traci.simulation.findRoute(opposite_edge, edgeID_by_shelter)
-        # print(f"stage :{stage.travelTime}")
-        candidate_route_edges_list.append(candidate_route_edges)
-        # 1. total_distance をここで初期化します (内側のループの外)
+    if current_edgeID.startswith(':'):
+        # 交差点内では計算しない
+        return "", shelterID_to_return, to_edge_list_to_return, 0.0 
+
+    # Uターンロジック
+    # 現在目指している避難所の情報を取得
+    current_target_shelterID = agent.get_target_shelter()
+    shelter_for_vehInfo: Shelter = find_shelter_by_edgeID_connect_target_shelter(
+        edgeID=agent.get_near_edgeID_by_target_shelter(),
+        shelter_list=shelter_list
+        )
+
+    # --- 1. 現在の経路での残り時間 (Estimated Current Time) の計算 ---
+    current_route_tuple = tuple(traci.vehicle.getRoute(agent.get_vehID()))
+    current_destination_edge = current_route_tuple[-1]
+    
+    # 現在地から現在の避難所までの正確な距離
+    distance_to_current_shelter = calculate_remaining_route_distance(
+        agent.get_vehID(), 
+        current_destination_edge, 
+        shelter=shelter_for_vehInfo
+    )
+
+    # 現在の速度（0除算防止）
+    try:
+        current_speed = traci.edge.getLastStepMeanSpeed(current_edgeID)
+        if current_speed < 1.8:
+            current_speed = 1.8
+    except traci.TraCIException as e:
+        print(f"Error getting speed for {agent.get_vehID()}: {e}")
+        current_speed = 1.0
+    estimated_current_route_evacuation_time = distance_to_current_shelter / current_speed
+    # print(f"estimeated_current_route_evacuation_time: {estimated_current_route_evacuation_time} distance_to_current_shelter: {distance_to_current_shelter} current_speed: {current_speed} for vehID: {agent.get_vehID()}")
+
+    # --- 2. 迂回検討のための準備 (Uターン地点の決定) ---
+    # 現在地がアプローチエッジに含まれているか確認（含まれていなければ反対車線からスタート）
+    approach_edgeIDs_by_start_edgeID = vehInfo.get_approach_edge_dict()
+    # print(f" approach_edgeIDs_by_start_edgeID: {approach_edgeIDs_by_start_edgeID} ")
+    is_in_approach_list = any(current_edgeID in edge_list for edge_list in approach_edgeIDs_by_start_edgeID.values())
+    # print(f" test {is_in_approach_list} for vehID: {agent.get_vehID()}, current_edgeID: {current_edgeID}")
+    reroute_start_edgeID = current_edgeID
+    if not is_in_approach_list:
+        reroute_start_edgeID = get_opposite_edgeID_by_edgeID(edgeID=current_edgeID)
+    # print(f" reroute_start_edgeID: {reroute_start_edgeID} for vehID: {agent.get_vehID()} ")
+
+    # V2V情報の取得
+    avg_evac_time_data = vehInfo.get_avg_evac_time_by_route_by_recive_time()
+    # データがあれば辞書を取得、なければ空辞書
+    routes_dict = list(avg_evac_time_data.values())[0] if avg_evac_time_data else {}
+
+
+    # --- 3. 全ての候補避難所について所要時間を計算 ---
+    # リストの要素: (所要時間, 避難所ID, 目的エッジID)
+    candidate_results_list = []
+    for candidate_shelterID, candidate_edgeID in agent.get_candidate_edge_by_shelterID().items():
+        # 現在の避難所は比較対象外
+        if candidate_shelterID == current_target_shelterID:
+            continue
+
+        # 避難所オブジェクトの取得（距離計算に必要）
+        candidate_shelter = find_shelter_by_edgeID_connect_target_shelter(
+            edgeID=candidate_edgeID,
+            shelter_list=shelter_list
+        )
+        if not candidate_shelter:
+            continue
+
+        # ---------------------------------------------------------
+        # A. [実測] 自由速度でのUターン所要時間の計算 (Baseline)
+        # ---------------------------------------------------------
+        # print(f" find_222alternative_better_choice from_edgeID: {reroute_start_edgeID}, to_edgeID: {candidate_edgeID}, shelterID: {candidate_shelterID}")
+        distance_free_flow = calculate_reroute_distance(
+            vehID=agent.get_vehID(),
+            from_edgeID=reroute_start_edgeID,
+            to_edgeID=candidate_edgeID,
+            shelter=candidate_shelter,
+            approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID
+        )
+        time_free_flow = distance_free_flow / FREE_FLOW_SPEED
+
+        # ---------------------------------------------------------
+        # B. [V2V] 情報に基づく所要時間の計算 (あれば)
+        # ---------------------------------------------------------
+        time_v2v_based = float('inf')
+        
+        if routes_dict:
+            # この候補エッジ(candidate_edgeID)を目的地とするルート情報を探す
+            for route_tuple, route_info in routes_dict.items():
+                # 目的地が一致しない、または現在のルートと同じならスキップ
+                if route_tuple[-1] != candidate_edgeID or route_tuple == current_route_tuple:
+                    continue
+                
+                v2v_avg_time = route_info['avg_time']
+
+                # 共通経路 (LCP: Longest Common Prefix) を探す
+                lcp_length = 0
+                min_len = min(len(current_route_tuple), len(route_tuple))
+                for i in range(min_len):
+                    if current_route_tuple[i] == route_tuple[i]:
+                        lcp_length += 1
+                    else:
+                        break
+                
+                # 分岐点への移動時間を計算
+                # LCPがある場合 -> 共通部分の終わりの次のエッジへ向かう
+                # LCPがない場合 -> ルートの最初のエッジへ向かう
+                target_index = lcp_length
+                if target_index >= len(route_tuple):
+                    target_index = 0 # 念のためのフォールバック
+                if target_index == 0:
+                    continue
+                else:
+                    branch_target_edge = route_tuple[target_index]
+                    # 分岐点までの距離を計算
+                    distance_to_branch = calculate_reroute_distance(
+                        vehID=agent.get_vehID(),
+                        from_edgeID=reroute_start_edgeID,
+                        to_edgeID=branch_target_edge,
+                        shelter=candidate_shelter, # 便宜上のターゲット
+                        approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID
+                    )
+                    time_to_branch = distance_to_branch / FREE_FLOW_SPEED
+
+                    # 合計時間 = 分岐点までの移動(自由速度) + そこからのV2V平均時間
+                    calculated_time = time_to_branch + v2v_avg_time
+
+                    if calculated_time < time_v2v_based:
+                        time_v2v_based = calculated_time
+
+        # ---------------------------------------------------------
+        # C. 最良時間の採用 (V2V計算 と 自由速度計算 の短い方)
+        # ---------------------------------------------------------
+        best_time_for_this_candidate = min(time_free_flow, time_v2v_based)
+        
+        candidate_results_list.append(
+            (best_time_for_this_candidate, candidate_shelterID, candidate_edgeID)
+        )
+
+    # --- 4. ソートと結果の生成 ---
+    # 時間が短い順にソート
+    candidate_results_list.sort(key=lambda x: x[0])
+    # print(f"  [候補] 車両ID: {agent.get_vehID()}  {candidate_results_list} ")
+
+    # 戻り値用のリスト (エッジIDのみ)
+    to_edge_list = [item[2] for item in candidate_results_list]
+
+    # 候補がない場合は終了
+    if not candidate_results_list:
+        # print("  [判断] 候補なし")
+        return reroute_start_edgeID, shelterID, [], 0.0
+    
+    if decision_mode == 2:
+        best_candidate_edgeID = candidate_results_list[0][2]
+        best_candidate_shelterID = candidate_results_list[0][1]
+        to_edge_decision_list = [best_candidate_edgeID]
+        return reroute_start_edgeID, best_candidate_shelterID, to_edge_list, 0.0
+
+    # --- 5. 最終判断 (現在の経路 vs 最良の迂回経路) ---
+    best_candidate_time = candidate_results_list[0][0]
+    best_candidate_shelterID = candidate_results_list[0][1]
+    best_candidate_edgeID = candidate_results_list[0][2]
+
+    # 心理的閾値を考慮した比較
+    # (現在の予測時間 - 迂回先の予測時間) > 閾値 なら変更
+    time_gain = estimated_current_route_evacuation_time - best_candidate_time
+    threshold = agent.get_route_change_threshold()
+    if time_gain > threshold:
+        # 経路変更を実行
+        # print(f"estimated_current_route_evacuation_time: {estimated_current_route_evacuation_time:.2f}s, best_candidate_time: {best_candidate_time:.2f}s diff:{time_gain} threshold: {threshold:.2f}s")
+        # print(f"  [判断] 迂回実行。Gain: {time_gain:.2f}s > Threshold: {threshold}s")
+        # print(f"         Current: {estimated_current_route_evacuation_time:.2f}s vs New: {best_candidate_time:.2f}s")
+        to_edge_decision_list = [best_candidate_edgeID]
+        return reroute_start_edgeID, best_candidate_shelterID, to_edge_decision_list, time_gain # 3番目は決定したエッジID単体
+    
+    else:
+        # 経路維持
+        # print(f"  [判断] 経路維持。Gain: {time_gain:.2f}s <= Threshold: {threshold}s")
+        return reroute_start_edgeID, shelterID, to_edge_list, time_gain
+
+def find_alternative_shelter_choice(
+                                        current_target_shelterID: str, 
+                                        vehID: str, 
+                                        current_edgeID: str,
+                                        vehInfo: VehicleInfo,
+                                        shelter_list: list,
+                                        agent: Agent
+                                    ) -> tuple: # (str, str, list) のタプルを返す
+    
+    FREE_FLOW_SPEED = 11.0
+    shelterID_to_return = vehInfo.get_target_shelter() # 最初は現在の避難地
+    to_edge_list_to_return = []
+    # ここはOK
+    # --- 1. Uターン地点の決定 ---
+    if current_edgeID.startswith(':'):
+        # 交差点内では計算しない
+        return "", shelterID_to_return, to_edge_list_to_return 
+
+    # Uターンロジック
+    # 進入路にいる場合は、そのまま、そうでなければ反対車線からスタート
+    approach_edgeIDs_by_start_edgeID = vehInfo.get_approach_edge_dict()
+    is_in_approach_list = any(current_edgeID in edge_list for edge_list in approach_edgeIDs_by_start_edgeID.values())
+    reroute_start_edgeID = current_edgeID
+    if not is_in_approach_list:
+        reroute_start_edgeID = get_opposite_edgeID_by_edgeID(edgeID=current_edgeID)
+
+    # --- 2. 現在の避難地のグループ名を取得 ---
+    current_group = _get_shelter_group(current_target_shelterID)
+    # --- 3. 候補の計算と比較 ---
+    # (時間, 避難所ID, 目的エッジID) を格納
+    candidate_results_list = [] 
+
+    # shelter_list (エージェントが知っている候補リストではない) を全検索
+    for candidate_shelter in shelter_list:
+        if candidate_shelter.get_near_edgeID() != agent.get_near_edgeID_by_target_shelter():
+            # print(f"canditate_sget_near_edgeIDhelterID: {candidate_shelter.get_near_edgeID()} agent_edgeID: {agent.get_near_edgeID_by_target_shelter()}")
+            # print(f"vehID: {vehID} current_edgeID: {current_edgeID} reroute_start_edgeID: {reroute_start_edgeID}")
+            candidate_shelterID = candidate_shelter.get_shelterID()
+            ## ここが違う
+            candidate_group = _get_shelter_group(candidate_shelterID)
+            
+            # --- 3a. フィルタリング ---
+            # (A) 現在の目的地そのものはスキップ
+            if candidate_shelterID == current_target_shelterID:
+                continue
+                
+            # (B) 現在のグループと同じグループはスキップ
+            if candidate_group == current_group:
+                continue
+                
+            # --- 3b. 自由速度での所要時間を計算 ---
+            candidate_edgeID = candidate_shelter.get_near_edgeID()
+            distance_free_flow = calculate_reroute_distance(
+                vehID=vehID,
+                from_edgeID=reroute_start_edgeID,
+                to_edgeID=candidate_edgeID,
+                shelter=candidate_shelter,
+                approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID
+            )
+            
+            time_free_flow = distance_free_flow / FREE_FLOW_SPEED
+            
+            candidate_results_list.append(
+                (time_free_flow, candidate_shelterID, candidate_edgeID)
+            )
+        # else:
+        #     return reroute_start_edgeID, shelterID_to_return, to_edge_list_to_return
+
+    # --- 4. ソートと結果の返却 ---
+    if not candidate_results_list:
+        # 比較対象(別グループ)が一つもなかった場合
+        return reroute_start_edgeID, shelterID_to_return, to_edge_list_to_return
+
+    # 時間（タプルの0番目）でソート
+    candidate_results_list.sort(key=lambda x: x[0])
+
+    # 戻り値用のソート済み「エッジIDリスト」を作成
+    to_edge_list_to_return = [item[2] for item in candidate_results_list]
+    found_shelterID = next(shelterID for shelterID, edgeID in agent.get_candidate_edge_by_shelterID().items() if edgeID == to_edge_list_to_return[0])
+    shelterID_to_return = found_shelterID
+    return reroute_start_edgeID, shelterID_to_return, to_edge_list_to_return
+
+def _get_shelter_group(shelter_id: str) -> str:
+    """
+    避難所IDからグループ名（例: "ShelterA"）を抽出する。
+    例: "ShelterB_2" -> "ShelterB"
+    """
+    try:
+        return shelter_id.split('_')[0]
+    except IndexError:
+        return shelter_id # '_' がない場合はID全体をグループ名とみなす
+
+def _get_full_edge_length(edge_ID: str) -> float:
+    """（ヘルパー）1エッジの完全な長さを取得します"""
+    try:
+        num_lanes = traci.edge.getLaneNumber(edge_ID)
+        if num_lanes > 0:
+            first_lane_ID = f"{edge_ID}_0"
+            return traci.lane.getLength(first_lane_ID)
+    except traci.TraCIException:
+        # 交差点内の内部エッジなどでエラーが出た場合は0を返す
+        pass
+    return 0.0
+
+def _sum_route_distance_from_second_edge(route_edges: list, shelter: Shelter, initial_distance: float = 0.0) -> float:
+    """
+    findRouteで得た経路リストの「2番目以降」のエッジ長を合計する。(最初のエッジのコストは initial_distance として計算済みと仮定)
+    避難所エッジは半分の長さとして計算する。
+    """
+    total_distance = initial_distance
+    shelter_edge_ID = shelter.get_near_edgeID()
+    
+    # 2番目以降のすべてのエッジの「全長」を加算
+    for edge_ID in route_edges[1:]:
+        if edge_ID == shelter_edge_ID:
+            # 避難所エッジは半分だけ計算
+            total_distance += _get_full_edge_length(edge_ID) / 2
+        else:
+            total_distance += _get_full_edge_length(edge_ID)
+    
+    return total_distance
+
+def calculate_remaining_route_distance(vehID: str, to_edge: str, shelter: Shelter) -> float:
+    try:
+        current_edgeID = traci.vehicle.getRoadID(vehID)
+        if current_edgeID.startswith(':'):
+            return 0.0
+        stage = traci.simulation.findRoute(current_edgeID, to_edge)
+        route_edges = stage.edges
+        if not route_edges:
+            print(f"Warning:2 No route found from {current_edgeID} to {to_edge} for vehicle {vehID}.")
+            return 0.0
+
+        # 1. "最初のエッジ" の「残り距離」を計算
+        try:
+            current_laneID = traci.vehicle.getLaneID(vehID)
+            current_lane_len = traci.lane.getLength(current_laneID)
+            edge_position = traci.vehicle.getLanePosition(vehID)
+            initial_distance = current_lane_len - edge_position # (全長) - (現在位置)
+        except traci.TraCIException as e:
+            print(f"TraCI Error calculating remaining length for {vehID} on {current_edgeID}: {e}")
+            initial_distance = _get_full_edge_length(route_edges[0]) # フォールバック
+
+        # 2. 共通関数を呼び出し、2番目以降のエッジ長を加算
+        return _sum_route_distance_from_second_edge(route_edges, shelter, initial_distance)
+
+    except traci.TraCIException as e:
+        print(f"TraCI Error calculating remaining distance for {vehID}: {e}")
+        return float('inf')
+
+def calculate_reroute_distance(vehID: str, from_edgeID: str, to_edgeID: str, shelter: Shelter, approach_edgeIDs_by_start_edgeID:dict) -> float:
+    """
+    車両が「Uターン」して「新しい避難所(to_edge)」に向かう場合の総走行距離を計算します。
+    """
+    try:
         total_distance = 0.0
-        for edge_ID in candidate_route_edges:
-            try:
-                # 3. エッジIDからレーン数を取得
-                num_lanes = traci.edge.getLaneNumber(edge_ID)
-                # 4. [バグ修正] レーン数が0より大きい場合のみ、長さを計算
-                if num_lanes > 0:
-                    
-                    # 5. [効率化] 最初のレーン ("_0") のIDだけを構築
-                    first_lane_ID = f"{edge_ID}_0"
-                    
-                    # 6. 最初のレーンの長さを取得して加算
-                    edge_length = traci.lane.getLength(first_lane_ID)
-                    total_distance += edge_length
-                # else: num_lanesが0の場合 (内部エッジ等) は、長さ0として扱い、何も加算しない
-            except traci.TraCIException as e:
-                # エッジ（例：内部エッジ）によっては長さを取得できずエラーになる場合があるため
-                print(f"TraCI Error (utilities.py): Failed to get length for edge {edge_ID}. {e}")
-        # print(f"経路 '{opposite_edge}' から '{edgeID_by_shelter}' まで {total_distance} 推定所要時間 {total_distance/11.0}")
-    print(vehInfo.get_avg_evac_time_by_route_by_recive_time())
+        # 1. Uターンコスト（現在エッジで既に進んだ距離）を計算
+        try:
+            # edge_position はレーンの始点からの距離(m)
+            edge_position = traci.vehicle.getLanePosition(vehID)
+            
+            # Uターンするには、この「既に進んだ距離」分を戻る必要がある
+            total_distance += edge_position
+        except traci.TraCIException as e:
+            print(f"TraCI Error calculating U-turn cost for {vehID}: {e}")
+            return float('inf') # 位置が取れない場合、計算不可能
 
-    return from_edgeID, to_edgeID, shelterID
+        # 2. Uターン後の経路（opposite_edge -> to_edge）を検索
 
+        # ここに反対車線
+        stage = traci.simulation.findRoute(from_edgeID, to_edgeID)
+        route_edges = stage.edges
+        
+        if not route_edges:
+            # is_in_approach_list = any(from_edgeID in edge_list for edge_list in approach_edgeIDs_by_start_edgeID.values())
+            # if not is_in_approach_list:
+            #     from_edgeID = get_opposite_edgeID_by_edgeID(edgeID=from_edgeID)
+            from_edgeID = get_opposite_edgeID_by_edgeID(from_edgeID)
+            stage = traci.simulation.findRoute(from_edgeID, to_edgeID)
+            route_edges = stage.edges
+            if not route_edges:
+                return float('inf') # ルートが見つからない
+
+        # 3. 2番目以降のすべてのエッジの「全長」を加算
+        shelter_edge_ID = shelter.get_near_edgeID()
+        
+        for edge_ID in route_edges[1:]:
+            if edge_ID == shelter_edge_ID or edge_ID == to_edgeID:
+                # 避難所エッジは半分だけ計算
+                total_distance += _get_full_edge_length(edge_ID) / 2
+            else:
+                total_distance += _get_full_edge_length(edge_ID)
+            
+        return total_distance
+
+    except traci.TraCIException as e:
+        print(f"TraCI Error in calculate_reroute_distance for {vehID}: {e}")
+        return float('inf')
 
 def find_alternative_route_better(current_edgeID: str, vehInfo:VehicleInfo, agent:Agent, shelter_list:list, custome_edge_list:List[CustomeEdge], MIDDLE_EDGE_ID_LIST:list, NEAR_EDGE_MIDDLE_EDGE_LIST:list):
     from_edgeID = ""; to_edgeID=""; shelterID = ""
@@ -794,6 +1193,7 @@ def find_alternative_route_better(current_edgeID: str, vehInfo:VehicleInfo, agen
                                                         )
 
     route_info_with_receive_time = vehInfo.get_avg_evac_time_by_route_by_recive_time()
+
     current_route_edgeIDs = tuple(traci.vehicle.getRoute(agent.get_vehID()))
     routes_dict = list(route_info_with_receive_time.values())[0]
 
@@ -824,7 +1224,7 @@ def find_alternative_route_better(current_edgeID: str, vehInfo:VehicleInfo, agen
     # 最短路が交差点1以前を含む場合
     if not '-E2' in best_route :
         if remaining_time + agent.get_route_change_threshold() > min_avg_time :
-            from_edgeID = get_opposie_edgeID_by_edgeID(current_edgeID); to_edgeID = best_route[-1]
+            from_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID); to_edgeID = best_route[-1]
             new_shelter: Shelter = find_shelter_by_edgeID_connect_target_shelter(
                                                             edgeID=to_edgeID,
                                                             shelter_list=shelter_list
@@ -854,7 +1254,7 @@ def find_alternative_route_better(current_edgeID: str, vehInfo:VehicleInfo, agen
         candidate_route_time:float = min_avg_time - time_from_start_junc_to_nearest_junct + time_to_nearest_junc
         if remaining_time + agent.get_route_change_threshold()  >  candidate_route_time:
             # print(f"remaining_time: {remaining_time}, candidate_route_time: {candidate_route_time}, agent.get_route_change_threshold(){agent.get_route_change_threshold()}")
-            from_edgeID = get_opposie_edgeID_by_edgeID(current_edgeID); to_edgeID = best_route[-1]
+            from_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID); to_edgeID = best_route[-1]
             new_shelter: Shelter = find_shelter_by_edgeID_connect_target_shelter(
                                                             edgeID=to_edgeID,
                                                             shelter_list=shelter_list
@@ -871,7 +1271,7 @@ def find_alternative_route_better(current_edgeID: str, vehInfo:VehicleInfo, agen
         candidate_route_time: float = min_avg_time + reverse_route_time
         if remaining_time + agent.get_route_change_threshold() > candidate_route_time :
             # print(f"remaining_time: {remaining_time}, candidate_route_time: {candidate_route_time}, agent.get_route_change_threshold(){agent.get_route_change_threshold()}")
-            from_edgeID = get_opposie_edgeID_by_edgeID(current_edgeID); to_edgeID = best_route[-1]
+            from_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID); to_edgeID = best_route[-1]
             new_shelter: Shelter = find_shelter_by_edgeID_connect_target_shelter(
                                                             edgeID=to_edgeID,
                                                             shelter_list=shelter_list
@@ -919,7 +1319,7 @@ def is_candidate_shelter_full(agent:Agent, vehInfo:VehicleInfo):
         if not agent.get_target_shelter() == shelterID:
             if vehInfo.get_congestion_level_by_shelter(shelterID) > 0.99:
                 # traci.vehicle.setColor(agent.get_vehID(), (255, 255, 80, 255))
-                # print(f'避難地{shelterID}の混雑率は、{vehInfo.get_congestion_level_by_shelter(shelterID)}')
+                print(f'避難地{shelterID}の混雑率は、{vehInfo.get_congestion_level_by_shelter(shelterID)}')
                 return True
     return False
 
@@ -957,40 +1357,72 @@ def is_vehIDs_changed_evaciation(target_vehID:str, vehInfo_list:list):
             if len(opposite_vehIDs) > 0:
                 for opposite_vehID in opposite_vehIDs:
                     if opposite_vehID != target_vehID:
-                        if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(opposite_vehID)) < 10:
+                        if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(opposite_vehID)) < 30:
                             return True
             return False
     except Exception as e:
         return False
 
 def is_vehIDs_another_lane(target_vehID:str, vehInfo_list:list, DRIVER_VISIBILITY_DISTANCE:int):
-    # 反対車線にいる車両のうち、避難地を変更した車両がいるかを判定
+    """
+    反対車線（複数車線考慮）を走行中で、
+    かつ「避難地を変更済み」の車両が視界内(DRIVER_VISIBILITY_DISTANCE)にいるかを判定する
+    """
+    
+    # 1. 自分の車両情報を取得
     target_vehInfo: VehicleInfo = find_vehInfo_by_vehID(target_vehID, vehInfo_list)
+    if not target_vehInfo:
+        return False # 自分の情報が見つからない
+
+    # 2. 自分が既に変更済みなら、この判定は不要
     if target_vehInfo.get_agent_changed_flag():
         return False
     try:
-        current_lane_ID = traci.vehicle.getLaneID(target_vehID)
-    except traci.TraCIException:
-        print(f'Error in run: {e}')
-        return False
-    parts = current_lane_ID.split('_')
-    # partsが2つ（エッジIDとインデックス）であることを確認
-    try:
-        if len(parts) == 2:
-            edge_ID = parts[0]
-            lane_index = int(parts[1]) # 文字列 '0' を 整数 0 に変換
-            another_lane_index = lane_index + 1
-            another_lane_ID = f"{edge_ID}_{another_lane_index}"
-            another_lane_vehIDs = traci.lane.getLastStepVehicleIDs(another_lane_ID)
+        # 3. 自分の現在地と、反対車線（エッジ）を取得
+        target_pos = traci.vehicle.getPosition(target_vehID)
+        current_edge_ID = traci.vehicle.getRoadID(target_vehID)
+        opposite_edge_ID = get_opposite_edgeID_by_edgeID(current_edge_ID)
+        
+        if not opposite_edge_ID or opposite_edge_ID == current_edge_ID:
+            # print(f'No opposite edge for {current_edge_ID}')
+            return False # 反対車線がない
 
-            for another_lane_vehIDs in another_lane_vehIDs:
-                if another_lane_vehIDs != target_vehID:
-                    if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), traci.vehicle.getPosition(another_lane_vehIDs)) < float(INSIGHT_RANGE):
+        # 4.【修正点】反対車線の「車線数」を取得
+        num_lanes = traci.edge.getLaneNumber(opposite_edge_ID)
+        if num_lanes == 0:
+            # print(f'No lanes on opposite edge {opposite_edge_ID}')
+            return False # 反対車線にレーンがない
+
+        # 5.【修正点】レーンIDを "edgeID_0", "edgeID_1"... のように手動で構築
+        all_opposite_lane_IDs = [f"{opposite_edge_ID}_{i}" for i in range(num_lanes)]
+    except traci.TraCIException as e:
+        print(f'Error: {target_vehID} の車両情報取得に失敗: {e}')
+        return False
+    
+    # 6. 反対車線の全レーンをスキャン
+    for lane_id in all_opposite_lane_IDs:
+        try:
+            vehicles_on_opposite_lane = traci.lane.getLastStepVehicleIDs(lane_id)
+        except traci.TraCIException:
+            # 'E11_1' のような存在しないレーンIDを呼んだ場合 (getLaneNumberが間違っていた場合)
+            continue 
+
+        # 7. 反対車線の各車両をチェック
+        for other_vehID in vehicles_on_opposite_lane:
+            other_vehInfo: VehicleInfo = find_vehInfo_by_vehID(other_vehID, vehInfo_list)
+            if other_vehInfo != None:
+                try:
+                    other_pos = traci.vehicle.getPosition(other_vehID)
+                    distance = distance_each_vehIDs(target_pos, other_pos) 
+
+                    if distance < float(DRIVER_VISIBILITY_DISTANCE):
                         return True
-
-            return False
-    except Exception as e:
-        return False
+                    else:
+                        return False
+                except traci.TraCIException:
+                    continue
+    # print(f'No changed vehicles found near {target_vehID} on opposite lanes.')
+    return False
 
 def is_vehIDs_changed_evaciation_with_random_true(target_vehID:str):
     # 反対車線にいる車両のうち、避難地を変更した車両がいるかを判定
@@ -1036,8 +1468,6 @@ def calculate_cdf(arrival_time_dict):
     cdf_dict = {}
 
     for ratio, arrival_times in arrival_time_dict.items():
-        # print(f'test rate{str(round(ratio, 1)).replace(".", "")} = {arrival_times}')
-        # sorted_times = np.sort(arrival_times)  # 到着時間をソート
         n = len(arrival_times)
         cdf_values = np.arange(1, n + 1) / n  # CDF 計算（1/N, 2/N, ..., N/N）
         
@@ -1073,9 +1503,6 @@ def calculate_avg_evac_time_by_route(shelter_list:List[Shelter]):
 
         # 避難時間とルートごとのデータを取得
         evac_time_with_route_by_vehID = shelter.get_evacuation_time_from_junction_multidict()
-        print(f"evac_time_with_route_by_vehID {evac_time_with_route_by_vehID}")
-        # if shelter.get_shelterID() == "ShelterA_2" and evac_time_with_route_by_vehID is not None:
-        #     print(f"避難時間とルートごとのデータ: {evac_time_with_route_by_vehID}")
         for vehID, route_with_evac_time in evac_time_with_route_by_vehID.items():
             route_by_vehID = route_with_evac_time[0]
             evac_time = route_with_evac_time[1]
@@ -1094,8 +1521,6 @@ def calculate_avg_evac_time_by_route(shelter_list:List[Shelter]):
             final_avg_evac_time_by_route[route] = {'avg_time': avg_time, 'vehicles': vehicles}
 
         # ルートごとの平均避難時間と台数をセット
-        # if shelter.get_shelterID() == "ShelterA_2":
-        #     print(f"避難時間とルートごとのデータ: {final_avg_evac_time_by_route}")
         shelter.set_avg_evac_time_by_route(final_avg_evac_time_by_route)
 
 def export_start_end_edgeIDs_to_json(start_end_edgeIDs:dict, file_path:str):
@@ -1106,7 +1531,6 @@ def export_start_end_edgeIDs_to_json(start_end_edgeIDs:dict, file_path:str):
 def import_start_end_edgeIDs_from_json(file_path:str):
     with open(file_path, 'r') as f:
         start_end_edgeIDs = json.load(f)
-    print(f"JSONファイルをインポートしました: {file_path}")
     return start_end_edgeIDs
 
 def export_connected_edges_to_json(connected_edges_list:list, file_path:str):
@@ -1355,12 +1779,13 @@ def merge_arrival_vehs_of_shelter(shelter_list: List[Shelter]):
         shelter.init_total_arrival_vehIDs()  # 初期化
         shelter_type = shelter.get_shelterID().split("_")[0]
 
-        total = 0
+        total = len(shelter.get_arrival_vehID_list())
+
         for other_shelter in shelter_list:
             other_type = other_shelter.get_shelterID().split("_")[0]
-            if shelter_type == other_type and shelter is not other_shelter:
-                total += len(shelter.get_arrival_vehID_list()) + len(other_shelter.get_arrival_vehID_list())
 
+            if shelter is not other_shelter and shelter_type == other_type:
+                total += len(other_shelter.get_arrival_vehID_list())
         shelter.set_total_arrival_vehIDs(total)
 
 def is_vehID_in_congested_edge(vehID:str, THRESHOLD_SPEED):
@@ -1409,6 +1834,7 @@ def v2shelter_communication(target_vehID:str, shelterID:str, vehInfo_list:list, 
                                                         )
 
     if distance_each_vehIDs(traci.vehicle.getPosition(target_vehID), shelter_for_target_vehID.get_position()) < COMMUNICATION_RANGE:
+        # print(f"v2shelter_communication: {target_vehID} -> {shelterID}")
         current_time = traci.simulation.getTime()
         # 避難地の混雑度を更新する
         current_congestion_rate_by_shelterID = shelter_for_target_vehID.get_congestion_rate()
@@ -1423,6 +1849,7 @@ def v2shelter_communication(target_vehID:str, shelterID:str, vehInfo_list:list, 
         avg_evac_time_by_route = shelter_for_target_vehID.get_avg_evac_time_by_route()
         target_vehInfo.v2shelter_update_avg_evac_time_by_route(avg_evac_time_by_route)
         target_vehInfo.v2v_avg_evac_time_by_route_by_recive_time(current_time=current_time)
+        # traci.vehicle.setColor(target_vehID, (80, 255, 80, 255))  # 緑色に変更
 
 def v2v_communication(target_vehID:str, target_vehInfo:VehicleInfo, around_vehIDs:list, agent_list:list, vehInfo_list:list, COMMUNICATION_RANGE:double):
     target_agent:Agent = find_agent_by_vehID(target_vehID, agent_list)
@@ -1441,6 +1868,7 @@ def v2v_communication(target_vehID:str, target_vehInfo:VehicleInfo, around_vehID
                     info_source = target_vehInfo if target_of_congestion_info_time > around_of_congestion_info_time else around_vehInfo
                     info_target = around_vehInfo if target_of_congestion_info_time > around_of_congestion_info_time else target_vehInfo
                     info_target.set_shelter_congestion_info(info_source.get_shelter_congestion_info())
+
             # 避難経路の情報交換
             target_of_route_info_tuple, = target_vehInfo.get_avg_evac_time_by_route_by_recive_time().items(); target_of_route_info_time = target_of_route_info_tuple[0]
             around_of_route_info_tuple, = around_vehInfo.get_avg_evac_time_by_route_by_recive_time().items(); around_of_route_info_time = around_of_route_info_tuple[0]
@@ -1448,6 +1876,7 @@ def v2v_communication(target_vehID:str, target_vehInfo:VehicleInfo, around_vehID
                 info_source = target_vehInfo if target_of_route_info_time > around_of_route_info_time else around_vehInfo
                 info_target = around_vehInfo if target_of_route_info_time > around_of_route_info_time else target_vehInfo
                 info_target.set_avg_evac_time_by_route_by_recive_time(info_source.get_avg_evac_time_by_route_by_recive_time())
+                # traci.vehicle.setColor(target_vehID, (80, 80, 255, 255))  # 青色に変更
 
 def v2v_communication_about_tsunami_info(target_vehID:str, target_vehInfo:VehicleInfo, around_vehIDs:list, vehInfo_list:list, COMMUNICATION_RANGE:float):
     for around_vehID in around_vehIDs:

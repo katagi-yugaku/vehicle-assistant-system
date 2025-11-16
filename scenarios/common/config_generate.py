@@ -202,6 +202,7 @@ if __name__ == "__main__":
     # python3 common/config_generate.py \
     # --csv icmu2025/simulation_params.csv \
     # --out-dir icmu2025/configs
+    # python3 common/config_generate.py --csv common/simulation_params.csv --out-dir pervehicle/configs
     main()
 
 

@@ -112,6 +112,9 @@ NORMALCY_BIAS_COUNT = 0
 POSITIVE_MAJORITY_BIAS_COUNT = 0
 NEGATIVE_MAJORITY_BIAS_COUNT = 0
 NEW_VEHICLE_COUNT = 0
+SHELTER_CAPACITY_FULL_COUNT = 0
+SHELTER_CONGESTION_COUNT = 0
+TEST_COUNT = 0
 
 # リストの初期化
 custome_edge_list: list = []
@@ -125,6 +128,7 @@ shelterB_arrival_time_list = []
 arrival_time_by_vehID_dict = {}
 arrival_time_list = []
 elapsed_time_list = []
+time_gap_list = []
 # dictの初期化
 current_route_dict = {}
 
@@ -149,6 +153,11 @@ def control_vehicles():
     global NORMALCY_BIAS_COUNT
     global OBTAIN_INFO_LANE_CHANGE_COUNT
     global ELAPSED_TIME_LANE_CHANGE_COUNT
+    global NORMALCY_BIAS_ROUTE_CHANGE_COUNT
+    global SHELTER_CAPACITY_FULL_COUNT
+    global SHELTER_CONGESTION_COUNT
+    global MAJORITY_BIAS_ROUTE_CHANGE_COUNT
+    global TEST_COUNT
     # 現在の存在するrouteを確認する
     for routeID in traci.route.getIDList():
         # 現在のrouteを取得
@@ -205,7 +214,7 @@ def control_vehicles():
                 # それ以外は自由流走行
                 traci.vehicle.slowDown(current_vehID, 8.0, 1.0)
 
-        if not vehInfo_by_current_vehID.get_arrival_flag(): # 未到着の車両に対して処理を実行
+        if not vehInfo_by_current_vehID.get_arrival_flag() and not agent_by_current_vehID.get_shelter_full_flg(): # 未到着の車両に対して処理を実行
             # 通信可能範囲内にいる車両と通信を行う　通信可能範囲は100m設定になる
             if traci.simulation.getTime() % 10 == 0:
                 around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
@@ -228,19 +237,17 @@ def control_vehicles():
 
             # ドライバーの心理による行動決定
             # 正常性バイアスによる経路変更の実装
-            if not vehInfo_by_current_vehID.get_arrival_flag() and utilities.is_vehID_in_congested_edge(vehID=current_vehID, THRESHOLD_SPEED=THRESHOLD_SPEED):
-                traci.vehicle.setColor(current_vehID, (180, 0, 0, 255))
-                if traci.simulation.getTime() % 5 == 0:
-                    # ここで経路を変更するかを判定それとも避難地を変更する
-                    from_edgeID, shelterID, to_edgeID = utilities.find_alternative_better_choice(
-                                                                    current_edgeID=current_edgeID,
-                                                                    vehInfo=vehInfo_by_current_vehID,
-                                                                    agent=agent_by_current_vehID,
-                                                                    shelter_list=shelter_list,
-                                                                    custome_edge_list=custome_edge_list
-                                                                    )
-                    if from_edgeID != "" and shelterID != "" and to_edgeID != "":
-                        # print(f"from_edgeID: {from_edgeID} shelterID: {shelterID} to_edgeID: {to_edgeID}")
+            if not vehInfo_by_current_vehID.get_arrival_flag() and traci.simulation.getTime() % 10 == 0:
+                if vehInfo_by_current_vehID.get_shelter_congestion_info()[agent_by_current_vehID.get_target_shelter()][0] > 0.99:
+                    from_edgeID, shelterID, to_edge_list = utilities.find_alternative_shelter_choice(
+                                                                        current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
+                                                                        vehID=current_vehID,
+                                                                        current_edgeID=current_edgeID,
+                                                                        vehInfo=vehInfo_by_current_vehID,
+                                                                        shelter_list=shelter_list,
+                                                                        agent=agent_by_current_vehID,
+                                                                        )
+                    if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
                         NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
                                                                             target_vehID=current_vehID, 
                                                                             NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
@@ -250,33 +257,95 @@ def control_vehicles():
                                                                             agent_by_target_vehID=agent_by_current_vehID, 
                                                                             from_edgeID=from_edgeID,
                                                                             new_shelterID=shelterID,
-                                                                            to_edgeID=to_edgeID
+                                                                            to_edgeID=to_edge_list[0],
+                                                                            color_mode=0
                                                                             )
+                        SHELTER_CAPACITY_FULL_COUNT+= 1
+                        continue
 
-            # 同調性バイアスによる経路変更の実装
-            # if (not vehInfo_by_current_vehID.get_arrival_flag() 
-            #     and utilities.is_vehIDs_changed_evaciation(target_vehID=current_vehID, vehInfo_list=vehInfo_list) 
-            #     and utilities.random_true(0.25)):
+            if not vehInfo_by_current_vehID.get_arrival_flag() and utilities.is_vehID_in_congested_edge(vehID=current_vehID, THRESHOLD_SPEED=THRESHOLD_SPEED):
+                if traci.simulation.getTime() % 10 == 0:
+                    if vehInfo_by_current_vehID.get_shelter_congestion_info()[agent_by_current_vehID.get_target_shelter()][0] > agent_by_current_vehID.get_shelter_occupancy_rate_threshold():
+                        from_edgeID, shelterID, to_edge_list = utilities.find_alternative_shelter_choice(
+                                                                        current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
+                                                                        vehID=current_vehID,
+                                                                        current_edgeID=current_edgeID,
+                                                                        vehInfo=vehInfo_by_current_vehID,
+                                                                        shelter_list=shelter_list,
+                                                                        agent=agent_by_current_vehID,
+                                                                        )
 
-                # if traci.simulation.getTime() % 5 == 0:
-                #     from_edgeID, shelterID, to_edgeID = utilities.find_alternative_route_better(
-                #                                                     current_edgeID=current_edgeID,
-                #                                                     vehInfo=vehInfo_by_current_vehID,
-                #                                                     agent=agent_by_current_vehID,
-                #                                                     shelter_list=shelter_list,
-                #                                                     custome_edge_list=custome_edge_list,
-                #                                                     )
-                #     NEW_VEHICLE_COUNT = utilities.generate_new_veh(
-                #                                                 target_vehID=current_vehID, 
-                #                                                 NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
-                #                                                 agent_list=agent_list, 
-                #                                                 vehInfo_list=vehInfo_list,
-                #                                                 vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                #                                                 agent_by_target_vehID=agent_by_current_vehID, 
-                #                                                 shelter_list=shelter_list,
-                #                                                 connected_edges_list=connected_edges_list,
-                #                                                 LATE_AGENT_THRESHOLD_LIST=LATE_AGENT_THRESHOLD_LIST
-                #                                                 )
+                        if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
+                            NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
+                                                                                target_vehID=current_vehID, 
+                                                                                NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
+                                                                                agent_list=agent_list, 
+                                                                                vehInfo_list=vehInfo_list,
+                                                                                vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                                agent_by_target_vehID=agent_by_current_vehID, 
+                                                                                from_edgeID=from_edgeID,
+                                                                                new_shelterID=shelterID,
+                                                                                to_edgeID=to_edge_list[0],
+                                                                                color_mode=1
+                                                                                )
+                            SHELTER_CONGESTION_COUNT += 1
+
+                    else:
+                        from_edgeID, shelterID, to_edge_list, time_gap = utilities.find_alternative_better_choice(
+                                                                        current_edgeID=current_edgeID,
+                                                                        vehInfo=vehInfo_by_current_vehID,
+                                                                        agent=agent_by_current_vehID,
+                                                                        shelter_list=shelter_list,
+                                                                        custome_edge_list=custome_edge_list,
+                                                                        decision_mode=1
+                                                                        )
+                        if time_gap > 0.0:
+                            time_gap_list.append(time_gap)
+
+                        if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
+                            NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
+                                                                                target_vehID=current_vehID, 
+                                                                                NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
+                                                                                agent_list=agent_list, 
+                                                                                vehInfo_list=vehInfo_list,
+                                                                                vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                                agent_by_target_vehID=agent_by_current_vehID, 
+                                                                                from_edgeID=from_edgeID,
+                                                                                new_shelterID=shelterID,
+                                                                                to_edgeID=to_edge_list[0],
+                                                                                color_mode=1
+                                                                                )
+                            NORMALCY_BIAS_ROUTE_CHANGE_COUNT += 1
+
+            if not vehInfo_by_current_vehID.get_arrival_flag():
+                # 同調性バイアスによる経路変更の実装
+                if not vehInfo_by_current_vehID.get_arrival_flag() and traci.simulation.getTime() % 10 == 0:
+                    if utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list, DRIVER_VISIBILITY_DISTANCE=DRIVER_VISIBILITY_DISTANCE):
+                        if utilities.random_true(0.2):
+                            TEST_COUNT += 1
+                            from_edgeID, shelterID, to_edge_list, time_gap  = utilities.find_alternative_better_choice(
+                                                                        current_edgeID=current_edgeID,
+                                                                        vehInfo=vehInfo_by_current_vehID,
+                                                                        agent=agent_by_current_vehID,
+                                                                        shelter_list=shelter_list,
+                                                                        custome_edge_list=custome_edge_list,
+                                                                        decision_mode=2
+                                                                        )
+
+                            if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
+                                NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
+                                                                                    target_vehID=current_vehID, 
+                                                                                    NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
+                                                                                    agent_list=agent_list, 
+                                                                                    vehInfo_list=vehInfo_list,
+                                                                                    vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                                    agent_by_target_vehID=agent_by_current_vehID, 
+                                                                                    from_edgeID=from_edgeID,
+                                                                                    new_shelterID=shelterID,
+                                                                                    to_edgeID=to_edge_list[0],
+                                                                                    color_mode=2
+                                                                                    )
+                                MAJORITY_BIAS_ROUTE_CHANGE_COUNT += 1
     
     # ルートごとの避難所要時間を計算する
     utilities.calculate_avg_evac_time_by_route(shelter_list=shelter_list)
@@ -304,7 +373,7 @@ def handle_arrival(current_vehID, vehInfo_by_current_vehID:VehicleInfo, agent_by
     shelter: Shelter = utilities.find_shelter_by_edgeID_connect_target_shelter(
         agent_by_current_vehID.get_near_edgeID_by_target_shelter(), shelter_list
     )
-    departure_time = traci.vehicle.getDeparture(current_vehID) + 100
+    departure_time = traci.vehicle.getDeparture(current_vehID) + 50
     shelter.update_evac_time_default_dict(
         vehID=current_vehID,
         route=traci.vehicle.getRoute(current_vehID),
@@ -380,11 +449,14 @@ if __name__ == "__main__":
     else:
         sumoBinary = checkBinary('sumo-gui')
     cfg = load_toml(Path(toml_path))
-    print(f"Loaded config: {cfg}")
 
     COMM_RANGE: float = _req(cfg, "comm_range", float)
     NUM_VEHICLES: int = _req(cfg, "num_vehicles", int)
     VEHICLE_INTERVAL: float = _req(cfg, "vehicle_interval", float)
+    VEHICLES_TO_SHELTER_A: float = _req(cfg, "vehicles_to_shelter_A", float)
+    VEHICLES_TO_SHELTER_B: float = _req(cfg, "vehicles_to_shelter_B", float)
+    SHELTER_A_CAPACITY: int = _req(cfg, "shelter_A_capacity", int)
+    SHELTER_B_CAPACITY: int = _req(cfg, "shelter_B_capacity", int)
     ACTIVE_ROUTE_CHANGE_MEAN: float = _req(cfg, "active_route_change_mean", float)
     ACTIVE_ROUTE_CHANGE_VAR: float = _req(cfg, "active_route_change_var", float)
     CAUTIOUS_ROUTE_CHANGE_MEAN: float = _req(cfg, "cautious_route_change_mean", float)
@@ -403,10 +475,22 @@ if __name__ == "__main__":
     DRIVER_VISIBILITY_DISTANCE: float = _req(cfg, "driver_visibility_distance", float)
     POSITIVE_MAJORITY_BIAS: float = _req(cfg, "positive_majority_bias", float)
     NEGATIVE_MAJORITY_BIAS: float = _req(cfg, "negative_majority_bias", float)
+    ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START: float = _req(cfg, "active_shelter_occupancy_rate_threshold_start", float)
+    ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float = _req(cfg, "active_shelter_occupancy_rate_threshold_end", float)
+    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_start", float)
+    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_end", float)
+
 
     # シミュレーションの初期化
     # 避難地の情報をもとに、Shelter一覧を生成
-    shelter_capacity_by_ID:dict = {"ShelterA_1": 150, "ShelterA_2": 150, "ShelterB_1": 150}
+    traci.start(
+                [sumoBinary,
+                 "-c", str(SUMO_CFG),
+                 "--tripinfo-output", "tripinfo.xml"],
+                traceFile="traci_log.txt",
+                traceGetters=False
+                )
+    shelter_capacity_by_ID:dict = {"ShelterA_1": VEHICLES_TO_SHELTER_A, "ShelterA_2": VEHICLES_TO_SHELTER_A, "ShelterB_1": VEHICLES_TO_SHELTER_B}
     edgeID_by_shelterID:dict = {"ShelterA_1": 'E17', "ShelterA_2": 'E37', "ShelterB_1": 'E12'}
     for shelterID, near_edgeID in edgeID_by_shelterID.items():
         shelter_list:list = utilities.init_shelter(
@@ -415,14 +499,7 @@ if __name__ == "__main__":
                                                     near_edgeID=near_edgeID, 
                                                     shelter_list=shelter_list
                                                     )
-    traci.start(
-                [sumoBinary,
-                 "-c", str(SUMO_CFG),
-                 "--tripinfo-output", "tripinfo.xml"],
-                traceFile="traci_log.txt",
-                traceGetters=False
-                )
-    custome_edge_list:list = utilities.init_custom_edge()
+    custome_edge_list:list = utilities.init_custome_edge()
     vehicle_start_edges:list = utilities.get_vehicle_start_edges(custome_edge_list=custome_edge_list)
     vehicle_end_edges:list = utilities.get_vehicle_end_edges(custome_edge_list=custome_edge_list)
     # 車両の開始エッジと終了エッジの組み合わせを辞書にする
@@ -442,10 +519,11 @@ if __name__ == "__main__":
     end_interval = 4.0
     base_vehicle_num_list = []
     extra_vehicle_count = 0
-    base_vehicle_num_list.append(100); base_vehicle_num_list.append(200)
+    # ここが車両数の決定ポイント
+    base_vehicle_num_list.append(VEHICLES_TO_SHELTER_A); base_vehicle_num_list.append(VEHICLES_TO_SHELTER_B)
     for edge_index, (start_edgeID, end_edgeID_list) in enumerate(mapping.items()):
         # 各開始エッジに割り当てる車両数
-        assigned_vehicle_num = base_vehicle_num_list[edge_index] + (1 if edge_index < extra_vehicle_count else 0)
+        assigned_vehicle_num = int(base_vehicle_num_list[edge_index] + (1 if edge_index < extra_vehicle_count else 0))
         vehicle_intervals = [start_interval - (start_interval - end_interval) * (i / (assigned_vehicle_num - 1))
                             for i in range(assigned_vehicle_num)]
         # 確率リストを取得（未指定なら一様分布）
@@ -489,7 +567,8 @@ if __name__ == "__main__":
         count = counter.get(cat, 0)
         print(f"  {cat}: {count} ({count / total:.2%})")
     # 車両情報の初期化
-    vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list)
+    approach_edgeIDs_by_start_edgeID:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "approach_edgeIDs_by_start_edgeID.json"))
+    vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID)
     # Agentの初期化
     agent_list:list = utilities.init_agent_list(
                                                 vehIDs=vehID_list, 
@@ -510,7 +589,11 @@ if __name__ == "__main__":
                                                 NEGATIVE_LANECHANGE_START=NEGATIVE_LANECHANGE_START,
                                                 NEGATIVE_LANECHANGE_END=NEGATIVE_LANECHANGE_END,
                                                 POSITIVE_MAJORITY_BIAS=POSITIVE_MAJORITY_BIAS,
-                                                NEGATIVE_MAJORITY_BIAS=NEGATIVE_MAJORITY_BIAS
+                                                NEGATIVE_MAJORITY_BIAS=NEGATIVE_MAJORITY_BIAS,
+                                                ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
+                                                ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
+                                                CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
+                                                CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END
                                                 )
 
     for vehID in traci.vehicle.getIDList():
@@ -523,13 +606,17 @@ if __name__ == "__main__":
         print(f"NG all vehs not arrived {len(arrival_time_list)}")
     print("===== Simlation Result Summary =====")
     print(f"arrival_time_by_vehID_dict:{arrival_time_by_vehID_dict}")
-    print(f"route_changed_vehicle_count:{ROUTE_CHANGED_VEHICLE_COUNT}")
+    print(f"route_changed_vehicle_count:{NEW_VEHICLE_COUNT}") 
     print(f"normalcy_bias_route_change_count:{NORMALCY_BIAS_ROUTE_CHANGE_COUNT}")
     print(f"majority_bias_route_change_count:{MAJORITY_BIAS_ROUTE_CHANGE_COUNT}")
+    print(f"shelter_congestion_count:{SHELTER_CONGESTION_COUNT}")
+    print(f"shelter_capacity_full_count:{SHELTER_CAPACITY_FULL_COUNT}")
     print(f"lane_changed_vehicle_count:{LANE_CHANGED_VEHICLE_COUNT}")
     print(f"info_obtained_lanechange_count:{OBTAIN_INFO_LANE_CHANGE_COUNT}")
     print(f"elapsed_time_lanechange_count:{ELAPSED_TIME_LANE_CHANGE_COUNT}")
     print(f"majority_bias_lanechange_count:{POSITIVE_MAJORITY_BIAS_COUNT}")
+
+    # print(f"time_gap_list={time_gap_list}")
 
 
 

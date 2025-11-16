@@ -27,6 +27,7 @@ class VehicleInfo():
         self._stop_flag = False # 車両が停止しているかどうかのフラグ
         self._start_time_measured_flag = False # 車両の避難開始時間を測定するフラグ
         self._agent_changed_flag = False # 車両の避難所が変更されたかどうかのフラグ
+        self._approach_edge_dict = {} # 進入路のedge
         # self._avg_evac_time_by_route = {} # key: route value: avg_time
 
     # 車両周辺の車両情報を更新
@@ -124,7 +125,7 @@ class VehicleInfo():
     def set_multiDict_around_vehIDs(self, around_vehInfo:defaultdict):
         self._multiDict_around_vehInfos = around_vehInfo
 
-    # 避難地周辺の車両情報のgetter/setter
+    # 避難地の混雑情報のgetter/setter
     def get_shelter_congestion_info(self):
         return self._shelter_congestion_info
     def set_shelter_congestion_info(self, shelter_congestion_info:defaultdict):
@@ -211,6 +212,12 @@ class VehicleInfo():
         return self._agent_changed_flag
     def set_agent_changed_flag(self, agent_changed_flag: bool):
         self._agent_changed_flag = agent_changed_flag
+    
+    # 進入路のedgeリストのgetter/setter
+    def get_approach_edge_dict(self):
+        return self._approach_edge_dict
+    def set_approach_edge_dict(self, approach_edge_dict: dict):
+        self._approach_edge_dict = approach_edge_dict
 
     def print_shelter_congestion_info(self):
         print(f"vehID:{self._vehID} has shelter_congestion_info: {self._shelter_congestion_info}")
