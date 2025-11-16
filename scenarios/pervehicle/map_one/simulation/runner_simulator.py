@@ -490,7 +490,7 @@ if __name__ == "__main__":
                 traceFile="traci_log.txt",
                 traceGetters=False
                 )
-    shelter_capacity_by_ID:dict = {"ShelterA_1": VEHICLES_TO_SHELTER_A, "ShelterA_2": VEHICLES_TO_SHELTER_A, "ShelterB_1": VEHICLES_TO_SHELTER_B}
+    shelter_capacity_by_ID:dict = {"ShelterA_1": SHELTER_A_CAPACITY, "ShelterA_2": SHELTER_A_CAPACITY, "ShelterB_1": SHELTER_B_CAPACITY}
     edgeID_by_shelterID:dict = {"ShelterA_1": 'E17', "ShelterA_2": 'E37', "ShelterB_1": 'E12'}
     for shelterID, near_edgeID in edgeID_by_shelterID.items():
         shelter_list:list = utilities.init_shelter(
@@ -517,21 +517,26 @@ if __name__ == "__main__":
     vehID_list = []
     start_interval = 5.0
     end_interval = 4.0
-    base_vehicle_num_list = []
-    extra_vehicle_count = 0
     # ここが車両数の決定ポイント
-    base_vehicle_num_list.append(VEHICLES_TO_SHELTER_A); base_vehicle_num_list.append(VEHICLES_TO_SHELTER_B)
-    for edge_index, (start_edgeID, end_edgeID_list) in enumerate(mapping.items()):
-        # 各開始エッジに割り当てる車両数
-        assigned_vehicle_num = int(base_vehicle_num_list[edge_index] + (1 if edge_index < extra_vehicle_count else 0))
-        vehicle_intervals = [start_interval - (start_interval - end_interval) * (i / (assigned_vehicle_num - 1))
-                            for i in range(assigned_vehicle_num)]
-        # 確率リストを取得（未指定なら一様分布）
+    # --- 修正ここから ---
+    
+    # どの開始エッジから何台出発させるかを明示的にマッピング
+    # (E21がA用、E13がB用だと仮定)
+    vehicle_count_by_start_edge = {
+        "E21": VEHICLES_TO_SHELTER_A,  # 例: 10台
+        "E13": VEHICLES_TO_SHELTER_B   # 例: 200台
+    }
+    # JSONから読み込んだmappingをループ
+    for start_edgeID, end_edgeID_list in mapping.items():
+        # この開始エッジに割り当てられた車両数を取得
+        assigned_vehicle_num = vehicle_count_by_start_edge.get(start_edgeID, 0)
+        if assigned_vehicle_num == 0:
+            continue # このエッジからは生成しないので次のループへ
+        vehicle_intervals = np.linspace(start_interval, end_interval, num=int(assigned_vehicle_num))
         probabilities = probabilities_by_start_edge.get(
             start_edgeID,
             [1.0 / len(end_edgeID_list)] * len(end_edgeID_list)
         )
-        # 安全チェック：確率とend_edgeリストの長さ一致を確認
         if len(probabilities) != len(end_edgeID_list):
             raise ValueError(
                 f"Probability length mismatch for {start_edgeID}: "
@@ -540,7 +545,7 @@ if __name__ == "__main__":
         # 出発時刻リセット
         DEPART_TIME = 0.0
         # 車両生成ループ
-        for vehicle_index in range(assigned_vehicle_num):
+        for vehicle_index in range(int(assigned_vehicle_num)):
             selected_end_edgeID = utilities.choose_edge_by_probability(edgeID_list=end_edgeID_list, probabilities=probabilities)
             target_shelterID = utilities.find_shelterID_by_edgeID_by_shelterID(edgeID=selected_end_edgeID, edgeID_by_shelterID=edgeID_by_shelterID)
 
