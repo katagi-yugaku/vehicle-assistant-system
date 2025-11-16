@@ -1,5 +1,5 @@
 # ﻿シナリオID
-scenario_id = 2
+scenario_id = 4
 
 # シミュレーション回数
 num_simulations = 50
@@ -11,10 +11,10 @@ comm_range = 200
 num_vehicles = 400
 
 # 避難地A行きの車両数
-vehicles_to_shelter_A = 230
+vehicles_to_shelter_A = 200
 
 # 避難地b行きの車両数
-vehicles_to_shelter_B = 170
+vehicles_to_shelter_B = 200
 
 # 避難地Aの収容台数
 shelter_A_capacity = 200
@@ -71,7 +71,7 @@ negative_lanechange_start = 800
 negative_lanechange_end = 1100
 
 # ドライバーの視認距離
-driver_visibility_distance = 30
+driver_visibility_distance = 50
 
 # 正の同調性
 positive_majority_bias = 100

@@ -8,19 +8,19 @@ num_simulations = 50
 comm_range = 200
 
 # 生成車両数
-num_vehicles = 400
+num_vehicles = 300
 
 # 避難地A行きの車両数
-vehicles_to_shelter_A = 200
+vehicles_to_shelter_A = 150
 
 # 避難地b行きの車両数
-vehicles_to_shelter_B = 200
+vehicles_to_shelter_B = 150
 
 # 避難地Aの収容台数
-shelter_A_capacity = 200
+shelter_A_capacity = 150
 
 # 避難地Bの収容台数
-shelter_B_capacity = 200
+shelter_B_capacity = 150
 
 # 車両生成間隔
 vehicle_interval = 5
