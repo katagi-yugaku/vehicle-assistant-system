@@ -48,6 +48,11 @@ COUNT_KEYS = [
     "negative_majority_bias_count",
     "positive_majority_bias_count",
     "lane_changed_vehicle_count",
+    "route_changed_vehicle_count",
+    "normalcy_bias_route_change_count",
+    "majority_bias_route_change_count",
+    "shelter_congestion_count",
+    "shelter_capacity_full_count",
 ]
 DICT_KEYS = [
     "arrival_time_by_vehID_dict",   # ここに辞書で受けたいキーを追加
