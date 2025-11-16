@@ -26,16 +26,16 @@ shelter_B_capacity = 200
 vehicle_interval = 5
 
 # 積極的経路変更者の平均
-active_route_change_mean = 60
+active_route_change_mean = 30
 
 # 積極的経路変更者の分散
-active_route_change_var = 30
+active_route_change_var = 15
 
 # 慎重的経路変更者の平均
-cautious_route_change_mean = 180
+cautious_route_change_mean = 90
 
 # 慎重的経路変更者の分散
-cautious_route_change_var = 30
+cautious_route_change_var = 20
 
 # 収容率閾値
 shelter_capacity_threshold = 1
