@@ -17,10 +17,10 @@ vehicles_to_shelter_A = 150
 vehicles_to_shelter_B = 150
 
 # 避難地Aの収容台数
-shelter_A_capacity = 200
+shelter_A_capacity = 150
 
 # 避難地Bの収容台数
-shelter_B_capacity = 200
+shelter_B_capacity = 150
 
 # 車両生成間隔
 vehicle_interval = 5
@@ -88,4 +88,4 @@ cautious_shelter_occupancy_rate_threshold_start = 0.8
 
 cautious_shelter_occupancy_rate_threshold_end = 0.95
 
-following_rate = 0.1
+following_rate = 0.2

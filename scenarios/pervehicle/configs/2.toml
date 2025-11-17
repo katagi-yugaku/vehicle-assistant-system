@@ -17,10 +17,10 @@ vehicles_to_shelter_A = 180
 vehicles_to_shelter_B = 120
 
 # 避難地Aの収容台数
-shelter_A_capacity = 200
+shelter_A_capacity = 150
 
 # 避難地Bの収容台数
-shelter_B_capacity = 200
+shelter_B_capacity = 150
 
 # 車両生成間隔
 vehicle_interval = 5
