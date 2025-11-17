@@ -87,3 +87,5 @@ active_shelter_occupancy_rate_threshold_end = 0.8
 cautious_shelter_occupancy_rate_threshold_start = 0.8
 
 cautious_shelter_occupancy_rate_threshold_end = 0.95
+
+following_rate = 0.1
