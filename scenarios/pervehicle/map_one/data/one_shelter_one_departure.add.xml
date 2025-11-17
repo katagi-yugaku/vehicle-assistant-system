@@ -4,10 +4,10 @@
 -->
 
 <additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
-<parkingArea id="ShelterA_1" lane="E17_0" startPos="50" endPos="180" roadsideCapacity="200" width="3" length="6" angle ="120">
+<parkingArea id="ShelterA_1" lane="E17_0" startPos="50" endPos="180" roadsideCapacity="250" width="3" length="6" angle ="120">
 </parkingArea>
-<parkingArea id="ShelterA_2" lane="E37_0" startPos="50" endPos="180" roadsideCapacity="200" width="3" length="6" angle ="120">
+<parkingArea id="ShelterA_2" lane="E37_0" startPos="50" endPos="180" roadsideCapacity="250" width="3" length="6" angle ="120">
 </parkingArea>
-<parkingArea id="ShelterB_1" lane="E12_0" startPos="50" endPos="180" roadsideCapacity="200" width="3" length="6" angle ="120">
+<parkingArea id="ShelterB_1" lane="E12_0" startPos="50" endPos="180" roadsideCapacity="250" width="3" length="6" angle ="120">
 </parkingArea>
 </additional>

@@ -12,4 +12,11 @@ results/
 
 # Pythonのキャッシュ
 __pycache__/
-*.pyc
+*.py
+
+# SUMO/Simulation outputs
+traci_log.txt
+tripinfo.xml
+
+# macOS
+.DS_Storec

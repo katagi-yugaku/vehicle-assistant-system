@@ -234,47 +234,21 @@ def control_vehicles():
                                                     shelter_list=shelter_list,
                                                     COMMUNICATION_RANGE=COMM_RANGE
                                                     )
-
+            
             # ドライバーの心理による行動決定
-            # 正常性バイアスによる経路変更の実装
+            # 満杯情報による
             if not vehInfo_by_current_vehID.get_arrival_flag() and traci.simulation.getTime() % 10 == 0:
-                if vehInfo_by_current_vehID.get_shelter_congestion_info()[agent_by_current_vehID.get_target_shelter()][0] > 0.99:
-                    from_edgeID, shelterID, to_edge_list = utilities.find_alternative_shelter_choice(
-                                                                        current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
-                                                                        vehID=current_vehID,
-                                                                        current_edgeID=current_edgeID,
-                                                                        vehInfo=vehInfo_by_current_vehID,
-                                                                        shelter_list=shelter_list,
-                                                                        agent=agent_by_current_vehID,
-                                                                        )
-                    if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
-                        NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
-                                                                            target_vehID=current_vehID, 
-                                                                            NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
-                                                                            agent_list=agent_list, 
-                                                                            vehInfo_list=vehInfo_list,
-                                                                            vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                            agent_by_target_vehID=agent_by_current_vehID, 
-                                                                            from_edgeID=from_edgeID,
-                                                                            new_shelterID=shelterID,
-                                                                            to_edgeID=to_edge_list[0],
-                                                                            color_mode=0
-                                                                            )
-                        SHELTER_CAPACITY_FULL_COUNT+= 1
-                        continue
-
-            if not vehInfo_by_current_vehID.get_arrival_flag() and utilities.is_vehID_in_congested_edge(vehID=current_vehID, THRESHOLD_SPEED=THRESHOLD_SPEED):
-                if traci.simulation.getTime() % 10 == 0:
-                    if vehInfo_by_current_vehID.get_shelter_congestion_info()[agent_by_current_vehID.get_target_shelter()][0] > agent_by_current_vehID.get_shelter_occupancy_rate_threshold():
+                if not agent_by_current_vehID.get_shelter_full_flg():
+                    if vehInfo_by_current_vehID.get_shelter_congestion_info()[agent_by_current_vehID.get_target_shelter()][0] > 0.99:
+                        agent_by_current_vehID.set_shelter_full_flg(True)
                         from_edgeID, shelterID, to_edge_list = utilities.find_alternative_shelter_choice(
-                                                                        current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
-                                                                        vehID=current_vehID,
-                                                                        current_edgeID=current_edgeID,
-                                                                        vehInfo=vehInfo_by_current_vehID,
-                                                                        shelter_list=shelter_list,
-                                                                        agent=agent_by_current_vehID,
-                                                                        )
-
+                                                                            current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
+                                                                            vehID=current_vehID,
+                                                                            current_edgeID=current_edgeID,
+                                                                            vehInfo=vehInfo_by_current_vehID,
+                                                                            shelter_list=shelter_list,
+                                                                            agent=agent_by_current_vehID,
+                                                                            )
                         if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
                             NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
                                                                                 target_vehID=current_vehID, 
@@ -286,51 +260,23 @@ def control_vehicles():
                                                                                 from_edgeID=from_edgeID,
                                                                                 new_shelterID=shelterID,
                                                                                 to_edgeID=to_edge_list[0],
-                                                                                color_mode=1
+                                                                                color_mode=0
                                                                                 )
-                            SHELTER_CONGESTION_COUNT += 1
-
-                    else:
-                        from_edgeID, shelterID, to_edge_list, time_gap = utilities.find_alternative_better_choice(
-                                                                        current_edgeID=current_edgeID,
-                                                                        vehInfo=vehInfo_by_current_vehID,
-                                                                        agent=agent_by_current_vehID,
-                                                                        shelter_list=shelter_list,
-                                                                        custome_edge_list=custome_edge_list,
-                                                                        decision_mode=1
-                                                                        )
-                        if time_gap > 0.0:
-                            time_gap_list.append(time_gap)
-
-                        if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
-                            NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
-                                                                                target_vehID=current_vehID, 
-                                                                                NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
-                                                                                agent_list=agent_list, 
-                                                                                vehInfo_list=vehInfo_list,
-                                                                                vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                                agent_by_target_vehID=agent_by_current_vehID, 
-                                                                                from_edgeID=from_edgeID,
-                                                                                new_shelterID=shelterID,
-                                                                                to_edgeID=to_edge_list[0],
-                                                                                color_mode=1
-                                                                                )
-                            NORMALCY_BIAS_ROUTE_CHANGE_COUNT += 1
-
-            if not vehInfo_by_current_vehID.get_arrival_flag():
-                # 同調性バイアスによる経路変更の実装
-                if not vehInfo_by_current_vehID.get_arrival_flag() and traci.simulation.getTime() % 10 == 0:
-                    if utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list, DRIVER_VISIBILITY_DISTANCE=DRIVER_VISIBILITY_DISTANCE):
-                        if utilities.random_true(0.2):
-                            TEST_COUNT += 1
-                            from_edgeID, shelterID, to_edge_list, time_gap  = utilities.find_alternative_better_choice(
-                                                                        current_edgeID=current_edgeID,
-                                                                        vehInfo=vehInfo_by_current_vehID,
-                                                                        agent=agent_by_current_vehID,
-                                                                        shelter_list=shelter_list,
-                                                                        custome_edge_list=custome_edge_list,
-                                                                        decision_mode=2
-                                                                        )
+                            SHELTER_CAPACITY_FULL_COUNT+= 1
+                            continue
+            if not agent_by_current_vehID.get_shelter_full_flg():
+                # 正常性バイアスによる経路変更の実装
+                if not vehInfo_by_current_vehID.get_arrival_flag() and utilities.is_vehID_in_congested_edge(vehID=current_vehID, THRESHOLD_SPEED=THRESHOLD_SPEED):
+                    if traci.simulation.getTime() % 10 == 0:
+                        if vehInfo_by_current_vehID.get_shelter_congestion_info()[agent_by_current_vehID.get_target_shelter()][0] > agent_by_current_vehID.get_shelter_occupancy_rate_threshold():
+                            from_edgeID, shelterID, to_edge_list = utilities.find_alternative_shelter_choice(
+                                                                            current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
+                                                                            vehID=current_vehID,
+                                                                            current_edgeID=current_edgeID,
+                                                                            vehInfo=vehInfo_by_current_vehID,
+                                                                            shelter_list=shelter_list,
+                                                                            agent=agent_by_current_vehID,
+                                                                            )
 
                             if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
                                 NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
@@ -343,10 +289,66 @@ def control_vehicles():
                                                                                     from_edgeID=from_edgeID,
                                                                                     new_shelterID=shelterID,
                                                                                     to_edgeID=to_edge_list[0],
-                                                                                    color_mode=2
+                                                                                    color_mode=1
                                                                                     )
-                                MAJORITY_BIAS_ROUTE_CHANGE_COUNT += 1
-    
+                                SHELTER_CONGESTION_COUNT += 1
+
+                        else:
+                            from_edgeID, shelterID, to_edge_list, time_gap = utilities.find_alternative_better_choice(
+                                                                            current_edgeID=current_edgeID,
+                                                                            vehInfo=vehInfo_by_current_vehID,
+                                                                            agent=agent_by_current_vehID,
+                                                                            shelter_list=shelter_list,
+                                                                            custome_edge_list=custome_edge_list,
+                                                                            system_mode=1,
+                                                                            decision_mode=1
+                                                                            )
+
+                            if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
+                                NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
+                                                                                    target_vehID=current_vehID, 
+                                                                                    NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
+                                                                                    agent_list=agent_list, 
+                                                                                    vehInfo_list=vehInfo_list,
+                                                                                    vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                                    agent_by_target_vehID=agent_by_current_vehID, 
+                                                                                    from_edgeID=from_edgeID,
+                                                                                    new_shelterID=shelterID,
+                                                                                    to_edgeID=to_edge_list[0],
+                                                                                    color_mode=1
+                                                                                    )
+                                NORMALCY_BIAS_ROUTE_CHANGE_COUNT += 1
+                # 同調性バイアスによる経路変更の実装
+                if not vehInfo_by_current_vehID.get_arrival_flag():
+                    if traci.simulation.getTime() % 10 == 0:
+                        if utilities.is_vehIDs_another_lane(target_vehID=current_vehID, vehInfo_list=vehInfo_list, DRIVER_VISIBILITY_DISTANCE=DRIVER_VISIBILITY_DISTANCE):
+                            TEST_COUNT += 1
+                            if utilities.random_true(FOLLOWING_RATE):
+                                from_edgeID, shelterID, to_edge_list, time_gap  = utilities.find_alternative_better_choice(
+                                                                            current_edgeID=current_edgeID,
+                                                                            vehInfo=vehInfo_by_current_vehID,
+                                                                            agent=agent_by_current_vehID,
+                                                                            shelter_list=shelter_list,
+                                                                            custome_edge_list=custome_edge_list,
+                                                                            system_mode=1,
+                                                                            decision_mode=2
+                                                                            )
+
+                                if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
+                                    NEW_VEHICLE_COUNT = utilities.generate_new_veh_based_on_route_time(
+                                                                                        target_vehID=current_vehID, 
+                                                                                        NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
+                                                                                        agent_list=agent_list, 
+                                                                                        vehInfo_list=vehInfo_list,
+                                                                                        vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                                        agent_by_target_vehID=agent_by_current_vehID, 
+                                                                                        from_edgeID=from_edgeID,
+                                                                                        new_shelterID=shelterID,
+                                                                                        to_edgeID=to_edge_list[0],
+                                                                                        color_mode=2
+                                                                                        )
+                                    MAJORITY_BIAS_ROUTE_CHANGE_COUNT += 1
+        
     # ルートごとの避難所要時間を計算する
     utilities.calculate_avg_evac_time_by_route(shelter_list=shelter_list)
     # shelterごとで情報を共有する
@@ -479,6 +481,8 @@ if __name__ == "__main__":
     ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float = _req(cfg, "active_shelter_occupancy_rate_threshold_end", float)
     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_start", float)
     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_end", float)
+    FOLLOWING_RATE: float = _req(cfg, "following_rate", float)
+
 
 
     # シミュレーションの初期化
@@ -620,6 +624,7 @@ if __name__ == "__main__":
     print(f"info_obtained_lanechange_count:{OBTAIN_INFO_LANE_CHANGE_COUNT}")
     print(f"elapsed_time_lanechange_count:{ELAPSED_TIME_LANE_CHANGE_COUNT}")
     print(f"majority_bias_lanechange_count:{POSITIVE_MAJORITY_BIAS_COUNT}")
+    print(f"test_count:{TEST_COUNT}")
 
     # print(f"time_gap_list={time_gap_list}")
 
