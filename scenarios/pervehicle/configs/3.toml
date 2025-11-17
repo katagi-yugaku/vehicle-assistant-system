@@ -8,13 +8,13 @@ num_simulations = 50
 comm_range = 200
 
 # 生成車両数
-num_vehicles = 300
+num_vehicles = 200
 
 # 避難地A行きの車両数
-vehicles_to_shelter_A = 150
+vehicles_to_shelter_A = 100
 
 # 避難地b行きの車両数
-vehicles_to_shelter_B = 150
+vehicles_to_shelter_B = 100
 
 # 避難地Aの収容台数
 shelter_A_capacity = 150
