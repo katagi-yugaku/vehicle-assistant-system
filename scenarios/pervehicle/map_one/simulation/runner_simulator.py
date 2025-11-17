@@ -577,7 +577,8 @@ if __name__ == "__main__":
         print(f"  {cat}: {count} ({count / total:.2%})")
     # 車両情報の初期化
     approach_edgeIDs_by_start_edgeID:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "approach_edgeIDs_by_start_edgeID.json"))
-    vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID)
+    edgeIDs_within_junction_to_shelter_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "edgeIDs_within_jucntion_to_shelter_by_shelter.json"))
+    vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID, edgeIDs_within_junction_to_shelter_dict=edgeIDs_within_junction_to_shelter_dict) 
     # Agentの初期化
     agent_list:list = utilities.init_agent_list(
                                                 vehIDs=vehID_list, 
