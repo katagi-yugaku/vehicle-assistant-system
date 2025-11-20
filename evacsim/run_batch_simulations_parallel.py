@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 import git
 from typing import Any, Dict, List, Optional
 
-_ID_RE = re.compile(r'^(?:init|newveh)_ShelterA_1_(\d+)(?:_\d+)?$')
+_ID_RE = re.compile(r'^(?:init|newveh)_Shelter[A-Z]_\d+_(\d+)(?:_\d+)?$')
 
 # --- ユーザー設定 ---
 # 実行するシミュレーションスクリプトのモジュール名
