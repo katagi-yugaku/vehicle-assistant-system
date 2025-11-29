@@ -269,6 +269,7 @@ def control_vehicles():
                 if not vehInfo_by_current_vehID.get_arrival_flag() and utilities.is_vehID_in_congested_edge(vehID=current_vehID, THRESHOLD_SPEED=THRESHOLD_SPEED):
                     if traci.simulation.getTime() % 10 == 0:
                         if vehInfo_by_current_vehID.get_shelter_congestion_info()[agent_by_current_vehID.get_target_shelter()][0] > agent_by_current_vehID.get_shelter_occupancy_rate_threshold():
+                            print(f"vehiInfoID:{current_vehID} {vehInfo_by_current_vehID.get_shelter_congestion_info()}")
                             from_edgeID, shelterID, to_edge_list = utilities.find_alternative_shelter_choice(
                                                                             current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
                                                                             vehID=current_vehID,
