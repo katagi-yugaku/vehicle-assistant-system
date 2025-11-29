@@ -35,7 +35,7 @@ active_route_change_var = 15
 cautious_route_change_mean = 90
 
 # 慎重的経路変更者の分散
-cautious_route_change_var = 20
+cautious_route_change_var = 15
 
 # 収容率閾値
 shelter_capacity_threshold = 1
@@ -71,7 +71,7 @@ negative_lanechange_start = 800
 negative_lanechange_end = 1100
 
 # ドライバーの視認距離
-driver_visibility_distance = 30
+driver_visibility_distance = 50
 
 # 正の同調性
 positive_majority_bias = 100
@@ -88,4 +88,4 @@ cautious_shelter_occupancy_rate_threshold_start = 0.8
 
 cautious_shelter_occupancy_rate_threshold_end = 0.95
 
-following_rate = 0.1
+following_rate = 0.2
