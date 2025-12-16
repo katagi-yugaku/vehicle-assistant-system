@@ -3,7 +3,7 @@
 ## Overview
 本リポジトリは、**車両DTN（Delay/Disruption Tolerant Network）** を用いた避難支援シミュレーション環境です。  
 災害時における車両避難を対象とし、運転者の行動モデル・車両間通信・地図別経路特性を統合的に評価できます。
-test
+
 ---
 
 ## Directory Structure
