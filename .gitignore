@@ -20,3 +20,11 @@ tripinfo.xml
 
 # macOS
 .DS_Storec
+
+# =========================
+# Slurm / simulation logs
+# =========================
+logs/
+slurm_logs/
+*.out
+*.err
