@@ -27,6 +27,7 @@ class VehicleInfo():
         self._stop_flag = False # 車両が停止しているかどうかのフラグ
         self._start_time_measured_flag = False # 車両の避難開始時間を測定するフラグ
         self._agent_changed_flag = False # 車両の避難所が変更されたかどうかのフラグ
+        self._vehicle_comm_enabled_flag = True # 車両の通信が有効かどうかのフラグ
         self._approach_edge_dict = {} # 進入路のedge
         self._edgeIDs_within_junction_to_shelter_dict = {} # 避難所までの交差点内のedge辞書
         # self._avg_evac_time_by_route = {} # key: route value: avg_time
@@ -213,6 +214,12 @@ class VehicleInfo():
         return self._agent_changed_flag
     def set_agent_changed_flag(self, agent_changed_flag: bool):
         self._agent_changed_flag = agent_changed_flag
+    
+    # 車両の通信が有効かどうかのフラグのgetter/setter
+    def get_vehicle_comm_enabled_flag(self):
+        return self._vehicle_comm_enabled_flag
+    def set_vehicle_comm_enabled_flag(self, vehicle_comm_enabled_flag: bool):
+        self._vehicle_comm_enabled_flag = vehicle_comm_enabled_flag
     
     # 進入路のedgeリストのgetter/setter
     def get_approach_edge_dict(self):

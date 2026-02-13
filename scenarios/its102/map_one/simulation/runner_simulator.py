@@ -227,32 +227,33 @@ def control_vehicles(DRIVER_VISIBILITY_DISTANCE: float):
 
         if not vehInfo_by_current_vehID.get_arrival_flag(): # 未到着の車両に対して処理を実行
             # 通信可能範囲内にいる車両と通信を行う　通信可能範囲は100m設定になる
-            if traci.simulation.getTime() % 10 == 0:
-                around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
-                utilities.v2v_communication(
-                                            target_vehID=current_vehID, 
-                                            target_vehInfo=vehInfo_by_current_vehID, 
-                                            around_vehIDs=around_vehIDs,
-                                            agent_list=agent_list,
-                                            vehInfo_list=vehInfo_list,
-                                            COMMUNICATION_RANGE=COMMUNICATION_RANGE
-                                            )
+            if vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag():
+                if traci.simulation.getTime() % 10 == 0:
+                    around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
+                    utilities.v2v_communication(
+                                                target_vehID=current_vehID, 
+                                                target_vehInfo=vehInfo_by_current_vehID, 
+                                                around_vehIDs=around_vehIDs,
+                                                agent_list=agent_list,
+                                                vehInfo_list=vehInfo_list,
+                                                COMMUNICATION_RANGE=COMMUNICATION_RANGE
+                                                )
 
-                utilities.v2shelter_communication(
-                                                    target_vehID=current_vehID, 
-                                                    shelterID=vehInfo_by_current_vehID.get_target_shelter(),
-                                                    vehInfo_list=vehInfo_list,
-                                                    shelter_list=shelter_list,
-                                                    COMMUNICATION_RANGE=COMMUNICATION_RANGE
-                                                    )
-                
-                utilities.v2v_communication_about_tsunami_info(
-                                                                target_vehID=current_vehID, 
-                                                                target_vehInfo=vehInfo_by_current_vehID, 
-                                                                around_vehIDs=around_vehIDs, 
-                                                                vehInfo_list=vehInfo_list, 
-                                                                COMMUNICATION_RANGE=COMMUNICATION_RANGE
-                                                                )
+                    utilities.v2shelter_communication(
+                                                        target_vehID=current_vehID, 
+                                                        shelterID=vehInfo_by_current_vehID.get_target_shelter(),
+                                                        vehInfo_list=vehInfo_list,
+                                                        shelter_list=shelter_list,
+                                                        COMMUNICATION_RANGE=COMMUNICATION_RANGE
+                                                        )
+                    
+                    utilities.v2v_communication_about_tsunami_info(
+                                                                    target_vehID=current_vehID, 
+                                                                    target_vehInfo=vehInfo_by_current_vehID, 
+                                                                    around_vehIDs=around_vehIDs, 
+                                                                    vehInfo_list=vehInfo_list, 
+                                                                    COMMUNICATION_RANGE=COMMUNICATION_RANGE
+                                                                    )
 
             # 心理モデルの実装
             if current_edgeID in ["E2", "E3", "E4", "E5", "E6", "E7"] and not agent_by_current_vehID.get_evacuation_route_changed_flg():
@@ -558,9 +559,10 @@ def parse_runner_args(argv=None):
 
     # python3 -m scenarios.its102.map_one.simulation.runner_simulator --config scenarios/its102/configs/1.toml --nogui --early_rate 0.5
 if __name__ == "__main__":
-    # python3 -m scenarios.its102.map_one.simulation.runner_base --nogui scenarios/its102/configs/1.toml 0.5 
+    # python3 -m scenarios.its102.map_one.simulation.runner_base --nogui scenarios/its102/configs/1.toml 0.5 1.0
     toml_path = sys.argv[2]
     early_rate:float= float(sys.argv[3]) 
+    v2v_capable_vehicle_rate:float=float(sys.argv[4])
 
     options = get_options()
     if options.nogui:
@@ -593,6 +595,15 @@ if __name__ == "__main__":
     NEGATIVE_MAJORITY_BIAS: float = _req(cfg, "negative_majority_bias", float)
 
     # シミュレーションの初期化
+
+    traci.start(
+            [sumoBinary,
+                "-c", str(SUMO_CFG),
+                "--tripinfo-output", "tripinfo.xml"],
+            traceFile="traci_log.txt",
+            traceGetters=False
+            )
+    
     # 避難地の情報をもとに、Shelter一覧を生成
     shelter_capacity_by_ID:dict = {"ShelterA_1": 150, "ShelterA_2": 150, "ShelterB_1": 150}
     edgeID_by_shelterID:dict = {"ShelterA_1": 'E17', "ShelterA_2": 'E17', "ShelterB_1": 'E9'}
@@ -604,14 +615,8 @@ if __name__ == "__main__":
                                                     near_edgeID=near_edgeID, 
                                                     shelter_list=shelter_list
                                                     )
-    traci.start(
-                [sumoBinary,
-                 "-c", str(SUMO_CFG),
-                 "--tripinfo-output", "tripinfo.xml"],
-                traceFile="traci_log.txt",
-                traceGetters=False
-                )
-    custome_edge_list:list = utilities.init_custom_edge()
+
+    custome_edge_list:list = utilities.init_custome_edge()
     vehicle_start_edges:list = utilities.get_vehicle_start_edges(custome_edge_list=custome_edge_list)
     vehicle_end_edges:list = utilities.get_vehicle_end_edges(custome_edge_list=custome_edge_list)
     # 車両の開始エッジと終了エッジの組み合わせを辞書にする
@@ -649,7 +654,8 @@ if __name__ == "__main__":
         count = counter.get(cat, 0)
         print(f"  {cat}: {count} ({count / total:.2%})")
     # 車両情報の初期化
-    vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list)
+    # ここで調整がいる！！！！
+    # vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID, edgeIDs_within_junction_to_shelter_dict=edgeIDs_within_junction_to_shelter_dict) 
     # Agentの初期化
     agent_list:list = utilities.init_agent_list(
                                                 vehIDs=vehID_list, 

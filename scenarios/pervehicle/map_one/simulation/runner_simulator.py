@@ -31,7 +31,7 @@ from typing import List
 # =========================
 from evacsim import utilities
 from evacsim.agents.Agent import Agent
-from evacsim.agents.CustomeEdge import CustomeEdge, ConnectedEdges  # ファイル名の綴りに注意
+from evacsim.agents.CustomeEdge import CustomeEdge, ConnectedEdges
 from evacsim.agents.Shelter import Shelter
 from evacsim.agents.VehicleInfo import VehicleInfo
 import datetime
@@ -216,25 +216,26 @@ def control_vehicles():
 
         if not vehInfo_by_current_vehID.get_arrival_flag() and not agent_by_current_vehID.get_shelter_full_flg(): # 未到着の車両に対して処理を実行
             # 通信可能範囲内にいる車両と通信を行う　通信可能範囲は100m設定になる
-            if traci.simulation.getTime() % 10 == 0:
-                around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
-                utilities.v2v_communication(
-                                            target_vehID=current_vehID, 
-                                            target_vehInfo=vehInfo_by_current_vehID, 
-                                            around_vehIDs=around_vehIDs,
-                                            agent_list=agent_list,
-                                            vehInfo_list=vehInfo_list,
-                                            COMMUNICATION_RANGE=COMM_RANGE
-                                            )
+            if vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag():
+                if traci.simulation.getTime() % 10 == 0:
+                    around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
+                    utilities.v2v_communication(
+                                                target_vehID=current_vehID, 
+                                                target_vehInfo=vehInfo_by_current_vehID, 
+                                                around_vehIDs=around_vehIDs,
+                                                agent_list=agent_list,
+                                                vehInfo_list=vehInfo_list,
+                                                COMMUNICATION_RANGE=COMM_RANGE
+                                                )
 
-                utilities.v2shelter_communication(
-                                                    target_vehID=current_vehID, 
-                                                    shelterID=vehInfo_by_current_vehID.get_target_shelter(),
-                                                    vehInfo_list=vehInfo_list,
-                                                    shelter_list=shelter_list,
-                                                    COMMUNICATION_RANGE=COMM_RANGE
-                                                    )
-            
+                    utilities.v2shelter_communication(
+                                                        target_vehID=current_vehID, 
+                                                        shelterID=vehInfo_by_current_vehID.get_target_shelter(),
+                                                        vehInfo_list=vehInfo_list,
+                                                        shelter_list=shelter_list,
+                                                        COMMUNICATION_RANGE=COMM_RANGE
+                                                        )
+
             # ドライバーの心理による行動決定
             # 満杯情報による
             if not vehInfo_by_current_vehID.get_arrival_flag() and traci.simulation.getTime() % 10 == 0:
@@ -442,9 +443,10 @@ def parse_runner_args(argv=None):
     return args, remaining
 
 if __name__ == "__main__":
-    # python3 -m scenarios.pervehicle.map_one.simulation.runner_simulator --nogui scenarios/pervehicle/configs/1.toml 0.5 
+    # python3 -m scenarios.pervehicle.map_one.simulation.runner_simulator --nogui scenarios/pervehicle/configs/config_scenario_1.toml 0.5 1.0
     toml_path = sys.argv[2]
     early_rate:float= float(sys.argv[3]) 
+    v2v_capable_vehicle_rate:float= float(sys.argv[4])
 
     options = get_options()
     if options.nogui:
@@ -483,8 +485,6 @@ if __name__ == "__main__":
     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_start", float)
     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_end", float)
     FOLLOWING_RATE: float = _req(cfg, "following_rate", float)
-
-
 
     # シミュレーションの初期化
     # 避難地の情報をもとに、Shelter一覧を生成
@@ -579,7 +579,9 @@ if __name__ == "__main__":
     # 車両情報の初期化
     approach_edgeIDs_by_start_edgeID:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "approach_edgeIDs_by_start_edgeID.json"))
     edgeIDs_within_junction_to_shelter_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "edgeIDs_within_jucntion_to_shelter_by_shelter.json"))
-    vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID, edgeIDs_within_junction_to_shelter_dict=edgeIDs_within_junction_to_shelter_dict) 
+    vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID, edgeIDs_within_junction_to_shelter_dict=edgeIDs_within_junction_to_shelter_dict, v2v_capable_vehicle_rate=v2v_capable_vehicle_rate) 
+    # test用に一旦ここで終了
+    sys.exit(0)
     # Agentの初期化
     agent_list:list = utilities.init_agent_list(
                                                 vehIDs=vehID_list, 

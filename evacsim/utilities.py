@@ -642,7 +642,7 @@ def init_shelter(shelterID:str, shelter_capacity_by_ID:dict, near_edgeID:str, sh
     shelter_list.append(shelter)
     return shelter_list
 
-def init_vehicleInfo_list(vehIDs: list, shelter_list: list, approach_edgeIDs_by_start_edgeID: dict, edgeIDs_within_junction_to_shelter_dict: dict):
+def init_vehicleInfo_list(vehIDs: list, shelter_list: list, approach_edgeIDs_by_start_edgeID: dict, edgeIDs_within_junction_to_shelter_dict: dict, v2v_capable_vehicle_rate: float):
     vehInfo_list = []
     for vehID in vehIDs:
         part_vehID = vehID.split("_")[1] + "_" + vehID.split("_")[2]
@@ -661,6 +661,10 @@ def init_vehicleInfo_list(vehIDs: list, shelter_list: list, approach_edgeIDs_by_
         [vehicleInfo.set_approach_edge_dict(approach_edgeIDs_by_start_edgeID)]
         [vehicleInfo.set_edgeIDs_within_junction_to_shelter_dict(edgeIDs_within_junction_to_shelter_dict)]
         vehInfo_list.append(vehicleInfo)
+    # 引数のv2v機能を有する車両の割合に応じて、フラグを設定する（初期は全車両True）
+    for vehInfo in vehInfo_list:
+        if not random_true(v2v_capable_vehicle_rate):
+            vehInfo.set_vehicle_comm_enabled_flag(False)
     return vehInfo_list
 
 def init_agent_list(vehIDs:list, 
