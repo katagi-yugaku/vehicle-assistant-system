@@ -581,56 +581,57 @@ if __name__ == "__main__":
     edgeIDs_within_junction_to_shelter_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "edgeIDs_within_jucntion_to_shelter_by_shelter.json"))
     vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID, edgeIDs_within_junction_to_shelter_dict=edgeIDs_within_junction_to_shelter_dict, v2v_capable_vehicle_rate=v2v_capable_vehicle_rate) 
     # test用に一旦ここで終了
-    sys.exit(0)
-    # Agentの初期化
-    agent_list:list = utilities.init_agent_list(
-                                                vehIDs=vehID_list, 
-                                                edgeID_by_shelterID=edgeID_by_shelterID, 
-                                                EARLY_AGENT_THRESHOLD_LIST=EARLY_AGENT_THRESHOLD_LIST, 
-                                                LATE_AGENT_THRESHOLD_LIST=LATE_AGENT_THRESHOLD_LIST, 
-                                                ATTR_RATE=early_rate,
-                                                MOTIVATION_THRESHOLD_START=MOTIVATION_THRESHOLD_START,
-                                                MOTIVATION_THRESHOLD_END=MOTIVATION_THRESHOLD_END,
-                                                MIN_MOTIVATION_START=MIN_MOTIVATION_START,
-                                                MIN_MOTIVATION_END=MIN_MOTIVATION_END,
-                                                ACTIVE_ROUTE_CHANGE_MEAN=ACTIVE_ROUTE_CHANGE_MEAN,
-                                                ACTIVE_ROUTE_CHANGE_VAR=ACTIVE_ROUTE_CHANGE_VAR,
-                                                CAUTIOUS_ROUTE_CHANGE_MEAN=CAUTIOUS_ROUTE_CHANGE_MEAN,
-                                                CAUTIOUS_ROUTE_CHANGE_VAR=CAUTIOUS_ROUTE_CHANGE_VAR,
-                                                POSITIVE_LANECHANGE_START=POSITIVE_LANECHANGE_START,
-                                                POSITIVE_LANECHANGE_END=POSITIVE_LANECHANGE_END,
-                                                NEGATIVE_LANECHANGE_START=NEGATIVE_LANECHANGE_START,
-                                                NEGATIVE_LANECHANGE_END=NEGATIVE_LANECHANGE_END,
-                                                POSITIVE_MAJORITY_BIAS=POSITIVE_MAJORITY_BIAS,
-                                                NEGATIVE_MAJORITY_BIAS=NEGATIVE_MAJORITY_BIAS,
-                                                ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
-                                                ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
-                                                CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
-                                                CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END
-                                                )
+    print("test finish")
+    # sys.exit(0)
+    # # Agentの初期化
+    # agent_list:list = utilities.init_agent_list(
+    #                                             vehIDs=vehID_list, 
+    #                                             edgeID_by_shelterID=edgeID_by_shelterID, 
+    #                                             EARLY_AGENT_THRESHOLD_LIST=EARLY_AGENT_THRESHOLD_LIST, 
+    #                                             LATE_AGENT_THRESHOLD_LIST=LATE_AGENT_THRESHOLD_LIST, 
+    #                                             ATTR_RATE=early_rate,
+    #                                             MOTIVATION_THRESHOLD_START=MOTIVATION_THRESHOLD_START,
+    #                                             MOTIVATION_THRESHOLD_END=MOTIVATION_THRESHOLD_END,
+    #                                             MIN_MOTIVATION_START=MIN_MOTIVATION_START,
+    #                                             MIN_MOTIVATION_END=MIN_MOTIVATION_END,
+    #                                             ACTIVE_ROUTE_CHANGE_MEAN=ACTIVE_ROUTE_CHANGE_MEAN,
+    #                                             ACTIVE_ROUTE_CHANGE_VAR=ACTIVE_ROUTE_CHANGE_VAR,
+    #                                             CAUTIOUS_ROUTE_CHANGE_MEAN=CAUTIOUS_ROUTE_CHANGE_MEAN,
+    #                                             CAUTIOUS_ROUTE_CHANGE_VAR=CAUTIOUS_ROUTE_CHANGE_VAR,
+    #                                             POSITIVE_LANECHANGE_START=POSITIVE_LANECHANGE_START,
+    #                                             POSITIVE_LANECHANGE_END=POSITIVE_LANECHANGE_END,
+    #                                             NEGATIVE_LANECHANGE_START=NEGATIVE_LANECHANGE_START,
+    #                                             NEGATIVE_LANECHANGE_END=NEGATIVE_LANECHANGE_END,
+    #                                             POSITIVE_MAJORITY_BIAS=POSITIVE_MAJORITY_BIAS,
+    #                                             NEGATIVE_MAJORITY_BIAS=NEGATIVE_MAJORITY_BIAS,
+    #                                             ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
+    #                                             ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
+    #                                             CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
+    #                                             CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END
+    #                                             )
 
-    for vehID in traci.vehicle.getIDList():
-        traci.vehicle.setMaxSpeed(vehID, 9.0)
-    run()
-    print(f"mean elapsed_time: {np.mean(elapsed_time_list)}")
-    if len(arrival_time_list) == NUM_VEHICLES:
-        print("OK all vehs arrived ")
-    else:
-        print(f"NG all vehs not arrived {len(arrival_time_list)}")
-    print("===== Simlation Result Summary =====")
-    print(f"arrival_time_by_vehID_dict:{arrival_time_by_vehID_dict}")
-    print(f"route_changed_vehicle_count:{NEW_VEHICLE_COUNT}") 
-    print(f"normalcy_bias_route_change_count:{NORMALCY_BIAS_ROUTE_CHANGE_COUNT}")
-    print(f"majority_bias_route_change_count:{MAJORITY_BIAS_ROUTE_CHANGE_COUNT}")
-    print(f"shelter_congestion_count:{SHELTER_CONGESTION_COUNT}")
-    print(f"shelter_capacity_full_count:{SHELTER_CAPACITY_FULL_COUNT}")
-    print(f"lane_changed_vehicle_count:{LANE_CHANGED_VEHICLE_COUNT}")
-    print(f"info_obtained_lanechange_count:{OBTAIN_INFO_LANE_CHANGE_COUNT}")
-    print(f"elapsed_time_lanechange_count:{ELAPSED_TIME_LANE_CHANGE_COUNT}")
-    print(f"majority_bias_lanechange_count:{POSITIVE_MAJORITY_BIAS_COUNT}")
-    print(f"test_count:{TEST_COUNT}")
+    # for vehID in traci.vehicle.getIDList():
+    #     traci.vehicle.setMaxSpeed(vehID, 9.0)
+    # run()
+    # print(f"mean elapsed_time: {np.mean(elapsed_time_list)}")
+    # if len(arrival_time_list) == NUM_VEHICLES:
+    #     print("OK all vehs arrived ")
+    # else:
+    #     print(f"NG all vehs not arrived {len(arrival_time_list)}")
+    # print("===== Simlation Result Summary =====")
+    # print(f"arrival_time_by_vehID_dict:{arrival_time_by_vehID_dict}")
+    # print(f"route_changed_vehicle_count:{NEW_VEHICLE_COUNT}") 
+    # print(f"normalcy_bias_route_change_count:{NORMALCY_BIAS_ROUTE_CHANGE_COUNT}")
+    # print(f"majority_bias_route_change_count:{MAJORITY_BIAS_ROUTE_CHANGE_COUNT}")
+    # print(f"shelter_congestion_count:{SHELTER_CONGESTION_COUNT}")
+    # print(f"shelter_capacity_full_count:{SHELTER_CAPACITY_FULL_COUNT}")
+    # print(f"lane_changed_vehicle_count:{LANE_CHANGED_VEHICLE_COUNT}")
+    # print(f"info_obtained_lanechange_count:{OBTAIN_INFO_LANE_CHANGE_COUNT}")
+    # print(f"elapsed_time_lanechange_count:{ELAPSED_TIME_LANE_CHANGE_COUNT}")
+    # print(f"majority_bias_lanechange_count:{POSITIVE_MAJORITY_BIAS_COUNT}")
+    # print(f"test_count:{TEST_COUNT}")
 
-    # print(f"time_gap_list={time_gap_list}")
+    # # print(f"time_gap_list={time_gap_list}")
 
 
 
