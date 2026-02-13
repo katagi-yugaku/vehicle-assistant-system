@@ -486,102 +486,102 @@ if __name__ == "__main__":
     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_end", float)
     FOLLOWING_RATE: float = _req(cfg, "following_rate", float)
 
-    # シミュレーションの初期化
-    # 避難地の情報をもとに、Shelter一覧を生成
-    traci.start(
-                [sumoBinary,
-                 "-c", str(SUMO_CFG),
-                 "--tripinfo-output", "tripinfo.xml"],
-                traceFile="traci_log.txt",
-                traceGetters=False
-                )
-    shelter_capacity_by_ID:dict = {"ShelterA_1": SHELTER_A_CAPACITY, "ShelterA_2": SHELTER_A_CAPACITY, "ShelterB_1": SHELTER_B_CAPACITY}
-    edgeID_by_shelterID:dict = {"ShelterA_1": 'E17', "ShelterA_2": 'E37', "ShelterB_1": 'E12'}
-    for shelterID, near_edgeID in edgeID_by_shelterID.items():
-        shelter_list:list = utilities.init_shelter(
-                                                    shelterID=shelterID, 
-                                                    shelter_capacity_by_ID=shelter_capacity_by_ID, 
-                                                    near_edgeID=near_edgeID, 
-                                                    shelter_list=shelter_list
-                                                    )
-    custome_edge_list:list = utilities.init_custome_edge()
-    vehicle_start_edges:list = utilities.get_vehicle_start_edges(custome_edge_list=custome_edge_list)
-    vehicle_end_edges:list = utilities.get_vehicle_end_edges(custome_edge_list=custome_edge_list)
-    # 車両の開始エッジと終了エッジの組み合わせを辞書にする
-    vehicle_end_list_by_start_edge_dict:dict = utilities.get_vehicle_end_list_by_start_edge_dict(vehicle_start_edges=vehicle_start_edges, vehicle_end_edges=vehicle_end_edges)
-    # 全経路で総当たりをし、通行可能経路を取得しておく。
-    connected_edges_list:list = utilities.import_connected_edges_from_json(file_path=str(DATA_DIR / "all_edgeIDs.json"))
-    nearest_end_edgeID_by_start_edgeID_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "start_end_edgeIDs.json"))
+    # # シミュレーションの初期化
+    # # 避難地の情報をもとに、Shelter一覧を生成
+    # traci.start(
+    #             [sumoBinary,
+    #              "-c", str(SUMO_CFG),
+    #              "--tripinfo-output", "tripinfo.xml"],
+    #             traceFile="traci_log.txt",
+    #             traceGetters=False
+    #             )
+    # shelter_capacity_by_ID:dict = {"ShelterA_1": SHELTER_A_CAPACITY, "ShelterA_2": SHELTER_A_CAPACITY, "ShelterB_1": SHELTER_B_CAPACITY}
+    # edgeID_by_shelterID:dict = {"ShelterA_1": 'E17', "ShelterA_2": 'E37', "ShelterB_1": 'E12'}
+    # for shelterID, near_edgeID in edgeID_by_shelterID.items():
+    #     shelter_list:list = utilities.init_shelter(
+    #                                                 shelterID=shelterID, 
+    #                                                 shelter_capacity_by_ID=shelter_capacity_by_ID, 
+    #                                                 near_edgeID=near_edgeID, 
+    #                                                 shelter_list=shelter_list
+    #                                                 )
+    # custome_edge_list:list = utilities.init_custome_edge()
+    # vehicle_start_edges:list = utilities.get_vehicle_start_edges(custome_edge_list=custome_edge_list)
+    # vehicle_end_edges:list = utilities.get_vehicle_end_edges(custome_edge_list=custome_edge_list)
+    # # 車両の開始エッジと終了エッジの組み合わせを辞書にする
+    # vehicle_end_list_by_start_edge_dict:dict = utilities.get_vehicle_end_list_by_start_edge_dict(vehicle_start_edges=vehicle_start_edges, vehicle_end_edges=vehicle_end_edges)
+    # # 全経路で総当たりをし、通行可能経路を取得しておく。
+    # connected_edges_list:list = utilities.import_connected_edges_from_json(file_path=str(DATA_DIR / "all_edgeIDs.json"))
+    # nearest_end_edgeID_by_start_edgeID_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "start_end_edgeIDs.json"))
 
-    mapping = nearest_end_edgeID_by_start_edgeID_dict
-    # 開始エッジごとの目的地確率（対応するend_edge数と一致させる）
-    probabilities_by_start_edge = {
-        "E13": [1.0],  # for shelter B
-        "E21": [0.8, 0.2],       # for shelter A
-    }
-    vehID_list = []
-    start_interval = 5.0
-    end_interval = 4.0
-    # ここが車両数の決定ポイント
-    # --- 修正ここから ---
+    # mapping = nearest_end_edgeID_by_start_edgeID_dict
+    # # 開始エッジごとの目的地確率（対応するend_edge数と一致させる）
+    # probabilities_by_start_edge = {
+    #     "E13": [1.0],  # for shelter B
+    #     "E21": [0.8, 0.2],       # for shelter A
+    # }
+    # vehID_list = []
+    # start_interval = 5.0
+    # end_interval = 4.0
+    # # ここが車両数の決定ポイント
+    # # --- 修正ここから ---
     
-    # どの開始エッジから何台出発させるかを明示的にマッピング
-    # (E21がA用、E13がB用だと仮定)
-    vehicle_count_by_start_edge = {
-        "E21": VEHICLES_TO_SHELTER_A,  # 例: 10台
-        "E13": VEHICLES_TO_SHELTER_B   # 例: 200台
-    }
-    # JSONから読み込んだmappingをループ
-    for start_edgeID, end_edgeID_list in mapping.items():
-        # この開始エッジに割り当てられた車両数を取得
-        assigned_vehicle_num = vehicle_count_by_start_edge.get(start_edgeID, 0)
-        if assigned_vehicle_num == 0:
-            continue # このエッジからは生成しないので次のループへ
-        vehicle_intervals = np.linspace(start_interval, end_interval, num=int(assigned_vehicle_num))
-        probabilities = probabilities_by_start_edge.get(
-            start_edgeID,
-            [1.0 / len(end_edgeID_list)] * len(end_edgeID_list)
-        )
-        if len(probabilities) != len(end_edgeID_list):
-            raise ValueError(
-                f"Probability length mismatch for {start_edgeID}: "
-                f"len(probabilities)={len(probabilities)} vs len(end_edgeID_list)={len(end_edgeID_list)}."
-            )
-        # 出発時刻リセット
-        DEPART_TIME = 0.0
-        # 車両生成ループ
-        for vehicle_index in range(int(assigned_vehicle_num)):
-            selected_end_edgeID = utilities.choose_edge_by_probability(edgeID_list=end_edgeID_list, probabilities=probabilities)
-            target_shelterID = utilities.find_shelterID_by_edgeID_by_shelterID(edgeID=selected_end_edgeID, edgeID_by_shelterID=edgeID_by_shelterID)
+    # # どの開始エッジから何台出発させるかを明示的にマッピング
+    # # (E21がA用、E13がB用だと仮定)
+    # vehicle_count_by_start_edge = {
+    #     "E21": VEHICLES_TO_SHELTER_A,  # 例: 10台
+    #     "E13": VEHICLES_TO_SHELTER_B   # 例: 200台
+    # }
+    # # JSONから読み込んだmappingをループ
+    # for start_edgeID, end_edgeID_list in mapping.items():
+    #     # この開始エッジに割り当てられた車両数を取得
+    #     assigned_vehicle_num = vehicle_count_by_start_edge.get(start_edgeID, 0)
+    #     if assigned_vehicle_num == 0:
+    #         continue # このエッジからは生成しないので次のループへ
+    #     vehicle_intervals = np.linspace(start_interval, end_interval, num=int(assigned_vehicle_num))
+    #     probabilities = probabilities_by_start_edge.get(
+    #         start_edgeID,
+    #         [1.0 / len(end_edgeID_list)] * len(end_edgeID_list)
+    #     )
+    #     if len(probabilities) != len(end_edgeID_list):
+    #         raise ValueError(
+    #             f"Probability length mismatch for {start_edgeID}: "
+    #             f"len(probabilities)={len(probabilities)} vs len(end_edgeID_list)={len(end_edgeID_list)}."
+    #         )
+    #     # 出発時刻リセット
+    #     DEPART_TIME = 0.0
+    #     # 車両生成ループ
+    #     for vehicle_index in range(int(assigned_vehicle_num)):
+    #         selected_end_edgeID = utilities.choose_edge_by_probability(edgeID_list=end_edgeID_list, probabilities=probabilities)
+    #         target_shelterID = utilities.find_shelterID_by_edgeID_by_shelterID(edgeID=selected_end_edgeID, edgeID_by_shelterID=edgeID_by_shelterID)
 
-            VEHICLE_NUM, ROUTE_NUM, vehID_list_by_shelter, DEPART_TIME = utilities.generate_simple_init_vehID(
-                                                                                                                from_edgeID=start_edgeID,
-                                                                                                                to_edgeID=selected_end_edgeID,
-                                                                                                                shelterID=target_shelterID,
-                                                                                                                generate_interval=vehicle_intervals[vehicle_index],
-                                                                                                                generate_route_count=ROUTE_NUM,
-                                                                                                                generate_veh_count=VEHICLE_NUM,
-                                                                                                                depart_time=DEPART_TIME
-                                                                                                            )
-            vehID_list.extend(vehID_list_by_shelter)
+    #         VEHICLE_NUM, ROUTE_NUM, vehID_list_by_shelter, DEPART_TIME = utilities.generate_simple_init_vehID(
+    #                                                                                                             from_edgeID=start_edgeID,
+    #                                                                                                             to_edgeID=selected_end_edgeID,
+    #                                                                                                             shelterID=target_shelterID,
+    #                                                                                                             generate_interval=vehicle_intervals[vehicle_index],
+    #                                                                                                             generate_route_count=ROUTE_NUM,
+    #                                                                                                             generate_veh_count=VEHICLE_NUM,
+    #                                                                                                             depart_time=DEPART_TIME
+    #                                                                                                         )
+    #         vehID_list.extend(vehID_list_by_shelter)
 
-    # カテゴリのカウント
-    categories = [extract_category(v) for v in vehID_list]
-    counter = Counter(categories)
+    # # カテゴリのカウント
+    # categories = [extract_category(v) for v in vehID_list]
+    # counter = Counter(categories)
 
-    # 合計と割合を表示
-    total = sum(counter.values())
-    print("出現数:", dict(counter))
-    print("割合:")
-    for cat in ["A1", "A2", "B1", "B2"]:
-        count = counter.get(cat, 0)
-        print(f"  {cat}: {count} ({count / total:.2%})")
-    # 車両情報の初期化
-    approach_edgeIDs_by_start_edgeID:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "approach_edgeIDs_by_start_edgeID.json"))
-    edgeIDs_within_junction_to_shelter_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "edgeIDs_within_jucntion_to_shelter_by_shelter.json"))
-    vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID, edgeIDs_within_junction_to_shelter_dict=edgeIDs_within_junction_to_shelter_dict, v2v_capable_vehicle_rate=v2v_capable_vehicle_rate) 
-    # test用に一旦ここで終了
-    print("test finish")
+    # # 合計と割合を表示
+    # total = sum(counter.values())
+    # print("出現数:", dict(counter))
+    # print("割合:")
+    # for cat in ["A1", "A2", "B1", "B2"]:
+    #     count = counter.get(cat, 0)
+    #     print(f"  {cat}: {count} ({count / total:.2%})")
+    # # 車両情報の初期化
+    # approach_edgeIDs_by_start_edgeID:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "approach_edgeIDs_by_start_edgeID.json"))
+    # edgeIDs_within_junction_to_shelter_dict:dict = utilities.import_start_end_edgeIDs_from_json(file_path=str(DATA_DIR / "edgeIDs_within_jucntion_to_shelter_by_shelter.json"))
+    # vehInfo_list:list = utilities.init_vehicleInfo_list(vehIDs=vehID_list, shelter_list=shelter_list, approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID, edgeIDs_within_junction_to_shelter_dict=edgeIDs_within_junction_to_shelter_dict, v2v_capable_vehicle_rate=v2v_capable_vehicle_rate) 
+    # # test用に一旦ここで終了
+    # print("test finish")
     # sys.exit(0)
     # # Agentの初期化
     # agent_list:list = utilities.init_agent_list(
