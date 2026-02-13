@@ -38,5 +38,6 @@ python3 -W ignore::UserWarning -m scenarios.pervehicle.map_one.simulation.runner
 #   "${CONFIG}" \
 #   "${EARLY_RATE}" \
 #   "${V2V_RATE}"
+# 修正
 
 echo "end       : $(date)"
