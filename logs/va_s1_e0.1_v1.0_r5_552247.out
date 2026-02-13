@@ -1,0 +1,17 @@
+=== Job Info ===
+host      : wagner
+jobid     : 552247
+scenario  : 1
+early_rate: 0.1
+v2v_rate  : 1.0
+run_id    : 5
+config    : scenarios/pervehicle/configs/config_scenario_1.toml
+start     : 2026年  2月 13日 金曜日 12:49:18 JST
+ Retrying in 1 seconds
+出現数: {'B1': 150, 'A2': 42, 'A1': 108}
+割合:
+  A1: 108 (36.00%)
+  A2: 42 (14.00%)
+  B1: 150 (50.00%)
+  B2: 0 (0.00%)
+Step #0.00end       : 2026年  2月 13日 金曜日 12:49:21 JST

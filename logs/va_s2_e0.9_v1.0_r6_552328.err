@@ -1,0 +1,5 @@
+Warning: Could not set locale to 'C'.
+/home/katagi/tmp/sumo/tools/traci/step.py:120: UserWarning: API change now handles duration as floating point seconds
+  return method(*args, **kwargs)
+Error: tcpip::Socket::recvAndCheck @ recv: peer shutdown
+Quitting (on error).

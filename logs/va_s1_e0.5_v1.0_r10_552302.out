@@ -1,0 +1,17 @@
+=== Job Info ===
+host      : chopin
+jobid     : 552302
+scenario  : 1
+early_rate: 0.5
+v2v_rate  : 1.0
+run_id    : 10
+config    : scenarios/pervehicle/configs/config_scenario_1.toml
+start     : Fri Feb 13 12:49:19 JST 2026
+ Retrying in 1 seconds
+出現数: {'B1': 150, 'A1': 111, 'A2': 39}
+割合:
+  A1: 111 (37.00%)
+  A2: 39 (13.00%)
+  B1: 150 (50.00%)
+  B2: 0 (0.00%)
+Step #0.00end       : Fri Feb 13 12:49:21 JST 2026

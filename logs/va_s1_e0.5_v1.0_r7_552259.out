@@ -1,0 +1,17 @@
+=== Job Info ===
+host      : paganini
+jobid     : 552259
+scenario  : 1
+early_rate: 0.5
+v2v_rate  : 1.0
+run_id    : 7
+config    : scenarios/pervehicle/configs/config_scenario_1.toml
+start     : Fri Feb 13 12:49:18 JST 2026
+ Retrying in 1 seconds
+出現数: {'B1': 150, 'A2': 38, 'A1': 112}
+割合:
+  A1: 112 (37.33%)
+  A2: 38 (12.67%)
+  B1: 150 (50.00%)
+  B2: 0 (0.00%)
+Step #0.00end       : Fri Feb 13 12:49:21 JST 2026

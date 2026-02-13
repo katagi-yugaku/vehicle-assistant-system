@@ -36,7 +36,7 @@ echo "start     : $(date)"
 # 任意：run_id を seed に使えるなら環境変数で渡す（runner側で読む実装なら）
 export RUN_ID
 
-python3 -m scenarios.pervehicle.map_one.simulation.runner_simulator \
+python3.10 -m scenarios.pervehicle.map_one.simulation.runner_simulator \
   --nogui \
   "${CONFIG}" \
   "${EARLY_RATE}" \
