@@ -28,18 +28,15 @@ echo "run_id    : ${RUN_ID}"
 echo "config    : ${CONFIG}"
 echo "start     : $(date)"
 
-# ここで必要なら環境ロード（例）
-# module load python/3.x
-# source ~/venv/bin/activate
-# conda activate yourenv
-
-# 任意：run_id を seed に使えるなら環境変数で渡す（runner側で読む実装なら）
 export RUN_ID
 
-python3.10 -m scenarios.pervehicle.map_one.simulation.runner_simulator \
-  --nogui \
-  "${CONFIG}" \
-  "${EARLY_RATE}" \
-  "${V2V_RATE}"
+python3 -W ignore::UserWarning -m scenarios.pervehicle.map_one.simulation.runner_simulator \
+  --nogui "${CONFIG}" "${EARLY_RATE}" "${V2V_RATE}"
+# -W はwarning制御オプション
+# python3.10 -m scenarios.pervehicle.map_one.simulation.runner_simulator \
+#   --nogui \
+#   "${CONFIG}" \
+#   "${EARLY_RATE}" \
+#   "${V2V_RATE}"
 
 echo "end       : $(date)"

@@ -614,7 +614,7 @@ if __name__ == "__main__":
         traci.vehicle.setMaxSpeed(vehID, 9.0)
     run()
     print(f"mean elapsed_time: {np.mean(elapsed_time_list)}")
-    if len(arrival_time_list) == NUM_VEHICLES:
+    if len(arrival_time_list) == VEHICLES_TO_SHELTER_A+VEHICLES_TO_SHELTER_B:
         print("OK all vehs arrived ")
     else:
         print(f"NG all vehs not arrived {len(arrival_time_list)}")
@@ -630,8 +630,6 @@ if __name__ == "__main__":
     print(f"elapsed_time_lanechange_count:{ELAPSED_TIME_LANE_CHANGE_COUNT}")
     print(f"majority_bias_lanechange_count:{POSITIVE_MAJORITY_BIAS_COUNT}")
     print(f"test_count:{TEST_COUNT}")
-
-    # print(f"time_gap_list={time_gap_list}")
 
 
 
