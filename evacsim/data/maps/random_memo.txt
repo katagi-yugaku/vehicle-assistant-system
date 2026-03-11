@@ -1,0 +1,4 @@
+python3 /Users/kashiisamutakeshi/vehicle-assistant-system/sumo/tools/randomTrips.py \
+-n ishinomaki_light.net.xml \
+-o trips.trips.xml \
+-r routes.rou.xml
