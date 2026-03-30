@@ -20,6 +20,8 @@ tripinfo.xml
 
 # macOS
 .DS_Storec
+*.DS_Store
+evacsim/data/maps/*.osm.pbf
 
 # =========================
 # Slurm / simulation logs
@@ -27,4 +29,4 @@ tripinfo.xml
 logs/
 slurm_logs/
 *.out
-*.err
+*.errevacsim/data/maps/*.osm.pbf

@@ -347,7 +347,8 @@ def generate_new_veh(
                             normalcy_motivation_increase=copy.deepcopy(agent_by_target_vehID.get_motivation_increase_from_info_receive()),
                             motivation_decrease_due_to_inactive_neighbors=copy.deepcopy(agent_by_target_vehID.get_motivation_decrease_due_to_inactive_neighbors()),
                             motivation_increase_due_to_following_neighbors=copy.deepcopy(agent_by_target_vehID.get_motivation_increase_due_to_following_neighbors()),
-                            lane_minimum_motivation_value=copy.deepcopy(agent_by_target_vehID.get_minimum_motivation_value())
+                            lane_minimum_motivation_value=copy.deepcopy(agent_by_target_vehID.get_minimum_motivation_value()),
+                            shelter_occupancy_rate_threshold=copy.deepcopy(agent_by_target_vehID.get_shelter_occupancy_rate_threshold())
                             )
     agent.set_near_edgeID_by_target_shelter(copy.deepcopy(agent_by_target_vehID.get_near_edgeID_by_target_shelter()))
     agent.set_candidate_edge_by_shelterID(updated_candidate_shelter)
@@ -631,6 +632,7 @@ def init_custome_edge() -> List["CustomeEdge"]:
     return custome_edge_list
 
 def init_shelter(shelterID:str, shelter_capacity_by_ID:dict, near_edgeID:str, shelter_list:list) -> list:
+    print(f"shelterID: {shelterID}, capacity: {shelter_capacity_by_ID[shelterID]}, near_edgeID: {near_edgeID}")
     shelter:Shelter = Shelter(shelterID=shelterID, capacity=shelter_capacity_by_ID[shelterID], near_edgeID=near_edgeID)
     
     # 避難所のレーンIDを取得
@@ -667,7 +669,27 @@ def init_vehicleInfo_list(vehIDs: list, shelter_list: list, approach_edgeIDs_by_
             vehInfo.set_vehicle_comm_enabled_flag(False)
     return vehInfo_list
 
-def init_agent_list(vehIDs:list, 
+def init_vehicleInfo_list_base(vehIDs: list, shelter_list: list):
+    vehInfo_list = []
+    for vehID in vehIDs:
+        part_vehID = vehID.split("_")[1] + "_" + vehID.split("_")[2]
+        target_shelter = next((shelter for shelter in shelter_list if shelter.get_shelterID() == part_vehID), None)
+        if target_shelter is None:
+            continue  # 対応する避難所がない場合はスキップ
+        vehicleInfo = VehicleInfo(
+                            vehID=vehID,
+                            target_shelter=target_shelter.get_shelterID(),
+                            edgeID_connect_target_shelter=target_shelter.get_near_edgeID(),
+                            create_time=traci.simulation.getTime()
+                            )
+        [vehicleInfo.init_set_congestion_level_by_shelter(shelter.get_shelterID(), 0, traci.simulation.getTime()) for shelter in shelter_list]
+        [vehicleInfo.init_set_avg_evac_time_by_route_by_recive_time()]
+        [vehicleInfo.init_set_tsunami_precursor_info()]
+        vehInfo_list.append(vehicleInfo)
+    return vehInfo_list
+
+def init_agent_list(
+                    vehIDs:list, 
                     edgeID_by_shelterID:dict, 
                     EARLY_AGENT_THRESHOLD_LIST:list, 
                     LATE_AGENT_THRESHOLD_LIST:list, 
