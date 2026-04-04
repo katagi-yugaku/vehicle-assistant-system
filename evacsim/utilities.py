@@ -26,6 +26,7 @@ import traci  # noqa: E402
 # =========================
 import matplotlib.pyplot as plt
 import numpy as np
+import xml.etree.ElementTree as ET
 from numpy import double
 
 # =========================
@@ -39,8 +40,8 @@ from .agents.VehicleInfo import VehicleInfo
 # =========================
 # Runtime config
 # =========================
-# random.seed(316)  # 乱数シードを314に設定（元のコメントを維持）　確率系にも影響を与えるのでかなり注意する
-random.seed()
+random.seed(316)  # 乱数シードを314に設定（元のコメントを維持）　確率系にも影響を与えるのでかなり注意する
+# random.seed()
 
 VEHICLE_SHELTER_DURATION_TIME = 10000
 FREE_FLOW_SPEED = 13.0  # 迂回路（Uターン時）の想定速度 (m/s)
@@ -162,6 +163,18 @@ def get_prev_edge(edgeIDs: tuple, current_edgeID: str):
         if idx > 0:
             return edgeIDs[idx - 1]
     return None
+
+def get_remaining_edges(route_edges, current_edgeID):
+    if current_edgeID not in route_edges:
+        return []  # 見つからない場合
+
+    idx = route_edges.index(current_edgeID)
+    return route_edges[idx:]  # current含めて以降
+
+def generate_route_prob_list(route_num):
+    n = route_num + 1
+    prob = 1.0 / n
+    return [prob] * n
 
 def generate_new_veh_based_on_route_time(target_vehID:str, 
                                          NEW_VEHICLE_COUNT:int, 
@@ -510,6 +523,60 @@ def get_new_shelterID_and_near_edgeID_by_vehID_based_on_distance(current_edgeID,
 
     return from_edgeID, new_shelterID, new_edgeID_near_shelter
 
+def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, current_time: float, neighbor_vehicle_abandant_nums: int):
+    final_rate = 0.2033
+    if neighbor_vehicle_abandant_nums > 4:
+        neighbor_vehicle_abandant_nums = 4
+
+    encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
+    current_vehicle_abandantment_value = 0.2*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
+    if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
+        print(f"(current_time: {current_time} - encounted_congestion_time: {encounted_congestion_time})*2 +  agent_by_target_vehID.get_tsunami_info_obtaiend_time(): {agent_by_target_vehID.get_tsunami_info_obtaiend_time()} - normalcy_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + majority_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()} = current_vehicle_abandantment_value: {current_vehicle_abandantment_value} compared with agent_by_target_vehID.get_vehicle_abandoned_threshold(): {agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
+        return True
+    return False
+
+def count_near_abandoned_vehicle_in_right_lane(
+                                                vehID: str,
+                                                agent_list: list,
+                                            ) -> int:
+    front_threshold: float = 15.0
+    back_threshold: float = 10.0
+    leaders = traci.vehicle.getNeighbors(vehID, 0b011)      # 右前
+    followers = traci.vehicle.getNeighbors(vehID, 0b001)    # 右後
+    count = 0
+
+    # 前方
+    for neighbor_vehID, neighbor_dist in leaders:
+        neighbor_agent: Agent = find_agent_by_vehID(neighbor_vehID, agent_list)
+        if neighbor_agent is not None and neighbor_agent.get_vehicle_abandoned_flg():
+            print(f"neighbor_vehID: {neighbor_vehID}, neighbor_dist: {neighbor_dist}, front_threshold: {front_threshold}")
+            if neighbor_dist < front_threshold:
+                count += 1
+
+    # 後方
+    for neighbor_vehID, neighbor_dist in followers:
+        neighbor_agent: Agent = find_agent_by_vehID(neighbor_vehID, agent_list)
+        if neighbor_agent is not None and neighbor_agent.get_vehicle_abandoned_flg():
+            if neighbor_dist > -back_threshold:
+                count += 1
+
+    return count
+
+def vehicle_abandant_behavior(current_vehID: str, current_edgeID: str, agent_by_current_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, PEDESTRIAN_COUNT: int, STOPPING_TIME_IN_SHELTER: int):
+    person_id = f"ped_{PEDESTRIAN_COUNT}"
+    edge_position = traci.vehicle.getLanePosition(current_vehID)
+    current_lane_length = traci.lane.getLength(traci.vehicle.getLaneID(current_vehID))
+    traci.person.add(personID=person_id, edgeID=current_edgeID, pos=edge_position, depart=traci.simulation.getTime(), typeID="DEFAULT_PEDTYPE")
+    route_edges_for_pedestrian:list = get_remaining_edges(route_edges=traci.vehicle.getRoute(current_vehID), current_edgeID=current_edgeID)
+    current_edgeID = traci.vehicle.getRoadID(current_vehID)
+    traci.person.appendWalkingStage(personID=person_id, edges=route_edges_for_pedestrian, arrivalPos=0.0)
+    PEDESTRIAN_COUNT += 1
+    agent_by_current_vehID.set_vehicle_abandoned_flg(True)
+    traci.vehicle.setStop(vehID=current_vehID, edgeID=current_edgeID, pos=edge_position, laneIndex=traci.vehicle.getLaneIndex(current_vehID), duration=STOPPING_TIME_IN_SHELTER)
+    traci.vehicle.setColor(current_vehID, (128, 128, 128, 255))  # 灰色に変更
+    return PEDESTRIAN_COUNT
+    
+
 def generate_initial_vehIDs_for_row_xml(start_edge:str, end_edge:str, via_edges:str, \
                         depart_time:double, interval:double, veh_count:int, \
                         vehs_written_list:list, shelter:Shelter):
@@ -579,6 +646,35 @@ def generate_simple_init_vehID(from_edgeID:str, to_edgeID:str, shelterID:str, \
     generate_veh_count += 1;generate_route_count += 1
     return generate_veh_count, generate_route_count, vehID_list, depart_time
 
+def generate_init_vehID_with_route_edges(from_edgeID:str, to_edgeID:str, shelterID:str, \
+                        generate_interval:double, generate_route_count:int, \
+                        generate_veh_count:int, depart_time:double, route_edges:list):
+    '''
+    Parameters:
+        from_edgeID: 出発エッジID to_edgeID: 到着エッジID shelterID: 避難地ID VEHICLE_FOR_SHELTER: 避難地に向かう車両数
+        start_time: 避難地に向かう車両における先頭車両の出発時間
+        generate_interval: 車両の生成間隔 generate_route_count: 生成したルートの数 generate_veh_count: 生成した車両の数
+    Returns:
+    generate_veh_count: 生成した車両の数 generate_route_count: 生成したルートの数 vehID_list: 生成した車両IDのリスト
+    '''
+    vehID_list = []
+    # 新しい車両IDを生成と出発時間を設定
+    new_veh_ID:str = "{}_{}_{}".format("init", shelterID, generate_veh_count)
+    vehID_list.append(new_veh_ID)
+    # 経由地点を取得する
+    via_edgeIDs_with_intial_end_edge:list = route_edges if route_edges is not None else list(traci.simulation.findRoute(from_edgeID, to_edgeID).edges)
+    # via_edgeIDs_with_intial_end_edge:list = list(traci.simulation.findRoute(from_edgeID, to_edgeID).edges)
+    # ルートを設定する
+    new_route_ID:str = "{}_{}_{}".format("initroute", shelterID, generate_route_count)
+    traci.route.add(routeID=new_route_ID, edges=via_edgeIDs_with_intial_end_edge)
+    #　新しい車両を生成
+    traci.vehicle.add(vehID=new_veh_ID, routeID=new_route_ID, depart=depart_time)
+    depart_time = depart_time + generate_interval
+    # 新規の避難地を設定
+    traci.vehicle.setParkingAreaStop(vehID=new_veh_ID, stopID=shelterID, duration=100000)
+    generate_veh_count += 1;generate_route_count += 1
+    return generate_veh_count, generate_route_count, vehID_list, depart_time
+
 def create_arrival_time_list(vehInfo_list:list,):
     arrival_time_list = []
     for vehInfo in vehInfo_list:
@@ -632,7 +728,7 @@ def init_custome_edge() -> List["CustomeEdge"]:
     return custome_edge_list
 
 def init_shelter(shelterID:str, shelter_capacity_by_ID:dict, near_edgeID:str, shelter_list:list) -> list:
-    print(f"shelterID: {shelterID}, capacity: {shelter_capacity_by_ID[shelterID]}, near_edgeID: {near_edgeID}")
+    # print(f"shelterID: {shelterID}, capacity: {shelter_capacity_by_ID[shelterID]}, near_edgeID: {near_edgeID}")
     shelter:Shelter = Shelter(shelterID=shelterID, capacity=shelter_capacity_by_ID[shelterID], near_edgeID=near_edgeID)
     
     # 避難所のレーンIDを取得
@@ -711,7 +807,13 @@ def init_agent_list(
                     ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START:float,
                     ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float,
                     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START:float,
-                    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float):
+                    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float,
+                    NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START:float,
+                    NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END:float,
+                    MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START:float,
+                    MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END:float,
+                    VEHICLE_ABANDONED_THRESHOLD_START:float,
+                    VEHICLE_ABANDONED_THRESHOLD_END:float):
     agent_list = []
     for vehID in vehIDs:
         # せっかちな人はこっち
@@ -726,7 +828,10 @@ def init_agent_list(
                             motivation_decrease_due_to_inactive_neighbors=NEGATIVE_MAJORITY_BIAS,
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
                             lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
-                            shelter_occupancy_rate_threshold=random.uniform(ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END)
+                            shelter_occupancy_rate_threshold=random.uniform(ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END),
+                            vehicle_abandoned_threshold=random.uniform(VEHICLE_ABANDONED_THRESHOLD_START, VEHICLE_ABANDONED_THRESHOLD_END),
+                            normalcy_value_about_vehicle_abandonment=random.uniform(NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START, NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END),
+                            majority_value_about_vehicle_abandonment=random.uniform(MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START, MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END)
                             )
         else:
             agent:Agent = Agent(
@@ -739,7 +844,10 @@ def init_agent_list(
                             motivation_decrease_due_to_inactive_neighbors=NEGATIVE_MAJORITY_BIAS,
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
                             lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
-                            shelter_occupancy_rate_threshold=random.uniform(CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END)
+                            shelter_occupancy_rate_threshold=random.uniform(CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END),
+                            vehicle_abandoned_threshold=random.uniform(VEHICLE_ABANDONED_THRESHOLD_START, VEHICLE_ABANDONED_THRESHOLD_END),
+                            normalcy_value_about_vehicle_abandonment=random.uniform(NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START, NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END),
+                            majority_value_about_vehicle_abandonment=random.uniform(MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START, MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END)
                             )
 
         agent.set_near_edgeID_by_target_shelter(edgeID_by_shelterID[vehID.split("_")[1] + "_" + vehID.split("_")[2]])
@@ -1882,6 +1990,11 @@ def choose_edge_by_probability(edgeID_list:list, probabilities:list) -> str:
 
     return random.choices(edgeID_list, weights=probabilities, k=1)[0]
 
+def choose_route_edges_by_probability(route_edges_list_by_start_end_index:dict, routeID_list, probabilities:list) -> list:
+    routeID = random.choices(routeID_list, weights=probabilities, k=1)[0]
+    return route_edges_list_by_start_end_index[routeID]
+
+
 
 # --- 周囲密度の計算（既存ロジックを維持） ---
 def get_local_density(vehID: str, radius: float = 100.0) -> float:
@@ -2094,41 +2207,107 @@ def merge_arrival_vehs_of_shelter(shelter_list: List[Shelter]):
                 total += len(other_shelter.get_arrival_vehID_list())
         shelter.set_total_arrival_vehIDs(total)
 
-def is_vehID_in_congested_edge(vehID:str, THRESHOLD_SPEED):
-    # 車両が通過するエッジが混雑しているか判定
-    current_edgeID = traci.vehicle.getRoadID(vehID)
-    edgeIDs_of_target_vehID = traci.route.getEdges(traci.vehicle.getRouteID(vehID))
-    next_edge_of_current_edgeID = get_next_edge(edgeIDs=edgeIDs_of_target_vehID, current_edgeID=current_edgeID)
-    prev_edge_of_current_edgeID = get_prev_edge(edgeIDs=edgeIDs_of_target_vehID, current_edgeID=current_edgeID)
-    if next_edge_of_current_edgeID is None :
-        next_edge_of_current_edgeID_num = 0
-    else:
-        next_edge_of_current_edgeID_num = len(traci.edge.getLastStepVehicleIDs(next_edge_of_current_edgeID))
-    if prev_edge_of_current_edgeID is None:
-        prev_edge_of_current_edgeID_num = 0
-    else:
-        prev_edge_of_current_edgeID_num = len(traci.edge.getLastStepVehicleIDs(prev_edge_of_current_edgeID))
-    current_edgeID_vehs_flag = len(traci.edge.getLastStepVehicleIDs(current_edgeID)) \
-                                + next_edge_of_current_edgeID_num \
-                                + prev_edge_of_current_edgeID_num > 15
-    # if current_edgeID_vehs_flag:
-    #     print(f"current_edgeID_num: {len(traci.edge.getLastStepVehicleIDs(current_edgeID))}, next_edge_of_current_edgeID_num: {next_edge_of_current_edgeID_num}, prev_edge_of_current_edgeID_num: {prev_edge_of_current_edgeID_num}")
+# def is_vehID_in_congested_edge(vehID:str, THRESHOLD_SPEED):
+#     # 車両が通過するエッジが混雑しているか判定
+#     current_edgeID = traci.vehicle.getRoadID(vehID)
+#     edgeIDs_of_target_vehID = traci.route.getEdges(traci.vehicle.getRouteID(vehID))
+#     next_edge_of_current_edgeID = get_next_edge(edgeIDs=edgeIDs_of_target_vehID, current_edgeID=current_edgeID)
+#     prev_edge_of_current_edgeID = get_prev_edge(edgeIDs=edgeIDs_of_target_vehID, current_edgeID=current_edgeID)
+#     if next_edge_of_current_edgeID is None :
+#         next_edge_of_current_edgeID_num = 0
+#     else:
+#         next_edge_of_current_edgeID_num = len(traci.edge.getLastStepVehicleIDs(next_edge_of_current_edgeID))
+#     if prev_edge_of_current_edgeID is None:
+#         prev_edge_of_current_edgeID_num = 0
+#     else:
+#         prev_edge_of_current_edgeID_num = len(traci.edge.getLastStepVehicleIDs(prev_edge_of_current_edgeID))
+#     current_edgeID_vehs_flag = len(traci.edge.getLastStepVehicleIDs(current_edgeID)) \
+#                                 + next_edge_of_current_edgeID_num \
+#                                 + prev_edge_of_current_edgeID_num > 15
+#     # if current_edgeID_vehs_flag:
+#     #     print(f"current_edgeID_num: {len(traci.edge.getLastStepVehicleIDs(current_edgeID))}, next_edge_of_current_edgeID_num: {next_edge_of_current_edgeID_num}, prev_edge_of_current_edgeID_num: {prev_edge_of_current_edgeID_num}")
+
+#     try:
+#         # 平均車速だとあかんな平均車両数で判定する 車線上の平均速度を取得
+#         # average_speed = traci.edge.getLastStepMeanSpeed(current_edgeID)
+#         my_speed = traci.vehicle.getSpeed(vehID)
+#         # if my_speed < 5.0:
+#         #     print(f"my_speed: {my_speed}, current_edgeID_vehs_flag: {current_edgeID_vehs_flag}")
+#         # 渋滞判定
+#         if my_speed < THRESHOLD_SPEED:
+#             if current_edgeID_vehs_flag :
+#                 return True
+#         else:
+#             return False
+#     except Exception as e:
+#         print(f"Error in is_lane_congested: {e}")
+#         return False # エラー時は渋滞していないと見なす
+
+def is_vehID_in_congested_edge(vehID: str, threshold_speed: float) -> bool:
+    leader_search_dist: float = 100.0
+    leader_gap_threshold: float = 20.0
+    density_threshold: float = 0.03   # 台/m（= 30台/km）
+    non_congested_front_vehicle_threshold: int = 5
 
     try:
-        # 平均車速だとあかんな平均車両数で判定する 車線上の平均速度を取得
-        # average_speed = traci.edge.getLastStepMeanSpeed(current_edgeID)
-        my_speed = traci.vehicle.getSpeed(vehID)
-        # if my_speed < 5.0:
-        #     print(f"my_speed: {my_speed}, current_edgeID_vehs_flag: {current_edgeID_vehs_flag}")
-        # 渋滞判定
-        if my_speed < THRESHOLD_SPEED:
-            if current_edgeID_vehs_flag :
-                return True
-        else:
+        current_edgeID = traci.vehicle.getRoadID(vehID)
+        route_edges = traci.route.getEdges(traci.vehicle.getRouteID(vehID))
+
+        next_edge = get_next_edge(edgeIDs=route_edges, current_edgeID=current_edgeID)
+        prev_edge = get_prev_edge(edgeIDs=route_edges, current_edgeID=current_edgeID)
+
+        current_num = len(traci.edge.getLastStepVehicleIDs(current_edgeID))
+        next_num = len(traci.edge.getLastStepVehicleIDs(next_edge)) if next_edge else 0
+        prev_num = len(traci.edge.getLastStepVehicleIDs(prev_edge)) if prev_edge else 0
+
+        current_length = traci.lane.getLength(f"{current_edgeID}_0")
+        next_length = traci.lane.getLength(f"{next_edge}_0") if next_edge else 0.0
+        prev_length = traci.lane.getLength(f"{prev_edge}_0") if prev_edge else 0.0
+
+        total_vehicle_count = current_num + next_num + prev_num
+        total_length = current_length + next_length + prev_length
+
+        if total_length <= 0:
             return False
+
+        vehicle_density = total_vehicle_count / total_length   # 台/m
+        many_vehicles = vehicle_density > density_threshold
+
+        low_speed = traci.vehicle.getSpeed(vehID) < threshold_speed
+
+        # 同一lane上で、自車より前にいる車両数を数える
+        current_pos = traci.vehicle.getLanePosition(vehID)
+        current_lane_index = traci.vehicle.getLaneIndex(vehID)
+
+        front_vehicle_count = 0
+        for other_vehID in traci.edge.getLastStepVehicleIDs(current_edgeID):
+            if other_vehID == vehID:
+                continue
+
+            if traci.vehicle.getLaneIndex(other_vehID) != current_lane_index:
+                continue
+
+            other_pos = traci.vehicle.getLanePosition(other_vehID)
+            if other_pos > current_pos:
+                front_vehicle_count += 1
+
+        # 渋滞先頭付近は除外
+        if front_vehicle_count <= non_congested_front_vehicle_threshold:
+            return False
+
+        leader = traci.vehicle.getLeader(vehID, dist=leader_search_dist)
+        if leader is None:
+            return False
+
+        leader_id, leader_gap = leader
+        close_leader = leader_gap < leader_gap_threshold
+
+        return low_speed and many_vehicles and close_leader
+
     except Exception as e:
-        print(f"Error in is_lane_congested: {e}")
-        return False # エラー時は渋滞していないと見なす
+        print(f"Error in is_vehID_in_congested_edge: {e}")
+        return False
+
 
 def v2shelter_communication(target_vehID:str, shelterID:str, vehInfo_list:list, shelter_list:list, COMMUNICATION_RANGE:double):
     # 車両が向かう避難所の混雑情報を取得する
@@ -2217,6 +2396,22 @@ def v2v_communication_about_tsunami_info(target_vehID:str, target_vehInfo:Vehicl
                 elif around_time < target_time:
                     # around の情報を target にコピーして、古い情報に統一する
                     target_vehInfo.set_tsunami_precursor_info(around_vehInfo.get_tsunami_precursor_info())
+
+def convert_routefile_to_routes_by_id(file_path):
+    tree = ET.parse(file_path)
+    root = tree.getroot()
+
+    route_dict = {}
+
+    for route in root.findall("route"):
+        route_id = route.get("id")
+        edges_str = route.get("edges")
+        # スペース区切り → リスト化
+        edges_list = edges_str.split()
+
+        route_dict[route_id] = edges_list
+
+    return route_dict
 
 def convert_to_cdf(data:dict, plot=True):
     """
