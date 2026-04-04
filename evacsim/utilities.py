@@ -531,8 +531,12 @@ def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_v
     encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
     current_vehicle_abandantment_value = 0.2*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
     if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
-        print(f"(current_time: {current_time} - encounted_congestion_time: {encounted_congestion_time})*2 +  agent_by_target_vehID.get_tsunami_info_obtaiend_time(): {agent_by_target_vehID.get_tsunami_info_obtaiend_time()} - normalcy_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + majority_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()} = current_vehicle_abandantment_value: {current_vehicle_abandantment_value} compared with agent_by_target_vehID.get_vehicle_abandoned_threshold(): {agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
+        # print(f"(current_time: {current_time} - encounted_congestion_time: {encounted_congestion_time})*2 +  agent_by_target_vehID.get_tsunami_info_obtaiend_time(): {agent_by_target_vehID.get_tsunami_info_obtaiend_time()} - normalcy_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + majority_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()} = current_vehicle_abandantment_value: {current_vehicle_abandantment_value} compared with agent_by_target_vehID.get_vehicle_abandoned_threshold(): {agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
+        # if agent_by_target_vehID.get_vehID() == "init_ShelterA_1_107":
+        #     print(f"Test vehicle abandant vehID {agent_by_target_vehID.get_vehID()}, current_vehicle_abandantment_value: {current_vehicle_abandantment_value}")
         return True
+    # if agent_by_target_vehID.get_vehID() == "init_ShelterA_1_107":
+    #     print(f"Check vehID {agent_by_target_vehID.get_vehID()}, current_vehicle_abandantment_value: {current_vehicle_abandantment_value}")
     return False
 
 def count_near_abandoned_vehicle_in_right_lane(
@@ -549,7 +553,7 @@ def count_near_abandoned_vehicle_in_right_lane(
     for neighbor_vehID, neighbor_dist in leaders:
         neighbor_agent: Agent = find_agent_by_vehID(neighbor_vehID, agent_list)
         if neighbor_agent is not None and neighbor_agent.get_vehicle_abandoned_flg():
-            print(f"neighbor_vehID: {neighbor_vehID}, neighbor_dist: {neighbor_dist}, front_threshold: {front_threshold}")
+            # print(f"neighbor_vehID: {neighbor_vehID}, neighbor_dist: {neighbor_dist}, front_threshold: {front_threshold}")
             if neighbor_dist < front_threshold:
                 count += 1
 
@@ -559,7 +563,8 @@ def count_near_abandoned_vehicle_in_right_lane(
         if neighbor_agent is not None and neighbor_agent.get_vehicle_abandoned_flg():
             if neighbor_dist > -back_threshold:
                 count += 1
-
+    # if vehID == "init_ShelterA_1_116":
+    #     print(f"vehID {vehID}, leaders: {leaders}, followers: {followers}")
     return count
 
 def vehicle_abandant_behavior(current_vehID: str, current_edgeID: str, agent_by_current_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, PEDESTRIAN_COUNT: int, STOPPING_TIME_IN_SHELTER: int):
@@ -2290,7 +2295,10 @@ def is_vehID_in_congested_edge(vehID: str, threshold_speed: float) -> bool:
             other_pos = traci.vehicle.getLanePosition(other_vehID)
             if other_pos > current_pos:
                 front_vehicle_count += 1
-
+        # if vehID == "init_ShelterA_1_107":
+        #     leader = traci.vehicle.getLeader(vehID, dist=leader_search_dist)
+        #     leader_id, leader_gap = leader
+        #     print(f"init_ShelterA_1_107 front_vehicle_count <= non_congested_front_vehicle_threshold: {front_vehicle_count <= non_congested_front_vehicle_threshold}, low_speed: {low_speed}, close_leader: {leader_gap < leader_gap_threshold}")
         # 渋滞先頭付近は除外
         if front_vehicle_count <= non_congested_front_vehicle_threshold:
             return False
@@ -2307,6 +2315,79 @@ def is_vehID_in_congested_edge(vehID: str, threshold_speed: float) -> bool:
     except Exception as e:
         print(f"Error in is_vehID_in_congested_edge: {e}")
         return False
+
+def has_abandoned_vehicle_within_front_n(
+                                        vehID: str,
+                                        agent_list: list,
+                                        front_n: int = 5
+                                    ) -> bool:
+    current_edgeID = traci.vehicle.getRoadID(vehID)
+    current_lane_index = traci.vehicle.getLaneIndex(vehID)
+    current_pos = traci.vehicle.getLanePosition(vehID)
+
+    front_vehicles = []
+    # if vehID == "init_ShelterA_1_116":
+    #     print(f"Checking for abandoned vehicles ahead of {vehID} on edge {current_edgeID}, {traci.edge.getLastStepVehicleIDs(current_edgeID)} leader: {traci.vehicle.getLeader(vehID)} ")
+
+    for other_vehID in traci.edge.getLastStepVehicleIDs(current_edgeID):
+        if other_vehID == vehID:
+            continue
+        if traci.vehicle.getLaneIndex(other_vehID) != current_lane_index:
+            continue
+
+        other_pos = traci.vehicle.getLanePosition(other_vehID)
+        if other_pos > current_pos:
+            front_vehicles.append((other_vehID, other_pos))
+
+    front_vehicles.sort(key=lambda x: x[1])
+
+    for other_vehID, _ in front_vehicles[:front_n]:
+        other_agent = find_agent_by_vehID(other_vehID, agent_list)
+        if other_agent is not None and other_agent.get_vehicle_abandoned_flg():
+            return True
+    leader_vehID = traci.vehicle.getLeader(vehID)
+    leader_agent = find_agent_by_vehID(leader_vehID[0], agent_list) if leader_vehID is not None else None
+    if leader_agent.get_vehicle_abandoned_flg() if leader_agent is not None else False:
+        return True
+    return False
+
+def can_escape_to_right_lane(
+                                vehID: str,
+                                front_threshold: float = 15.0,
+                                back_threshold: float = 10.0
+                            ) -> bool:
+    leaders = traci.vehicle.getNeighbors(vehID, 0b011)   # 右前
+    followers = traci.vehicle.getNeighbors(vehID, 0b001) # 右後
+
+    if leaders:
+        _, dist = leaders[0]
+        if dist < front_threshold:
+            return False
+
+    if followers:
+        _, dist = followers[0]
+        if dist > -back_threshold:
+            return False
+
+    return True
+
+def is_vehID_blocked_by_abandoned_vehicle(
+                                            vehID: str,
+                                            agent_list: list
+                                        ) -> bool:
+    has_abandoned_ahead = has_abandoned_vehicle_within_front_n(
+                                                                vehID=vehID,
+                                                                agent_list=agent_list,
+                                                                front_n=5
+                                                                )
+
+    # if vehID == "init_ShelterA_1_107":
+    #     print(f"has_abandoned_ahead: {has_abandoned_ahead}, can_escape_to_right_lane: {can_escape_to_right_lane(vehID)}")
+
+    # if not has_abandoned_ahead:
+    #     return False
+    # return not can_escape_to_right_lane(vehID)
+    return has_abandoned_ahead
 
 
 def v2shelter_communication(target_vehID:str, shelterID:str, vehInfo_list:list, shelter_list:list, COMMUNICATION_RANGE:double):
