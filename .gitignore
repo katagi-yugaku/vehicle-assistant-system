@@ -10,10 +10,6 @@ results/
 *.trc
 *.fcd.xml
 
-# Pythonのキャッシュ
-__pycache__/
-*.py
-
 # SUMO/Simulation outputs
 traci_log.txt
 tripinfo.xml
