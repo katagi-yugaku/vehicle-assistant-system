@@ -601,6 +601,7 @@ if __name__ == "__main__":
     print("===== Simlation Result Summary =====")
     print(f"arrival_time_by_vehID_dict:{arrival_time_by_vehID_dict}")
     print(f"pedestrianIDs:{pedestrianIDs}")
+    print(f"PEDESTRIAN_COUNT:{PEDESTRIAN_COUNT}")
     print(f"route_changed_vehicle_count:{ROUTE_CHANGED_VEHICLE_COUNT}")
     print(f"normalcy_bias_route_change_count:{NORMALCY_BIAS_ROUTE_CHANGE_COUNT}")
     print(f"majority_bias_route_change_count:{MAJORITY_BIAS_ROUTE_CHANGE_COUNT}")
