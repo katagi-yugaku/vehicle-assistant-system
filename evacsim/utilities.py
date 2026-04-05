@@ -40,8 +40,8 @@ from .agents.VehicleInfo import VehicleInfo
 # =========================
 # Runtime config
 # =========================
-random.seed(316)  # 乱数シードを314に設定（元のコメントを維持）　確率系にも影響を与えるのでかなり注意する
-# random.seed()
+# random.seed(316)  # 乱数シードを314に設定（元のコメントを維持）　確率系にも影響を与えるのでかなり注意する
+random.seed()
 
 VEHICLE_SHELTER_DURATION_TIME = 10000
 FREE_FLOW_SPEED = 13.0  # 迂回路（Uターン時）の想定速度 (m/s)
@@ -527,10 +527,12 @@ def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_v
     final_rate = 0.2033
     if neighbor_vehicle_abandant_nums > 4:
         neighbor_vehicle_abandant_nums = 4
+    # print(f"vehInfo_by_target_vehID.get_tsunami_precursor_info(){vehInfo_by_target_vehID.get_tsunami_precursor_info()}")
 
     encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
     current_vehicle_abandantment_value = 0.3*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
     if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
+        # print(f"agent_by_target_vehID::{agent_by_target_vehID.get_tsunami_info_obtaiend_time()} ")
         # print(f"(current_time: {current_time} - encounted_congestion_time: {encounted_congestion_time})*2 +  agent_by_target_vehID.get_tsunami_info_obtaiend_time(): {agent_by_target_vehID.get_tsunami_info_obtaiend_time()} - normalcy_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + majority_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()} = current_vehicle_abandantment_value: {current_vehicle_abandantment_value} compared with agent_by_target_vehID.get_vehicle_abandoned_threshold(): {agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
         # if agent_by_target_vehID.get_vehID() == "init_ShelterA_1_107":
         #     print(f"Test vehicle abandant vehID {agent_by_target_vehID.get_vehID()}, current_vehicle_abandantment_value: {current_vehicle_abandantment_value}")
@@ -567,7 +569,7 @@ def count_near_abandoned_vehicle_in_right_lane(
     #     print(f"vehID {vehID}, leaders: {leaders}, followers: {followers}")
     return count
 
-def vehicle_abandant_behavior(current_vehID: str, current_edgeID: str, agent_by_current_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, PEDESTRIAN_COUNT: int, STOPPING_TIME_IN_SHELTER: int):
+def vehicle_abandant_behavior(current_vehID: str, current_edgeID: str, agent_by_current_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, PEDESTRIAN_COUNT: int, STOPPING_TIME_IN_SHELTER: int, shelter: Shelter):
     person_id = f"ped_{current_vehID}_{PEDESTRIAN_COUNT}"
     edge_position = traci.vehicle.getLanePosition(current_vehID)
     current_lane_length = traci.lane.getLength(traci.vehicle.getLaneID(current_vehID))
@@ -581,7 +583,9 @@ def vehicle_abandant_behavior(current_vehID: str, current_edgeID: str, agent_by_
     agent_by_current_vehID.set_vehicle_abandoned_time(traci.simulation.getTime())
     traci.vehicle.setStop(vehID=current_vehID, edgeID=current_edgeID, pos=edge_position, laneIndex=traci.vehicle.getLaneIndex(current_vehID), duration=STOPPING_TIME_IN_SHELTER)
     traci.vehicle.setColor(current_vehID, (128, 128, 128, 255))  # 灰色に変更
-    return PEDESTRIAN_COUNT, person_id
+
+    walking_distance = calculate_remaining_route_distance(vehID=current_vehID, to_edge=vehInfo_by_target_vehID.get_edgeID_connect_target_shelter(), shelter=shelter)
+    return PEDESTRIAN_COUNT, person_id, walking_distance
 
 def generate_initial_vehIDs_for_row_xml(start_edge:str, end_edge:str, via_edges:str, \
                         depart_time:double, interval:double, veh_count:int, \
@@ -1657,6 +1661,49 @@ def find_route_name_by_edge(edgeID, routes_dict):
     
     return None # どのリストにも見つからなかった場合
 
+def find_alternative_route_calculated_time(current_edgeID: str, vehInfo:VehicleInfo, agent:Agent, shelter_list:list, custome_edge_list:List[CustomeEdge]):
+    route_info_with_receive_time = vehInfo.get_avg_evac_time_by_route_by_recive_time()
+    # if traci.simulation.getTime() > 500:
+    #     print(f"vehID: {agent.get_vehID()} route_info_with_receive_time: {route_info_with_receive_time}")
+    routeIDs = traci.route.getIDList()
+    for routeID in routeIDs:
+        edges_for_routeID = traci.route.getEdges(routeID)
+        current_route_time, best_alternative_time, best_alternative_route  = extract_current_and_best_alternative_time(route_info_with_receive_time, current_route=tuple(edges_for_routeID))
+        if current_route_time is not None and best_alternative_time is not None:
+            if current_route_time - best_alternative_time > agent.get_route_change_threshold():
+                # print(f"vehID: {agent.get_vehID()} routeID: {routeID} diff time: {current_route_time - best_alternative_time:.2f}s > {agent.get_route_change_threshold()}")
+
+                return routeID
+        # print(f"edges_for_routeID: {edges_for_routeID} for routeID: {routeID}")
+
+
+    return None
+
+def extract_current_and_best_alternative_time(route_info_with_receive_time, current_route):
+    if not route_info_with_receive_time:
+        return None, None, None, None
+
+    # 受信時刻が1つだけ入っている前提
+    receive_time = next(iter(route_info_with_receive_time.keys()))
+    route_dict = route_info_with_receive_time[receive_time]
+
+    current_route_time = None
+    best_alternative_time = None
+    best_alternative_route = None
+
+    for route, info in route_dict.items():
+        avg_time = info.get("avg_time")
+
+        if route == current_route:
+            current_route_time = avg_time
+        else:
+            if best_alternative_time is None or avg_time < best_alternative_time:
+                best_alternative_time = avg_time
+                best_alternative_route = route
+
+    return current_route_time, best_alternative_time, best_alternative_route
+
+
 
 def find_alternative_route_better(current_edgeID: str, vehInfo:VehicleInfo, agent:Agent, shelter_list:list, custome_edge_list:List[CustomeEdge], MIDDLE_EDGE_ID_LIST:list, NEAR_EDGE_MIDDLE_EDGE_LIST:list):
     from_edgeID = ""; to_edgeID=""; shelterID = ""
@@ -2464,13 +2511,11 @@ def v2shelter_communication(target_vehID:str, shelterID:str, vehInfo_list:list, 
                                                         congestion=current_congestion_rate_by_shelterID, 
                                                         time_stamp=current_time
                                                         )
-        # print(f"after {target_vehID} {shelterID} {target_vehInfo.get_congestion_level_by_shelter(shelterID)}")
 
         # 避難経路の情報を更新
         avg_evac_time_by_route = shelter_for_target_vehID.get_avg_evac_time_by_route()
         target_vehInfo.v2shelter_update_avg_evac_time_by_route(avg_evac_time_by_route)
         target_vehInfo.v2v_avg_evac_time_by_route_by_recive_time(current_time=current_time)
-        # traci.vehicle.setColor(target_vehID, (80, 255, 80, 255))  # 緑色に変更
 
 def v2v_communication(target_vehID:str, target_vehInfo:VehicleInfo, around_vehIDs:list, agent_list:list, vehInfo_list:list, COMMUNICATION_RANGE:double):
     target_agent:Agent = find_agent_by_vehID(target_vehID, agent_list)
@@ -2497,7 +2542,6 @@ def v2v_communication(target_vehID:str, target_vehInfo:VehicleInfo, around_vehID
                 info_source = target_vehInfo if target_of_route_info_time > around_of_route_info_time else around_vehInfo
                 info_target = around_vehInfo if target_of_route_info_time > around_of_route_info_time else target_vehInfo
                 info_target.set_avg_evac_time_by_route_by_recive_time(info_source.get_avg_evac_time_by_route_by_recive_time())
-                # traci.vehicle.setColor(target_vehID, (80, 80, 255, 255))  # 青色に変更
 
 def v2v_communication_about_tsunami_info(target_vehID:str, target_vehInfo:VehicleInfo, around_vehIDs:list, vehInfo_list:list, COMMUNICATION_RANGE:float):
     for around_vehID in around_vehIDs:

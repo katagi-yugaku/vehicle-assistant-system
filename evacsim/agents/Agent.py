@@ -48,6 +48,7 @@ class Agent():
         self.encounted_congestion_flg = False # 渋滞に遭遇したフラグ
         self.avoiding_abandoned_vehicle_flg = False # 車両放棄回避フラグ
         self.arrival_shelter_flg = False # 避難所到着フラグ
+        self.tsunami_info_obtaiend_flg = False # 津波情報取得フラグ
 
     # ドライバーの現在の車線変更動機付け値の更新
     def update_calculated_motivation_value(self, current_time:float):
@@ -343,6 +344,12 @@ class Agent():
         return self.arrival_shelter_flg
     def set_arrival_shelter_flg(self, arrival_shelter_flg:bool):
         self.arrival_shelter_flg = arrival_shelter_flg
+
+    # 津波情報取得フラグの取得・設定
+    def get_tsunami_info_obtaiend_flg(self):
+        return self.tsunami_info_obtaiend_flg
+    def set_tsunami_info_obtaiend_flg(self, tsunami_info_obtaiend_flg:bool):
+        self.tsunami_info_obtaiend_flg = tsunami_info_obtaiend_flg
 
     #　エージェントの情報を表示
     def print_info(self):
