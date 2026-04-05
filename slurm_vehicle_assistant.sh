@@ -14,7 +14,7 @@ EARLY_RATE="${2:?early_rate is required}"
 V2V_RATE="${3:?v2v_rate is required}"
 RUN_ID="${4:-0}"
 
-CONFIG="scenarios/pervehicle/configs/config_scenario_${SCENARIO_ID}.toml"
+CONFIG="scenarios/its105/configs/config_scenario_${SCENARIO_ID}.toml"
 
 mkdir -p logs
 
