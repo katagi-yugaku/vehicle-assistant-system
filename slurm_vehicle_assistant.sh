@@ -30,7 +30,7 @@ echo "start     : $(date)"
 
 export RUN_ID
 
-python3.10 -W ignore::UserWarning -m scenarios.pervehicle.map_one.simulation.runner_simulator \
+python3.10 -W ignore::UserWarning -m scenarios.its105.map_one.simulation.runner_simulator \
   --nogui "${CONFIG}" "${EARLY_RATE}" "${V2V_RATE}"
 # -W はwarning制御オプション
 # python3.10 -m scenarios.pervehicle.map_one.simulation.runner_simulator \
