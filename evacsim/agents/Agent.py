@@ -34,6 +34,7 @@ class Agent():
         self.normalcy_value_about_vehicle_abandonment = normalcy_value_about_vehicle_abandonment # 車両放棄に対する正常性バイアス
         self.majority_value_about_vehicle_abandonment = majority_value_about_vehicle_abandonment # 車両放棄に対する同調性バイアス
         self.tsunami_info_obtaiend_time = 0.0 # 津波情報取得時間
+        self.vehicle_abandoned_time = 0.0
         self.shelter_occupancy_rate_threshold = shelter_occupancy_rate_threshold # 避難所の混雑率
         self.created_time_flg = False # エージェント作成時間設定フラグ
         self.shelter_flg = False #　駐車フラグ
@@ -46,6 +47,7 @@ class Agent():
         self.vehicle_abandoned_flg = False # 車両放棄フラグ
         self.encounted_congestion_flg = False # 渋滞に遭遇したフラグ
         self.avoiding_abandoned_vehicle_flg = False # 車両放棄回避フラグ
+        self.arrival_shelter_flg = False # 避難所到着フラグ
 
     # ドライバーの現在の車線変更動機付け値の更新
     def update_calculated_motivation_value(self, current_time:float):
@@ -269,6 +271,12 @@ class Agent():
         return self.tsunami_info_obtaiend_time
     def set_tsunami_info_obtaiend_time(self, tsunami_info_obtaiend_time:float):
         self.tsunami_info_obtaiend_time = tsunami_info_obtaiend_time
+    
+    # 車両乗り捨て時刻
+    def get_vehicle_abandoned_time(self):
+        return self.vehicle_abandoned_time
+    def set_vehicle_abandoned_time(self, vehicle_abandoned_time:float):
+        self.vehicle_abandoned_time = vehicle_abandoned_time
 
     #　駐車フラグの取得・設定
     def get_shelter_flg(self):
@@ -329,6 +337,12 @@ class Agent():
         return self.avoiding_abandoned_vehicle_flg
     def set_avoiding_abandoned_vehicle_flg(self, avoiding_abandoned_vehicle_flg:bool):
         self.avoiding_abandoned_vehicle_flg = avoiding_abandoned_vehicle_flg
+    
+    # 避難所到着フラグの取得・設定
+    def get_arrival_shelter_flg(self):
+        return self.arrival_shelter_flg
+    def set_arrival_shelter_flg(self, arrival_shelter_flg:bool):
+        self.arrival_shelter_flg = arrival_shelter_flg
 
     #　エージェントの情報を表示
     def print_info(self):

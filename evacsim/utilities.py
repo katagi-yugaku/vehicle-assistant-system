@@ -568,19 +568,20 @@ def count_near_abandoned_vehicle_in_right_lane(
     return count
 
 def vehicle_abandant_behavior(current_vehID: str, current_edgeID: str, agent_by_current_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, PEDESTRIAN_COUNT: int, STOPPING_TIME_IN_SHELTER: int):
-    person_id = f"ped_{PEDESTRIAN_COUNT}"
+    person_id = f"ped_{current_vehID}_{PEDESTRIAN_COUNT}"
     edge_position = traci.vehicle.getLanePosition(current_vehID)
     current_lane_length = traci.lane.getLength(traci.vehicle.getLaneID(current_vehID))
     traci.person.add(personID=person_id, edgeID=current_edgeID, pos=edge_position, depart=traci.simulation.getTime(), typeID="DEFAULT_PEDTYPE")
     route_edges_for_pedestrian:list = get_remaining_edges(route_edges=traci.vehicle.getRoute(current_vehID), current_edgeID=current_edgeID)
     current_edgeID = traci.vehicle.getRoadID(current_vehID)
-    traci.person.appendWalkingStage(personID=person_id, edges=route_edges_for_pedestrian, arrivalPos=0.0)
+    print(f"route_edges_for_pedestrian: {route_edges_for_pedestrian}, current_edgeID: {current_edgeID}")
+    traci.person.appendWalkingStage(personID=person_id, edges=route_edges_for_pedestrian, arrivalPos=100.0)
     PEDESTRIAN_COUNT += 1
     agent_by_current_vehID.set_vehicle_abandoned_flg(True)
+    agent_by_current_vehID.set_vehicle_abandoned_time(traci.simulation.getTime())
     traci.vehicle.setStop(vehID=current_vehID, edgeID=current_edgeID, pos=edge_position, laneIndex=traci.vehicle.getLaneIndex(current_vehID), duration=STOPPING_TIME_IN_SHELTER)
     traci.vehicle.setColor(current_vehID, (128, 128, 128, 255))  # 灰色に変更
-    return PEDESTRIAN_COUNT
-    
+    return PEDESTRIAN_COUNT, person_id
 
 def generate_initial_vehIDs_for_row_xml(start_edge:str, end_edge:str, via_edges:str, \
                         depart_time:double, interval:double, veh_count:int, \
@@ -706,6 +707,60 @@ def write_initial_vehIDs_for_row_xml(file_path:str, veh_written_list:list):
 
 def remove_junction_from_edgeID(edgeIDs:list):
     return [edgeID for edgeID in edgeIDs if not edgeID.startswith(":")]
+
+def handle_arrival(current_vehID, vehInfo_by_current_vehID:VehicleInfo, agent_by_current_vehID:Agent,
+                    shelter_for_current_vehID:Shelter, shelter_list:list,
+                    arrival_time_list:list, arrival_time_by_vehID_dict:dict, elapsed_time_list:list):
+    """
+    避難地到着時の処理
+    """
+    arrival_time_list.append(traci.simulation.getTime())
+    arrival_time_by_vehID_dict[f"{current_vehID}"] = traci.simulation.getTime()
+    traci.vehicle.setSpeed(current_vehID, 9.0)
+    # 避難地オブジェクトに登録
+    shelter_for_current_vehID.add_arrival_vehID(current_vehID)
+    vehInfo_by_current_vehID.set_evac_end_time(traci.simulation.getTime())
+    # 近傍エッジから避難地オブジェクトを取得して避難時間を更新
+    shelter: Shelter = find_shelter_by_edgeID_connect_target_shelter(
+        agent_by_current_vehID.get_near_edgeID_by_target_shelter(), shelter_list
+    )
+    departure_time = traci.vehicle.getDeparture(current_vehID) + 100
+    shelter.update_evac_time_default_dict(
+        vehID=current_vehID,
+        route=traci.vehicle.getRoute(current_vehID),
+        evac_time=vehInfo_by_current_vehID.get_evac_end_time() - departure_time
+    )
+    # 到着フラグと駐車フラグを更新
+    vehInfo_by_current_vehID.set_parked_flag(True)
+    agent_by_current_vehID.set_arrival_time(traci.simulation.getTime())
+    elapsed_time_list.append(traci.simulation.getTime() - agent_by_current_vehID.get_created_time())
+
+def handle_arrival_for_pedestrian(pedestrianID:str, current_vehID:str, vehInfo_by_current_vehID:VehicleInfo, agent_by_current_vehID:Agent,
+                    shelter_for_current_vehID:Shelter, shelter_list:list,
+                    arrival_time_list:list, arrival_time_by_vehID_dict:dict, elapsed_time_list:list):
+    arrival_time_list.append(traci.simulation.getTime())
+    arrival_time_by_vehID_dict[f"{pedestrianID}"] = traci.simulation.getTime()
+    # 避難地オブジェクトに登録
+    shelter_for_current_vehID.add_arrival_vehID(pedestrianID)
+    vehInfo_by_current_vehID.set_evac_end_time(traci.simulation.getTime())
+    # 近傍エッジから避難地オブジェクトを取得して避難時間を更新
+    shelter: Shelter = find_shelter_by_edgeID_connect_target_shelter(
+        agent_by_current_vehID.get_near_edgeID_by_target_shelter(), shelter_list
+    )
+    departure_time = traci.vehicle.getDeparture(current_vehID) + 100
+    # TODO 徒歩避難に切り替えた避難も同様に避難時間を記録するようにするのか？？？
+    shelter.update_evac_time_default_dict(
+        vehID=pedestrianID,
+        route=traci.vehicle.getRoute(current_vehID),
+        evac_time=vehInfo_by_current_vehID.get_evac_end_time() - departure_time
+    )
+    # 到着フラグと駐車フラグを更新
+    agent_by_current_vehID.set_arrival_shelter_flg(True)
+    agent_by_current_vehID.set_arrival_time(traci.simulation.getTime())
+    elapsed_time_list.append(traci.simulation.getTime() - agent_by_current_vehID.get_created_time())
+
+def extract_vehicle_id(pedestrian_id: str) -> str:
+    return pedestrian_id.replace("ped_", "").rsplit("_", 1)[0]
 
 def clean_vehIDs_for_row_xml(file_path:str, START_WRITTEN_LINE:int, END_WRITTEN_LINE:int):
     # ファイルを読み込んで、必要な行だけ保持

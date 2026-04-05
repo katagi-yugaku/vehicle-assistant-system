@@ -123,6 +123,8 @@ shelterB_arrival_time_list = []
 arrival_time_by_vehID_dict = {}
 arrival_time_list = []
 elapsed_time_list = []
+pedestrianIDs = []
+
 # dictの初期化
 current_route_dict = {}
 
@@ -182,18 +184,19 @@ def control_vehicles():
         #                                                                     lane_change_mode=1
         #                                                                     )
 
-        # 到着処理 # 到着によってparked_flagがTrue
+        # 到着処理 # 到着によってparked_flagがTrue 到着車両に関しての処理
         if traci.vehicle.isStoppedParking(current_vehID) and not vehInfo_by_current_vehID.get_parked_flag():
-            handle_arrival(
+            utilities.handle_arrival(
                             current_vehID=current_vehID,
                             vehInfo_by_current_vehID=vehInfo_by_current_vehID,
                             agent_by_current_vehID=agent_by_current_vehID,
                             shelter_for_current_vehID=shelter_for_current_vehID,
                             shelter_list=shelter_list,
                             arrival_time_list=arrival_time_list,
-                            arrival_time_by_vehID_dict=arrival_time_by_vehID_dict
+                            arrival_time_by_vehID_dict=arrival_time_by_vehID_dict,
+                            elapsed_time_list=elapsed_time_list
                             )
-        
+
         if not vehInfo_by_current_vehID.get_decline_edge_arrival_flag():  # 減速処理を行う
             #避難地に接続する(直前の)道路にいる場合、減速する
             pre_edgeID_near_shelter_flag = \
@@ -309,8 +312,8 @@ def control_vehicles():
                             vehID=current_vehID,
                             agent_list=agent_list
                         )
-                    )
-                ):                    # 渋滞に巻き込まれたら、渋滞継続時間測定のためにフラグをrueにし、計測時間を作る
+                        )
+                    ):                    # 渋滞に巻き込まれたら、渋滞継続時間測定のためにフラグをTrueにし、計測時間を作る
                     traci.vehicle.setColor(current_vehID,(225, 90, 40))
                     if not agent_by_current_vehID.get_encounted_congestion_flg():
                         agent_by_current_vehID.set_congestion_duration(traci.simulation.getTime())
@@ -322,15 +325,16 @@ def control_vehicles():
                         if utilities.is_driver_vehicle_abandant(agent_by_target_vehID=agent_by_current_vehID, vehInfo_by_target_vehID=vehInfo_by_current_vehID, current_time=current_time, neighbor_vehicle_abandant_nums=neighbor_vehicle_abandant_count):
                             traci.vehicle.setColor(current_vehID,(0, 103,192))
                             if traci.vehicle.getLaneIndex(current_vehID) == 1:
-                                PEDESTRIAN_COUNT= utilities.vehicle_abandant_behavior(
-                                                                                        current_vehID=current_vehID, 
-                                                                                        current_edgeID=current_edgeID,
-                                                                                        agent_by_current_vehID=agent_by_current_vehID, 
-                                                                                        vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                                        PEDESTRIAN_COUNT=PEDESTRIAN_COUNT, 
-                                                                                        STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER
-                                                                                        )
-                                
+                                PEDESTRIAN_COUNT, pedestrianID= utilities.vehicle_abandant_behavior(
+                                                                                                    current_vehID=current_vehID, 
+                                                                                                    current_edgeID=current_edgeID,
+                                                                                                    agent_by_current_vehID=agent_by_current_vehID, 
+                                                                                                    vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                                                    PEDESTRIAN_COUNT=PEDESTRIAN_COUNT, 
+                                                                                                    STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER
+                                                                                                    )
+                                # print(f"Vehicle {current_vehID} has been abandoned at edge {current_edgeID} and changed to pedestrian {pedestrianID}")
+                                pedestrianIDs.append(pedestrianID)
                             # 前方にある乗り捨て車両を検知すると、車両横を徐行しながら走行する
 
 
@@ -338,32 +342,25 @@ def control_vehicles():
                 if traci.simulation.getTime() > TSUNAMI_SIGN_START_TIME and traci.simulation.getTime() < TSUNAMI_SIGN_END_TIME:
                     vehInfo_by_current_vehID.update_tsunami_precursor_info(vehID=current_vehID, tsunami_precursor_flag=True, current_time=traci.simulation.getTime())
 
-def handle_arrival(current_vehID, vehInfo_by_current_vehID:VehicleInfo, agent_by_current_vehID:Agent,
-                    shelter_for_current_vehID:Shelter, shelter_list,
-                    arrival_time_list, arrival_time_by_vehID_dict):
-    """
-    避難地到着時の処理
-    """
-    arrival_time_list.append(traci.simulation.getTime())
-    arrival_time_by_vehID_dict[f"{current_vehID}"] = traci.simulation.getTime()
-    traci.vehicle.setSpeed(current_vehID, 9.0)
-    # 避難地オブジェクトに登録
-    shelter_for_current_vehID.add_arrival_vehID(current_vehID)
-    vehInfo_by_current_vehID.set_evac_end_time(traci.simulation.getTime())
-    # 近傍エッジから避難地オブジェクトを取得して避難時間を更新
-    shelter: Shelter = utilities.find_shelter_by_edgeID_connect_target_shelter(
-        agent_by_current_vehID.get_near_edgeID_by_target_shelter(), shelter_list
-    )
-    departure_time = traci.vehicle.getDeparture(current_vehID) + 100
-    shelter.update_evac_time_default_dict(
-        vehID=current_vehID,
-        route=traci.vehicle.getRoute(current_vehID),
-        evac_time=vehInfo_by_current_vehID.get_evac_end_time() - departure_time
-    )
-    # 到着フラグと駐車フラグを更新
-    vehInfo_by_current_vehID.set_parked_flag(True)
-    agent_by_current_vehID.set_arrival_time(traci.simulation.getTime())
-    elapsed_time_list.append(traci.simulation.getTime() - agent_by_current_vehID.get_created_time())
+    for pedestrianID in pedestrianIDs:
+        vehID_by_pedestrianID: str = utilities.extract_vehicle_id(pedestrianID)
+        agent_by_pedestrianID: Agent = utilities.find_agent_by_vehID(vehID_by_pedestrianID, agent_list=agent_list)
+        vehInfo_by_pedestrianID: VehicleInfo = utilities.find_vehInfo_by_vehID(vehID_by_pedestrianID, vehInfo_list)
+        shelter_by_pedestrianID: Shelter = utilities.find_shelter_by_edgeID_connect_target_shelter(vehInfo_by_pedestrianID.get_edgeID_connect_target_shelter(), shelter_list)
+        if not agent_by_pedestrianID.get_arrival_shelter_flg():
+            if traci.person.getRoadID(pedestrianID) == "E16"  :
+                utilities.handle_arrival_for_pedestrian(
+                                                        pedestrianID=pedestrianID,
+                                                        current_vehID=current_vehID,
+                                                        vehInfo_by_current_vehID=vehInfo_by_pedestrianID,
+                                                        agent_by_current_vehID=agent_by_pedestrianID,
+                                                        shelter_for_current_vehID=shelter_by_pedestrianID,
+                                                        shelter_list=shelter_list,
+                                                        arrival_time_list=arrival_time_list,
+                                                        arrival_time_by_vehID_dict=arrival_time_by_vehID_dict,
+                                                        elapsed_time_list=elapsed_time_list
+                                                        )
+            
 
 def extract_category(vehID):
     if "ShelterA_1" in vehID:
