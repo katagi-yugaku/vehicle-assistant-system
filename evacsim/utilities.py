@@ -529,7 +529,7 @@ def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_v
         neighbor_vehicle_abandant_nums = 4
 
     encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
-    current_vehicle_abandantment_value = 0.2*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
+    current_vehicle_abandantment_value = 0.3*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
     if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
         # print(f"(current_time: {current_time} - encounted_congestion_time: {encounted_congestion_time})*2 +  agent_by_target_vehID.get_tsunami_info_obtaiend_time(): {agent_by_target_vehID.get_tsunami_info_obtaiend_time()} - normalcy_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + majority_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()} = current_vehicle_abandantment_value: {current_vehicle_abandantment_value} compared with agent_by_target_vehID.get_vehicle_abandoned_threshold(): {agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
         # if agent_by_target_vehID.get_vehID() == "init_ShelterA_1_107":

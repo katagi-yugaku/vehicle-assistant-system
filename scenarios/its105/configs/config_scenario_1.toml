@@ -34,5 +34,5 @@ normalcy_value_about_vehicle_abandonment_start = 6000
 normalcy_value_about_vehicle_abandonment_end = 8000
 majority_value_about_vehicle_abandonment_start = 1000
 majority_value_about_vehicle_abandonment_end = 3000
-vehicle_abandoned_threshold_start = 5000
-vehicle_abandoned_threshold_end = 8000
+vehicle_abandoned_threshold_start = 4000
+vehicle_abandoned_threshold_end = 7000
