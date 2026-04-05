@@ -475,6 +475,18 @@ if __name__ == "__main__":
     MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END:float = _req(cfg, "majority_value_about_vehicle_abandonment_end", float)
     VEHICLE_ABANDONED_THRESHOLD_START:float = _req(cfg, "vehicle_abandoned_threshold_start", float)
     VEHICLE_ABANDONED_THRESHOLD_END:float = _req(cfg, "vehicle_abandoned_threshold_end", float)
+    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float =  _req(cfg, "active_normalcy_value_about_vehicle_abandonment_mean", float)
+    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  = _req(cfg, "active_normalcy_value_about_vehicle_abandonment_var", float)
+    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float = _req(cfg, "active_majority_value_about_vehicle_abandonment_mean", float)
+    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  =  _req(cfg, "active_majority_value_about_vehicle_abandonment_var", float)
+    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN: float = _req(cfg, "active_vehicle_abandoned_threshold_mean", float)
+    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR: float  = _req(cfg, "active_vehicle_abandoned_threshold_var", float)
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float = _req(cfg, "cautious_normalcy_value_about_vehicle_abandonment_mean", float)
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  = _req(cfg, "cautious_normalcy_value_about_vehicle_abandonment_var", float)
+    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float = _req(cfg, "cautious_majority_value_about_vehicle_abandonment_mean", float)
+    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  = _req(cfg, "cautious_majority_value_about_vehicle_abandonment_var", float)
+    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN: float = _req(cfg, "cautious_vehicle_abandoned_threshold_mean", float)
+    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR: float  = _req(cfg, "cautious_vehicle_abandoned_threshold_var", float)
 
     traci.start(
                 [sumoBinary,
@@ -587,12 +599,18 @@ if __name__ == "__main__":
                                                 ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
                                                 CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
                                                 CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
-                                                NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START=NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START,
-                                                NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END=NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END,
-                                                MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START=MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START,
-                                                MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END=MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END,
-                                                VEHICLE_ABANDONED_THRESHOLD_START=VEHICLE_ABANDONED_THRESHOLD_START,
-                                                VEHICLE_ABANDONED_THRESHOLD_END=VEHICLE_ABANDONED_THRESHOLD_END
+                                                ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN = ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
+                                                ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR = ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
+                                                ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN = ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
+                                                ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR = ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
+                                                ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN = ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN,
+                                                ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR = ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR,
+                                                CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN = CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
+                                                CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR = CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
+                                                CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN = CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
+                                                CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR = CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
+                                                CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN = CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN,
+                                                CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR = CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR,
                                                 )
 
     # ドライバーの行動の初期化
@@ -610,7 +628,8 @@ if __name__ == "__main__":
     #         utilities.plot_dot(agent)
     print("===== Simlation Result Summary =====")
     print(f"arrival_time_by_vehID_dict:{arrival_time_by_vehID_dict}")
-    print(f"pedestrianIDs:{vehicle_abandant_time_by_pedestrianID_dict}")
+    print(f"vehicle_abandant_time_by_pedestrianID_dict:{vehicle_abandant_time_by_pedestrianID_dict}")
+    print(f"walking_distance_by_pedestrianID_dict:{walking_distance_by_pedestrianID_dict}")
     print(f"pedestrian_count:{PEDESTRIAN_COUNT}")
     print(f"route_changed_vehicle_count:{ROUTE_CHANGED_VEHICLE_COUNT}")
     print(f"normalcy_bias_route_change_count:{NORMALCY_BIAS_ROUTE_CHANGE_COUNT}")

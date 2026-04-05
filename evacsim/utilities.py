@@ -872,12 +872,19 @@ def init_agent_list(
                     ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float,
                     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START:float,
                     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float,
-                    NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START:float,
-                    NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END:float,
-                    MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START:float,
-                    MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END:float,
-                    VEHICLE_ABANDONED_THRESHOLD_START:float,
-                    VEHICLE_ABANDONED_THRESHOLD_END:float):
+                    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float,
+                    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float,
+                    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float,
+                    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float,
+                    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN: float,
+                    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR: float,
+                    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float,
+                    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float,
+                    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float,
+                    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float,
+                    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN: float,
+                    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR: float,
+                    ):
     agent_list = []
     for vehID in vehIDs:
         # せっかちな人はこっち
@@ -893,9 +900,9 @@ def init_agent_list(
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
                             lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
                             shelter_occupancy_rate_threshold=random.uniform(ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END),
-                            vehicle_abandoned_threshold=random.uniform(VEHICLE_ABANDONED_THRESHOLD_START, VEHICLE_ABANDONED_THRESHOLD_END),
-                            normalcy_value_about_vehicle_abandonment=random.uniform(NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START, NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END),
-                            majority_value_about_vehicle_abandonment=random.uniform(MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START, MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END)
+                            vehicle_abandoned_threshold=random.normal(ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN, ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR),
+                            normalcy_value_about_vehicle_abandonment=random.normal(ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR),
+                            majority_value_about_vehicle_abandonment=random.normal(ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR)
                             )
         else:
             agent:Agent = Agent(
@@ -909,9 +916,9 @@ def init_agent_list(
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
                             lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
                             shelter_occupancy_rate_threshold=random.uniform(CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END),
-                            vehicle_abandoned_threshold=random.uniform(VEHICLE_ABANDONED_THRESHOLD_START, VEHICLE_ABANDONED_THRESHOLD_END),
-                            normalcy_value_about_vehicle_abandonment=random.uniform(NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START, NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END),
-                            majority_value_about_vehicle_abandonment=random.uniform(MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_START, MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_END)
+                            vehicle_abandoned_threshold=random.uniform(CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN, CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR),
+                            normalcy_value_about_vehicle_abandonment=random.uniform(CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR),
+                            majority_value_about_vehicle_abandonment=random.uniform(CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR)
                             )
 
         agent.set_near_edgeID_by_target_shelter(edgeID_by_shelterID[vehID.split("_")[1] + "_" + vehID.split("_")[2]])

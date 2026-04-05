@@ -53,9 +53,15 @@ COUNT_KEYS = [
     "majority_bias_route_change_count",
     "shelter_congestion_count",
     "shelter_capacity_full_count",
+    "route_changed_vehicle_count",
+    "pedestrian_count",
 ]
+
 DICT_KEYS = [
     "arrival_time_by_vehID_dict",   # ここに辞書で受けたいキーを追加
+    "vehicle_abandant_time_by_pedestrianID_dict",
+    "walking_distance_by_pedestrianID_dict",
+
 ]
 
 # --- TOML loader（Py3.11+ は tomllib、Py3.10 は tomli を使用） ---
