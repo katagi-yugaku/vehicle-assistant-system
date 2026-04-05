@@ -1,7 +1,7 @@
 scenario_id = 1
 num_simulations = 50
 comm_range = 200
-num_vehicles = 10
+num_vehicles = 300
 vehicle_interval = 5
 shelter_capacity_threshold = 1.0
 driver_visibility_distance = 50
