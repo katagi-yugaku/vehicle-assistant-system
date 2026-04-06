@@ -6,7 +6,7 @@ SCENARIO_FROM="${1:?scenarioID_from is required}"
 SCENARIO_TO="${2:?scenarioID_to is required}"
 
 # 実験設定
-n=10
+n=50
 early_rate_list=(0.1 0.5 0.9)
 v2v_capable_vehicle_rate_list=(0.0 0.5 1.0)
 
