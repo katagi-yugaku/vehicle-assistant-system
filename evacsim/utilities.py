@@ -527,65 +527,87 @@ def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_v
     final_rate = 0.2033
     if neighbor_vehicle_abandant_nums > 4:
         neighbor_vehicle_abandant_nums = 4
-    # print(f"vehInfo_by_target_vehID.get_tsunami_precursor_info(){vehInfo_by_target_vehID.get_tsunami_precursor_info()}")
 
     encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
-    current_vehicle_abandantment_value = 0.3*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
+    current_vehicle_abandantment_value = 0.3*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + neighbor_vehicle_abandant_nums*agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
     if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
-        # print(f"agent_by_target_vehID::{agent_by_target_vehID.get_tsunami_info_obtaiend_time()} ")
-        # print(f"(current_time: {current_time} - encounted_congestion_time: {encounted_congestion_time})*2 +  agent_by_target_vehID.get_tsunami_info_obtaiend_time(): {agent_by_target_vehID.get_tsunami_info_obtaiend_time()} - normalcy_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + majority_value_about_vehicle_abandonment(): {agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()} = current_vehicle_abandantment_value: {current_vehicle_abandantment_value} compared with agent_by_target_vehID.get_vehicle_abandoned_threshold(): {agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
-        # if agent_by_target_vehID.get_vehID() == "init_ShelterA_1_107":
-        #     print(f"Test vehicle abandant vehID {agent_by_target_vehID.get_vehID()}, current_vehicle_abandantment_value: {current_vehicle_abandantment_value}")
+        print(f"Check {current_vehicle_abandantment_value} ({current_time} - {encounted_congestion_time} + {1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
         return True
-    # if agent_by_target_vehID.get_vehID() == "init_ShelterA_1_107":
-    #     print(f"Check vehID {agent_by_target_vehID.get_vehID()}, current_vehicle_abandantment_value: {current_vehicle_abandantment_value}")
     return False
 
 def count_near_abandoned_vehicle_in_right_lane(
                                                 vehID: str,
                                                 agent_list: list,
+                                                pedestrianID_list: list
                                             ) -> int:
-    front_threshold: float = 15.0
-    back_threshold: float = 10.0
-    leaders = traci.vehicle.getNeighbors(vehID, 0b011)      # 右前
-    followers = traci.vehicle.getNeighbors(vehID, 0b001)    # 右後
     count = 0
-
-    # 前方
-    for neighbor_vehID, neighbor_dist in leaders:
-        neighbor_agent: Agent = find_agent_by_vehID(neighbor_vehID, agent_list)
-        if neighbor_agent is not None and neighbor_agent.get_vehicle_abandoned_flg():
-            # print(f"neighbor_vehID: {neighbor_vehID}, neighbor_dist: {neighbor_dist}, front_threshold: {front_threshold}")
-            if neighbor_dist < front_threshold:
+    for pedestrianID in pedestrianID_list:
+        if traci.person.getPosition(pedestrianID) is not None:
+            ped_x, ped_y = traci.person.getPosition(pedestrianID)
+            veh_x, veh_y = traci.vehicle.getPosition(vehID)
+            distance = sqrt((ped_x - veh_x) ** 2 + (ped_y - veh_y) ** 2)
+            if distance < 30.0:
                 count += 1
+    return count
+    # front_threshold: float = 30.0
+    # back_threshold: float = 20.0
+    # leaders = traci.vehicle.getNeighbors(vehID, 0b011)      # 右前
+    # followers = traci.vehicle.getNeighbors(vehID, 0b001)    # 右後
+    # count = 0
 
-    # 後方
-    for neighbor_vehID, neighbor_dist in followers:
-        neighbor_agent: Agent = find_agent_by_vehID(neighbor_vehID, agent_list)
-        if neighbor_agent is not None and neighbor_agent.get_vehicle_abandoned_flg():
-            if neighbor_dist > -back_threshold:
-                count += 1
+    # # 前方
+    # for neighbor_vehID, neighbor_dist in leaders:
+    #     neighbor_dist = np.abs(neighbor_dist)
+    #     neighbor_agent: Agent = find_agent_by_vehID(neighbor_vehID, agent_list)
+    #     if neighbor_agent is not None and neighbor_agent.get_vehicle_abandoned_flg():
+    #         # print(f"neighbor_vehID: {neighbor_vehID}, neighbor_dist: {neighbor_dist}, front_threshold: {front_threshold}")
+    #         if neighbor_dist < front_threshold:
+    #             count += 1
+
+    # # 後方
+    # for neighbor_vehID, neighbor_dist in followers:
+    #     neighbor_dist = np.abs(neighbor_dist)
+    #     neighbor_agent: Agent = find_agent_by_vehID(neighbor_vehID, agent_list)
+    #     if neighbor_agent is not None and neighbor_agent.get_vehicle_abandoned_flg():
+    #         if neighbor_dist > -back_threshold:
+    #             count += 1
     # if vehID == "init_ShelterA_1_116":
     #     print(f"vehID {vehID}, leaders: {leaders}, followers: {followers}")
+    # if traci.simulation.getTime() > 1000:
+    #     print(f"coutn {count}vehID: {vehID}, leaders: {leaders}, followers: {followers}")
     return count
 
 def vehicle_abandant_behavior(current_vehID: str, current_edgeID: str, agent_by_current_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, PEDESTRIAN_COUNT: int, STOPPING_TIME_IN_SHELTER: int, shelter: Shelter):
-    person_id = f"ped_{current_vehID}_{PEDESTRIAN_COUNT}"
-    edge_position = traci.vehicle.getLanePosition(current_vehID)
-    current_lane_length = traci.lane.getLength(traci.vehicle.getLaneID(current_vehID))
-    traci.person.add(personID=person_id, edgeID=current_edgeID, pos=edge_position, depart=traci.simulation.getTime(), typeID="DEFAULT_PEDTYPE")
-    route_edges_for_pedestrian:list = get_remaining_edges(route_edges=traci.vehicle.getRoute(current_vehID), current_edgeID=current_edgeID)
-    current_edgeID = traci.vehicle.getRoadID(current_vehID)
-    print(f"route_edges_for_pedestrian: {route_edges_for_pedestrian}, current_edgeID: {current_edgeID}")
-    traci.person.appendWalkingStage(personID=person_id, edges=route_edges_for_pedestrian, arrivalPos=100.0)
-    PEDESTRIAN_COUNT += 1
-    agent_by_current_vehID.set_vehicle_abandoned_flg(True)
-    agent_by_current_vehID.set_vehicle_abandoned_time(traci.simulation.getTime())
-    traci.vehicle.setStop(vehID=current_vehID, edgeID=current_edgeID, pos=edge_position, laneIndex=traci.vehicle.getLaneIndex(current_vehID), duration=STOPPING_TIME_IN_SHELTER)
-    traci.vehicle.setColor(current_vehID, (128, 128, 128, 255))  # 灰色に変更
+    try:
+        person_id = f"ped_{current_vehID}_{PEDESTRIAN_COUNT}"
+        edge_position = traci.vehicle.getLanePosition(current_vehID)
+        current_lane_length = traci.lane.getLength(traci.vehicle.getLaneID(current_vehID))
+        traci.person.add(personID=person_id, edgeID=current_edgeID, pos=edge_position, depart=traci.simulation.getTime(), typeID="DEFAULT_PEDTYPE")
+        route_edges_for_pedestrian:list = get_remaining_edges(route_edges=traci.vehicle.getRoute(current_vehID), current_edgeID=current_edgeID)
+        current_edgeID = traci.vehicle.getRoadID(current_vehID)
+        # print(f"route_edges_for_pedestrian: {route_edges_for_pedestrian}, current_edgeID: {current_edgeID}")
+        traci.person.appendWalkingStage(personID=person_id, edges=route_edges_for_pedestrian, arrivalPos=100.0)
+        PEDESTRIAN_COUNT += 1
+        agent_by_current_vehID.set_vehicle_abandoned_flg(True)
+        agent_by_current_vehID.set_vehicle_abandoned_time(traci.simulation.getTime())
+        current_lane_index = traci.vehicle.getLaneIndex(current_vehID)
+        # 現在速度に応じて、停止位置を少し先に置く
+        # 先に減速させる
+        traci.vehicle.slowDown(current_vehID, 0.0, 2.0)
+        traci.vehicle.setStop(
+            vehID=current_vehID,
+            edgeID=current_edgeID,
+            pos=edge_position ,
+            laneIndex=current_lane_index,
+            duration=STOPPING_TIME_IN_SHELTER
+        )
+        traci.vehicle.setColor(current_vehID, (128, 128, 128, 255))  # 灰色に変更
+        walking_distance = calculate_remaining_route_distance(vehID=current_vehID, to_edge=vehInfo_by_target_vehID.get_edgeID_connect_target_shelter(), shelter=shelter)
+        return PEDESTRIAN_COUNT, person_id, walking_distance
 
-    walking_distance = calculate_remaining_route_distance(vehID=current_vehID, to_edge=vehInfo_by_target_vehID.get_edgeID_connect_target_shelter(), shelter=shelter)
-    return PEDESTRIAN_COUNT, person_id, walking_distance
+    except traci.exceptions.TraCIException as e:
+            print(f"[WARN] setStop failed for {current_vehID}: {e}")
+            return PEDESTRIAN_COUNT, None, None
 
 def generate_initial_vehIDs_for_row_xml(start_edge:str, end_edge:str, via_edges:str, \
                         depart_time:double, interval:double, veh_count:int, \
@@ -887,6 +909,8 @@ def init_agent_list(
                     ):
     agent_list = []
     for vehID in vehIDs:
+        # print(f"ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: {ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN}, ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: {ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR}")
+        # print(f"Initializing agent for {vehID}... {np.random.normal(ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR)}")
         # せっかちな人はこっち
         if random_true(ATTR_RATE):
             agent:Agent = Agent(
@@ -900,7 +924,7 @@ def init_agent_list(
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
                             lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
                             shelter_occupancy_rate_threshold=random.uniform(ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END),
-                            vehicle_abandoned_threshold=np.random.normal(ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN, ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR),
+                            vehicle_abandoned_threshold=random.uniform(ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN, ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR),
                             normalcy_value_about_vehicle_abandonment=np.random.normal(ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR),
                             majority_value_about_vehicle_abandonment=np.random.normal(ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR)
                             )
@@ -916,7 +940,7 @@ def init_agent_list(
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
                             lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
                             shelter_occupancy_rate_threshold=random.uniform(CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END),
-                            vehicle_abandoned_threshold=np.random.normal(CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN, CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR),
+                            vehicle_abandoned_threshold=random.uniform(CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN, CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR), # ここはいったん一様分布で生成しているが、実際には正規分布などの方が良いかもしれない
                             normalcy_value_about_vehicle_abandonment=np.random.normal(CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR),
                             majority_value_about_vehicle_abandonment=np.random.normal(CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR)
                             )
