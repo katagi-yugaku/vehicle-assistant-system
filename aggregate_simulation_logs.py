@@ -484,7 +484,7 @@ def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> No
         elif is_close_float(key, 0.0):
             plt.plot(arr, cdf, label=label_for(key), color="blue", linestyle="--")
 
-    plt.xlim(200, 1500)
+    plt.xlim(200, 3000)
     plt.ylim(0.05, 1.0)
     plt.xticks(ticks=list(range(200, 1510, 100)), fontsize=14, fontweight="semibold")
     plt.yticks(ticks=[i / 10 for i in range(1, 11)], fontsize=14, fontweight="semibold")
