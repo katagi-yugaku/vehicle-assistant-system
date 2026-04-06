@@ -1,7 +1,7 @@
 sumo/
+
 # シミュレーションの出力フォルダ
 output/
-results/
 
 # ログファイル
 *.log
@@ -15,9 +15,16 @@ traci_log.txt
 tripinfo.xml
 
 # macOS
-.DS_Storec
+.DS_Store
 *.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+
+# map data
 evacsim/data/maps/*.osm.pbf
+data/maps/*.osm.pbf
 
 # =========================
 # Slurm / simulation logs
@@ -25,4 +32,4 @@ evacsim/data/maps/*.osm.pbf
 logs/
 slurm_logs/
 *.out
-*.errevacsim/data/maps/*.osm.pbf
+*.err
