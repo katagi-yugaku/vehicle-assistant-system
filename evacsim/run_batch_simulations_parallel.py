@@ -42,17 +42,6 @@ vehicle_interval = 5.0
 
 # ---- 収集対象キーをここで集中管理 ----
 COUNT_KEYS = [
-    "obtain_info_lane_change_count",
-    "elapsed_time_lane_change_count",
-    "normalcy_bias_count",
-    "negative_majority_bias_count",
-    "positive_majority_bias_count",
-    "lane_changed_vehicle_count",
-    "route_changed_vehicle_count",
-    "normalcy_bias_route_change_count",
-    "majority_bias_route_change_count",
-    "shelter_congestion_count",
-    "shelter_capacity_full_count",
     "route_changed_vehicle_count",
     "pedestrian_count",
 ]
