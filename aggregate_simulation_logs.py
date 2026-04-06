@@ -53,6 +53,7 @@ SUMMARY_COUNT_KEYS = [
     "positive_majority_bias_count",
     "lane_changed_vehicle_count",
     "pedestrian_count",
+    "route_changed_vehicle_count",
 ]
 
 
