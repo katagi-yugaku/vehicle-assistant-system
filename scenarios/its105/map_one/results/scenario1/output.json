@@ -1,6 +1,6 @@
 {
   "scenario": 1,
-  "timestamp": "2026-04-06 19:29:35",
+  "timestamp": "2026-04-06 19:34:56",
   "cdf_source": {
     "0.1": [
       307.09090909090907,
@@ -3699,22 +3699,26 @@
     "0.1": {
       "obtain_info_lane_change_count": 0.0,
       "elapsed_time_lane_change_count": 0.0,
-      "lane_changed_vehicle_count": 0.0
+      "lane_changed_vehicle_count": 0.0,
+      "pedestrian_count": 5.886363636363637
     },
     "0.5": {
       "obtain_info_lane_change_count": 0.0,
       "elapsed_time_lane_change_count": 0.0,
-      "lane_changed_vehicle_count": 0.0
+      "lane_changed_vehicle_count": 0.0,
+      "pedestrian_count": 5.6
     },
     "0.9": {
       "obtain_info_lane_change_count": 0.0,
       "elapsed_time_lane_change_count": 0.0,
-      "lane_changed_vehicle_count": 0.0
+      "lane_changed_vehicle_count": 0.0,
+      "pedestrian_count": 1.4081632653061225
     },
     "nosystem": {
       "obtain_info_lane_change_count": 0.0,
       "elapsed_time_lane_change_count": 0.0,
-      "lane_changed_vehicle_count": 0.0
+      "lane_changed_vehicle_count": 0.0,
+      "pedestrian_count": 4.534883720930233
     }
   }
 }
