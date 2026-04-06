@@ -698,6 +698,20 @@ def aggregate_all_conditions(
 
     return result
 
+def build_output_dir_from_scenario_name(scenario_name: str) -> str:
+    """
+    aggregate_simulation_logs.py が置かれている
+    vehicle-assistant-system/ を基準にして、
+    scenarios/{scenario_name}/map_one/results を返す
+    """
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(
+        repo_root,
+        "scenarios",
+        scenario_name,
+        "map_one",
+        "results",
+    )
 
 # =========================================
 # CLI
@@ -728,19 +742,25 @@ def parse_args() -> argparse.Namespace:
         default=OUTPUT_JSON_FILE,
         help=f"出力 JSON ファイル名。既定値: {OUTPUT_JSON_FILE}",
     )
+    parser.add_argument(
+    "--scenario-name",
+    default=None,
+    help="scenarios/{scenario_name}/map_one/results を出力先として使うためのシナリオ名。例: its105",
+    )
     return parser.parse_args()
-
 
 def main() -> int:
     """エントリポイント"""
     args = parse_args()
 
     log_dir = os.path.abspath(args.log_dir)
-    output_dir = (
-        os.path.abspath(args.output_dir)
-        if args.output_dir is not None
-        else log_dir
-    )
+
+    if args.scenario_name:
+        output_dir = build_output_dir_from_scenario_name(args.scenario_name)
+    elif args.output_dir is not None:
+        output_dir = os.path.abspath(args.output_dir)
+    else:
+        output_dir = log_dir
 
     try:
         aggregate_all_conditions(
@@ -754,7 +774,6 @@ def main() -> int:
         return 1
 
     return 0
-
 
 if __name__ == "__main__":
     sys.exit(main())
