@@ -531,7 +531,7 @@ def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_v
     encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
     current_vehicle_abandantment_value = 0.3*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + neighbor_vehicle_abandant_nums*agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
     if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
-        print(f"Check {current_vehicle_abandantment_value} ({0.3*max(0, (current_time - encounted_congestion_time)**2)} + {1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
+        print(f"Check {current_vehicle_abandantment_value} ({current_time} - {encounted_congestion_time} + {1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
         return True
     return False
 
@@ -924,7 +924,7 @@ def init_agent_list(
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
                             lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
                             shelter_occupancy_rate_threshold=random.uniform(ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END),
-                            vehicle_abandoned_threshold=np.random.normal(ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN, ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR),
+                            vehicle_abandoned_threshold=random.uniform(ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN, ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR),
                             normalcy_value_about_vehicle_abandonment=np.random.normal(ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR),
                             majority_value_about_vehicle_abandonment=np.random.normal(ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR)
                             )
@@ -940,7 +940,7 @@ def init_agent_list(
                             motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
                             lane_minimum_motivation_value=random.uniform(MIN_MOTIVATION_START, MIN_MOTIVATION_END),
                             shelter_occupancy_rate_threshold=random.uniform(CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START, CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END),
-                            vehicle_abandoned_threshold=np.random.normal(CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN, CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR),
+                            vehicle_abandoned_threshold=random.uniform(CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN, CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR), # ここはいったん一様分布で生成しているが、実際には正規分布などの方が良いかもしれない
                             normalcy_value_about_vehicle_abandonment=np.random.normal(CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR),
                             majority_value_about_vehicle_abandonment=np.random.normal(CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN, CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR)
                             )

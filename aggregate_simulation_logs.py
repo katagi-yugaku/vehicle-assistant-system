@@ -33,6 +33,7 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, DefaultDict, Dict, Iterable, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
@@ -43,6 +44,21 @@ COMPARISON_SYSTEM_EARLY_RATES = [0.1, 0.5, 0.9]
 COMPARISON_SYSTEM_V2V_RATE = 1.0
 COMPARISON_NOSYSTEM_EARLY_RATE = 0.5
 COMPARISON_NOSYSTEM_V2V_RATE = 0.0
+
+SUMMARY_COUNT_KEYS = [
+    "obtain_info_lane_change_count",
+    "elapsed_time_lane_change_count",
+    "normalcy_bias_count",
+    "negative_majority_bias_count",
+    "positive_majority_bias_count",
+    "lane_changed_vehicle_count",
+]
+
+WALKING_DISTANCE_BIN_WIDTH = 50
+WALKING_DISTANCE_BIN_EDGES = [
+    200, 250, 300, 350, 400, 450, 500, 550,
+    600, 650, 700, 750, 800, 850, 900, 950, 1000,
+]
 
 def is_close_float(a: float, b: float, tol: float = 1e-9) -> bool:
     return abs(a - b) < tol
@@ -454,6 +470,134 @@ def parse_log_content(text: str) -> Tuple[Dict[str, Optional[float]], Dict[str, 
     return count_values, dict_values, messages
 
 
+
+def build_histogram_from_values(values: List[float], bin_edges: List[float]) -> Dict[str, Any]:
+    """
+    指定した bin_edges に従って度数分布を作る。
+    区間は [left, right) とし、最後の bin のみ right を含む。
+    bin 範囲外の値は無視する。
+    """
+    if len(bin_edges) < 2:
+        raise ValueError("bin_edges には 2 つ以上の境界が必要です")
+
+    counts = [0] * (len(bin_edges) - 1)
+
+    for value in values:
+        for index in range(len(bin_edges) - 1):
+            left = bin_edges[index]
+            right = bin_edges[index + 1]
+            is_last_bin = index == len(bin_edges) - 2
+            if (left <= value < right) or (is_last_bin and left <= value <= right):
+                counts[index] += 1
+                break
+
+    counted_total = sum(counts)
+    if counted_total > 0:
+        ratios = [round(count / counted_total, 4) for count in counts]
+    else:
+        ratios = [0.0 for _ in counts]
+
+    bin_width = bin_edges[1] - bin_edges[0]
+
+    return {
+        "bin_width": bin_width,
+        "bin_edges": list(bin_edges),
+        "counts": counts,
+        "ratios": ratios,
+    }
+
+
+def get_requested_output_key(early_rate: float, v2v_rate: float) -> Optional[str]:
+    """
+    出力 JSON 用のキーを返す。
+    system 側は "0.1", "0.5", "0.9"、
+    nosystem 側は early_rate=0.5, v2v_rate=0.0 を "nosystem" とする。
+    """
+    if is_close_float(v2v_rate, COMPARISON_SYSTEM_V2V_RATE):
+        for target_rate in COMPARISON_SYSTEM_EARLY_RATES:
+            if is_close_float(early_rate, target_rate):
+                return f"{target_rate:.1f}"
+
+    if (
+        is_close_float(early_rate, COMPARISON_NOSYSTEM_EARLY_RATE)
+        and is_close_float(v2v_rate, COMPARISON_NOSYSTEM_V2V_RATE)
+    ):
+        return "nosystem"
+
+    return None
+
+
+def build_requested_output_for_scenario(
+    scenario: int,
+    scenario_results: Dict[str, Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    ユーザー指定形式の output.json を構築する。
+    """
+    ordered_keys = ["0.1", "0.5", "0.9", "nosystem"]
+
+    selected_results: Dict[str, Dict[str, Any]] = {}
+    for _, condition_result in scenario_results.items():
+        early_rate = float(condition_result["early_rate"])
+        v2v_rate = float(condition_result["v2v_rate"])
+        output_key = get_requested_output_key(early_rate, v2v_rate)
+        if output_key is not None:
+            selected_results[output_key] = condition_result
+
+    cdf_source: Dict[str, List[float]] = {}
+    arrival_time_cdf: Dict[str, Dict[str, List[float]]] = {}
+    average_count_metrics: Dict[str, Dict[str, float]] = {}
+    walking_distance_values: List[float] = []
+
+    for output_key in ordered_keys:
+        condition_result = selected_results.get(output_key)
+
+        if condition_result is None:
+            cdf_source[output_key] = []
+            arrival_time_cdf[output_key] = {"x": [], "y": []}
+            average_count_metrics[output_key] = {}
+            continue
+
+        arrival_values = [
+            float(value)
+            for value in condition_result.get("arrival_time", {}).get("arrival_time_list", [])
+        ]
+        arrival_values = sorted(arrival_values)
+        cdf_source[output_key] = arrival_values
+
+        x_values, y_values = compute_cdf_points(arrival_values)
+        arrival_time_cdf[output_key] = {
+            "x": x_values,
+            "y": y_values,
+        }
+
+        count_averages = condition_result.get("count_averages", {})
+        average_count_metrics[output_key] = {
+            key: float(count_averages[key])
+            for key in SUMMARY_COUNT_KEYS
+            if count_averages.get(key) is not None
+        }
+
+        walking_distance_map = condition_result.get("abandonment", {}).get(
+            "vehicle_mean_walking_distance", {}
+        )
+        walking_distance_values.extend(float(value) for value in walking_distance_map.values())
+
+    walking_distance_distribution = build_histogram_from_values(
+        walking_distance_values,
+        WALKING_DISTANCE_BIN_EDGES,
+    )
+
+    return {
+        "scenario": scenario,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "cdf_source": cdf_source,
+        "arrival_time_cdf": arrival_time_cdf,
+        "walking_distance_distribution": walking_distance_distribution,
+        "average_count_metrics": average_count_metrics,
+    }
+
+
 def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> None:
     plt.figure(figsize=(10, 6))
 
@@ -689,7 +833,7 @@ def create_cdf_plot(condition_key: str, values: List[float], output_dir: str) ->
 def write_json(data: Dict[str, Any], output_path: str) -> None:
     """結果 JSON を保存する"""
     with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=True)
+        json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=False)
 
 
 # =========================================
@@ -751,11 +895,7 @@ def aggregate_all_conditions(
             warn(f"比較 CDF 用データが不足しているためスキップします: scenario={scenario}")
             comparison_plot_filename = None
 
-        scenario_json_data = {
-            "scenario": scenario,
-            "comparison_cdf_plot_file": comparison_plot_filename,
-            "conditions": scenario_results,
-        }
+        scenario_json_data = build_requested_output_for_scenario(scenario, scenario_results)
 
         json_output_path = os.path.join(scenario_output_dir, json_filename)
         write_json(scenario_json_data, json_output_path)
