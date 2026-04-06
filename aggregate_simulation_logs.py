@@ -37,12 +37,27 @@ from typing import Any, DefaultDict, Dict, Iterable, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 
+OUTPUT_JSON_FILE = "output.json"
+
+COMPARISON_SYSTEM_EARLY_RATES = [0.1, 0.5, 0.9]
+COMPARISON_SYSTEM_V2V_RATE = 1.0
+COMPARISON_NOSYSTEM_EARLY_RATE = 0.5
+COMPARISON_NOSYSTEM_V2V_RATE = 0.0
+
+def is_close_float(a: float, b: float, tol: float = 1e-9) -> bool:
+    return abs(a - b) < tol
+
+def build_scenario_output_dir(base_output_dir: str, scenario: int) -> str:
+    return os.path.join(base_output_dir, f"scenario{scenario}")
+
+def build_output_dir_from_scenario_name(scenario_name: str) -> str:
+    repo_root = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(repo_root, "scenarios", scenario_name, "map_one", "results")
 
 # =========================================
 # 拡張しやすい定数定義
 # =========================================
 
-OUTPUT_JSON_FILE = "simulation_averages.json"
 
 # 想定 run_id の上限。必要に応じて CLI 引数で上書き可能。
 DEFAULT_EXPECTED_MAX_RUN_ID = 50
@@ -439,6 +454,48 @@ def parse_log_content(text: str) -> Tuple[Dict[str, Optional[float]], Dict[str, 
     return count_values, dict_values, messages
 
 
+def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> None:
+    plt.figure(figsize=(10, 6))
+
+    def label_for(key: float) -> str:
+        if is_close_float(key, 0.1):
+            return "system 0.1"
+        if is_close_float(key, 0.5):
+            return "system 0.5"
+        if is_close_float(key, 0.9):
+            return "system 0.9"
+        if is_close_float(key, 0.0):
+            return "nosystem 0.5"
+        return f"key={key}"
+
+    for key in [0.1, 0.5, 0.9, 0.0]:
+        values = data_dict.get(key, [])
+        arr = sorted(float(v) for v in values)
+        if not arr:
+            continue
+        cdf = [(i + 1) / len(arr) for i in range(len(arr))]
+
+        if is_close_float(key, 0.1):
+            plt.plot(arr, cdf, label=label_for(key), color="r", linestyle="-")
+        elif is_close_float(key, 0.5):
+            plt.plot(arr, cdf, label=label_for(key), color="blue", linestyle="-")
+        elif is_close_float(key, 0.9):
+            plt.plot(arr, cdf, label=label_for(key), color="g", linestyle="-")
+        elif is_close_float(key, 0.0):
+            plt.plot(arr, cdf, label=label_for(key), color="blue", linestyle="--")
+
+    plt.xlim(200, 1500)
+    plt.ylim(0.05, 1.0)
+    plt.xticks(ticks=list(range(200, 1510, 100)), fontsize=14, fontweight="semibold")
+    plt.yticks(ticks=[i / 10 for i in range(1, 11)], fontsize=14, fontweight="semibold")
+    plt.xlabel("Mean arrival time")
+    plt.ylabel("Cumulative distribution")
+    plt.legend(loc="lower right")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=150)
+    plt.close()
+
 # =========================================
 # 条件別集計
 # =========================================
@@ -466,13 +523,9 @@ def aggregate_condition(
     parsed_run_ids: List[int] = []
     failed_run_ids: List[int] = []
 
-    # count 系: key ごとに run 横断で値を蓄積
     count_accumulator: DefaultDict[str, List[float]] = defaultdict(list)
-
-    # arrival_time: vehicle_id ごとに run 横断で arrival time を蓄積
     arrival_time_accumulator: DefaultDict[str, List[float]] = defaultdict(list)
 
-    # abandonment: 全イベント平均 + vehicle ごと平均
     abandon_time_all_events: List[float] = []
     walking_distance_all_events: List[float] = []
     abandon_time_by_vehicle: DefaultDict[str, List[float]] = defaultdict(list)
@@ -486,7 +539,6 @@ def aggregate_condition(
 
         count_values, dict_values, messages = parse_log_content(text)
 
-        # 何も取れなかった場合は失敗扱い
         has_any_count = any(value is not None for value in count_values.values())
         has_any_dict = any(bool(value_dict) for value_dict in dict_values.values())
         if not (has_any_count or has_any_dict):
@@ -501,49 +553,40 @@ def aggregate_condition(
 
         parsed_run_ids.append(file_info.run_id)
 
-        # 部分的な欠損は warning のみ
         for message in messages:
             warn(f"{file_info.filename}: {message}")
 
-        # count 系集計
         for key, value in count_values.items():
             if value is not None and not math.isnan(value):
                 count_accumulator[key].append(value)
 
-        # arrival_time 集計
         arrival_dict = dict_values.get("arrival_time_by_vehID_dict", {})
         for vehicle_id, arrival_time in arrival_dict.items():
             arrival_time_accumulator[vehicle_id].append(arrival_time)
 
-        # abandonment time 集計
         abandon_dict = dict_values.get("vehicle_abandant_time_by_pedestrianID_dict", {})
         for vehicle_id, abandon_time in abandon_dict.items():
             abandon_time_all_events.append(abandon_time)
             abandon_time_by_vehicle[vehicle_id].append(abandon_time)
 
-        # walking distance 集計
         walking_dict = dict_values.get("walking_distance_by_pedestrianID_dict", {})
         for vehicle_id, walking_distance in walking_dict.items():
             walking_distance_all_events.append(walking_distance)
             walking_distance_by_vehicle[vehicle_id].append(walking_distance)
 
-    # 重複 run の可能性は事前に除外済みだが、念のためソート & unique 化
     parsed_run_ids = sorted(set(parsed_run_ids))
     failed_run_ids = sorted(set(failed_run_ids))
 
-    # count 平均
     count_averages: Dict[str, Optional[float]] = {}
     for key in COUNT_KEYS:
         count_averages[key] = safe_mean(count_accumulator.get(key, []))
 
-    # arrival_time の vehicle ごと平均
     vehicle_mean_arrival_time: Dict[str, float] = {}
     for vehicle_id, values in arrival_time_accumulator.items():
         mean_value = safe_mean(values)
         if mean_value is not None:
             vehicle_mean_arrival_time[vehicle_id] = mean_value
 
-    # abandonment の vehicle ごと平均
     vehicle_mean_abandon_time: Dict[str, float] = {}
     for vehicle_id, values in abandon_time_by_vehicle.items():
         mean_value = safe_mean(values)
@@ -556,12 +599,8 @@ def aggregate_condition(
         if mean_value is not None:
             vehicle_mean_walking_distance[vehicle_id] = mean_value
 
-    # CDF 出力
-    cdf_plot_file = create_cdf_plot(
-        condition_key=condition_key,
-        values=list(vehicle_mean_arrival_time.values()),
-        output_dir=output_dir,
-    )
+    # CDF の元データとして使いやすいように list でも保持
+    arrival_time_list = sorted(vehicle_mean_arrival_time.values())
 
     result: Dict[str, Any] = {
         "scenario": scenario,
@@ -576,11 +615,11 @@ def aggregate_condition(
         },
         "count_averages": count_averages,
         "arrival_time": {
+            "arrival_time_list": arrival_time_list,
             "vehicle_mean_arrival_time": {
                 vehicle_id: vehicle_mean_arrival_time[vehicle_id]
                 for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_arrival_time.keys())
             },
-            "cdf_plot_file": cdf_plot_file,
         },
         "abandonment": {
             "mean_abandon_time": safe_mean(abandon_time_all_events),
@@ -597,7 +636,6 @@ def aggregate_condition(
     }
 
     return result
-
 
 # =========================================
 # CDF 出力
@@ -664,7 +702,7 @@ def aggregate_all_conditions(
     expected_max_run_id: int,
     json_filename: str,
 ) -> Dict[str, Any]:
-    """全条件を集計し、JSON と CDF を出力する"""
+    """全条件を集計し、scenario ごとに JSON と比較 CDF を出力する"""
     ensure_output_dir(output_dir)
 
     out_paths = list_out_files(log_dir)
@@ -681,7 +719,8 @@ def aggregate_all_conditions(
     grouped = deduplicate_by_condition_and_run(parsed_files)
     info(f"検出された条件数: {len(grouped)}")
 
-    result: Dict[str, Any] = {}
+    all_results_by_scenario: Dict[int, Dict[str, Any]] = defaultdict(dict)
+
     for condition_key in sorted(grouped.keys()):
         info(f"集計中: {condition_key}")
         condition_result = aggregate_condition(
@@ -690,28 +729,76 @@ def aggregate_all_conditions(
             output_dir=output_dir,
             expected_max_run_id=expected_max_run_id,
         )
-        result[condition_key] = condition_result
+        scenario = int(condition_result["scenario"])
+        all_results_by_scenario[scenario][condition_key] = condition_result
 
-    json_output_path = os.path.join(output_dir, json_filename)
-    write_json(result, json_output_path)
-    info(f"JSON を出力しました: {json_output_path}")
+    final_output: Dict[str, Any] = {}
 
-    return result
+    for scenario, scenario_results in sorted(all_results_by_scenario.items()):
+        scenario_output_dir = build_scenario_output_dir(output_dir, scenario)
+        ensure_output_dir(scenario_output_dir)
 
-def build_output_dir_from_scenario_name(scenario_name: str) -> str:
+        comparison_plot_filename = f"cdf_compare_s{scenario}.pdf"
+        comparison_plot_path = os.path.join(
+            scenario_output_dir,
+            comparison_plot_filename,
+        )
+
+        comparison_data = build_comparison_cdf_data_for_scenario(scenario_results)
+        if comparison_data:
+            plot_cdfs_to_path(comparison_data, comparison_plot_path)
+        else:
+            warn(f"比較 CDF 用データが不足しているためスキップします: scenario={scenario}")
+            comparison_plot_filename = None
+
+        scenario_json_data = {
+            "scenario": scenario,
+            "comparison_cdf_plot_file": comparison_plot_filename,
+            "conditions": scenario_results,
+        }
+
+        json_output_path = os.path.join(scenario_output_dir, json_filename)
+        write_json(scenario_json_data, json_output_path)
+        info(f"JSON を出力しました: {json_output_path}")
+
+        final_output[f"scenario{scenario}"] = scenario_json_data
+
+    return final_output
+
+
+def build_comparison_cdf_data_for_scenario(
+    scenario_results: Dict[str, Dict[str, Any]]
+) -> Dict[float, List[float]]:
     """
-    aggregate_simulation_logs.py が置かれている
-    vehicle-assistant-system/ を基準にして、
-    scenarios/{scenario_name}/map_one/results を返す
+    scenario 単位で、比較 CDF 用のデータを組み立てる。
+    対象:
+      - system 0.1: early_rate=0.1, v2v=1.0
+      - system 0.5: early_rate=0.5, v2v=1.0
+      - system 0.9: early_rate=0.9, v2v=1.0
+      - nosystem 0.5: early_rate=0.5, v2v=0.0
     """
-    repo_root = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(
-        repo_root,
-        "scenarios",
-        scenario_name,
-        "map_one",
-        "results",
-    )
+    comparison_data: Dict[float, List[float]] = {}
+
+    for _, condition_result in scenario_results.items():
+        early_rate = float(condition_result["early_rate"])
+        v2v_rate = float(condition_result["v2v_rate"])
+        arrival_values = list(condition_result["arrival_time"].get("arrival_time_list", []))
+
+        if not arrival_values:
+            continue
+
+        if (
+            is_close_float(v2v_rate, COMPARISON_SYSTEM_V2V_RATE)
+            and any(is_close_float(early_rate, x) for x in COMPARISON_SYSTEM_EARLY_RATES)
+        ):
+            comparison_data[early_rate] = arrival_values
+        elif (
+            is_close_float(early_rate, COMPARISON_NOSYSTEM_EARLY_RATE)
+            and is_close_float(v2v_rate, COMPARISON_NOSYSTEM_V2V_RATE)
+        ):
+            comparison_data[0.0] = arrival_values
+
+    return comparison_data
 
 # =========================================
 # CLI
