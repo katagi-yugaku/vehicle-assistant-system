@@ -33,3 +33,4 @@ logs/
 slurm_logs/
 *.out
 *.err
+*.pyc
