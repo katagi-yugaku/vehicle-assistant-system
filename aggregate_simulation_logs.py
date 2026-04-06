@@ -486,7 +486,7 @@ def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> No
 
     plt.xlim(200, 3000)
     plt.ylim(0.05, 1.0)
-    plt.xticks(ticks=list(range(200, 1510, 100)), fontsize=14, fontweight="semibold")
+    plt.xticks(ticks=list(range(200, 3000, 100)), fontsize=14, fontweight="semibold")
     plt.yticks(ticks=[i / 10 for i in range(1, 11)], fontsize=14, fontweight="semibold")
     plt.xlabel("Mean arrival time")
     plt.ylabel("Cumulative distribution")
