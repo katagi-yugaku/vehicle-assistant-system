@@ -52,7 +52,9 @@ SUMMARY_COUNT_KEYS = [
     "negative_majority_bias_count",
     "positive_majority_bias_count",
     "lane_changed_vehicle_count",
+    "pedestrian_count",
 ]
+
 
 WALKING_DISTANCE_BIN_WIDTH = 50
 WALKING_DISTANCE_BIN_EDGES = [
