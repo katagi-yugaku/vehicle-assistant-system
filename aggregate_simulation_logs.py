@@ -593,10 +593,11 @@ def build_requested_output_for_scenario(
     return {
         "scenario": scenario,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "average_count_metrics": average_count_metrics,
+        "average_count_metrics": average_count_metrics,
         "cdf_source": cdf_source,
         "arrival_time_cdf": arrival_time_cdf,
         "walking_distance_distribution": walking_distance_distribution,
-        "average_count_metrics": average_count_metrics,
     }
 
 
