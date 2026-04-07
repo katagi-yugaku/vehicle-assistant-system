@@ -478,7 +478,6 @@ def parse_log_content(text: str) -> Tuple[Dict[str, Optional[float]], Dict[str, 
     return count_values, dict_values, messages
 
 
-
 def build_histogram_from_values(values: List[float], bin_edges: List[float]) -> Dict[str, Any]:
     """
     指定した bin_edges に従って度数分布を作る。
@@ -541,6 +540,8 @@ def build_requested_output_for_scenario(
 ) -> Dict[str, Any]:
     """
     ユーザー指定形式の output.json を構築する。
+    0.1 / 0.5 / 0.9 / nosystem ごとに
+    abandon_time_distribution と walking_distance_distribution を持たせる。
     """
     ordered_keys = ["0.1", "0.5", "0.9", "nosystem"]
 
@@ -556,8 +557,8 @@ def build_requested_output_for_scenario(
     arrival_time_cdf: Dict[str, Dict[str, List[float]]] = {}
     average_count_metrics: Dict[str, Dict[str, float]] = {}
 
-    abandon_time_values: List[float] = []
-    walking_distance_values: List[float] = []
+    abandon_time_distribution: Dict[str, Dict[str, Any]] = {}
+    walking_distance_distribution: Dict[str, Dict[str, Any]] = {}
 
     for output_key in ordered_keys:
         condition_result = selected_results.get(output_key)
@@ -566,6 +567,14 @@ def build_requested_output_for_scenario(
             cdf_source[output_key] = []
             arrival_time_cdf[output_key] = {"x": [], "y": []}
             average_count_metrics[output_key] = {}
+            abandon_time_distribution[output_key] = build_histogram_from_values(
+                [],
+                ABANDON_TIME_BIN_EDGES,
+            )
+            walking_distance_distribution[output_key] = build_histogram_from_values(
+                [],
+                WALKING_DISTANCE_BIN_EDGES,
+            )
             continue
 
         arrival_values = [
@@ -591,24 +600,18 @@ def build_requested_output_for_scenario(
         abandonment = condition_result.get("abandonment", {})
 
         abandon_time_map = abandonment.get("vehicle_mean_abandon_time", {})
-        abandon_time_values.extend(
-            float(value) for value in abandon_time_map.values()
+        abandon_time_values = [float(value) for value in abandon_time_map.values()]
+        abandon_time_distribution[output_key] = build_histogram_from_values(
+            abandon_time_values,
+            ABANDON_TIME_BIN_EDGES,
         )
 
         walking_distance_map = abandonment.get("vehicle_mean_walking_distance", {})
-        walking_distance_values.extend(
-            float(value) for value in walking_distance_map.values()
+        walking_distance_values = [float(value) for value in walking_distance_map.values()]
+        walking_distance_distribution[output_key] = build_histogram_from_values(
+            walking_distance_values,
+            WALKING_DISTANCE_BIN_EDGES,
         )
-
-    abandon_time_distribution = build_histogram_from_values(
-        abandon_time_values,
-        ABANDON_TIME_BIN_EDGES,
-    )
-
-    walking_distance_distribution = build_histogram_from_values(
-        walking_distance_values,
-        WALKING_DISTANCE_BIN_EDGES,
-    )
 
     return {
         "scenario": scenario,
@@ -619,6 +622,7 @@ def build_requested_output_for_scenario(
         "abandon_time_distribution": abandon_time_distribution,
         "walking_distance_distribution": walking_distance_distribution,
     }
+
 
 def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> None:
     plt.figure(figsize=(10, 6))
