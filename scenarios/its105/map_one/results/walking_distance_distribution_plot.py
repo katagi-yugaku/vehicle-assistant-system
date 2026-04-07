@@ -1,84 +1,61 @@
 import json
-import numpy as np
+import sys
+from pathlib import Path
 import matplotlib.pyplot as plt
+import numpy as np
 
 
-def load_walking_distance_distribution(json_path: str) -> dict:
-    """
-    JSON から walking_distance_distribution を取り出す
-    """
-    with open(json_path, "r", encoding="utf-8") as f:
-        obj = json.load(f)
-
-    if "walking_distance_distribution" not in obj:
-        raise KeyError("JSON に 'walking_distance_distribution' が存在しません。")
-
-    return obj["walking_distance_distribution"]
+def normalize_scenario_arg(arg: str) -> str:
+    arg = arg.strip()
+    if arg.isdigit():
+        return f"scenario{arg}"
+    return arg
 
 
-def plot_walking_distance_distribution(dist_dict: dict, label_suffix: str):
-    """
-    walking_distance_distribution から回数分布を描画する関数
+def load_walking_distance_distribution(json_path: Path) -> dict:
+    if not json_path.exists():
+        raise FileNotFoundError(f"JSON file not found: {json_path}")
 
-    Parameters
-    ----------
-    dist_dict : dict
-        例:
-        {
-            "bin_width": 50,
-            "bin_edges": [200, 250, 300, ... ,1000],
-            "counts": [108, 112, 98, 8, ...]
-        }
+    with json_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    label_suffix : str
-        保存ファイル名に付与するサフィックス
-    """
-    bin_width = dist_dict["bin_width"]
-    bin_edges = np.array(dist_dict["bin_edges"], dtype=float)
-    counts = np.array(dist_dict["counts"], dtype=int)
+    if "walking_distance_distribution" not in data:
+        raise KeyError(f"'walking_distance_distribution' not found in {json_path}")
 
-    if len(bin_edges) != len(counts) + 1:
-        raise ValueError(
-            f"bin_edges の長さは counts より 1 だけ多い必要があります。"
-            f" len(bin_edges)={len(bin_edges)}, len(counts)={len(counts)}"
-        )
+    return data["walking_distance_distribution"]
 
-    # 各階級の左端
-    left_edges = bin_edges[:-1]
+
+def plot_distribution(dist: dict, label_suffix: str) -> None:
+    bin_width = dist["bin_width"]
+    bin_edges = dist["bin_edges"]
+    counts = dist["counts"]
+    ratios = dist["ratios"]
+
+    left_edges = np.array(bin_edges[:-1], dtype=float)
 
     plt.figure(figsize=(10, 6))
+    plt.bar(left_edges, counts, width=bin_width, align="edge", edgecolor="black")
 
-    plt.bar(
-        left_edges,
-        counts,
-        width=bin_width,
-        align="edge",
-        edgecolor="black",
-        linewidth=1.0
-    )
-
-    plt.xticks(
-        ticks=np.arange(bin_edges[0], bin_edges[-1] + 1, 100),
-        fontsize=20,
-        fontweight="semibold"
-    )
-    plt.yticks(
-        fontsize=20,
-        fontweight="semibold"
-    )
-
-    plt.xlabel("Walking distance [m]", fontsize=20, fontweight="semibold")
-    plt.ylabel("Count", fontsize=20, fontweight="semibold")
+    plt.xlabel("Walking distance [m]")
+    plt.ylabel("Count")
+    plt.title(f"Walking distance distribution ({label_suffix})")
     plt.grid(True, axis="y", alpha=0.3)
 
-    save_path = f"/Users/kashiisamutakeshi/walking_distance_distribution_{label_suffix}.pdf"
-    plt.savefig(save_path, bbox_inches="tight")
-    print(f"✅ Saved figure as: {save_path}")
-
-    plt.show()
+    out_path = Path(__file__).resolve().parent / f"walking_distance_distribution_{label_suffix}.pdf"
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
+    print(f"saved: {out_path}")
+    # plt.show()  # 必要なときだけ有効化
 
 
 if __name__ == "__main__":
-    json_path = "/mnt/data/output.json"   # 適宜変更
+    if len(sys.argv) < 2:
+        print("Usage: python3 walking_distance_distribution_plot.py <scenario_id>")
+        sys.exit(1)
+
+    scenario_name = normalize_scenario_arg(sys.argv[1])
+
+    base_dir = Path(__file__).resolve().parent
+    json_path = base_dir / scenario_name / "output.json"
+
     dist = load_walking_distance_distribution(json_path)
-    plot_walking_distance_distribution(dist, label_suffix="30")
+    plot_distribution(dist, scenario_name)
