@@ -53,7 +53,7 @@ SUMMARY_COUNT_KEYS = [
     "positive_majority_bias_count",
     "lane_changed_vehicle_count",
     "pedestrian_count",
-    "route_changed_vehicle_count",
+    "route_changed_vehicle_count"
 ]
 
 
@@ -550,6 +550,8 @@ def build_requested_output_for_scenario(
     cdf_source: Dict[str, List[float]] = {}
     arrival_time_cdf: Dict[str, Dict[str, List[float]]] = {}
     average_count_metrics: Dict[str, Dict[str, float]] = {}
+
+    abandon_time_values: List[float] = []
     walking_distance_values: List[float] = []
 
     for output_key in ordered_keys:
@@ -581,10 +583,22 @@ def build_requested_output_for_scenario(
             if count_averages.get(key) is not None
         }
 
-        walking_distance_map = condition_result.get("abandonment", {}).get(
-            "vehicle_mean_walking_distance", {}
+        abandonment = condition_result.get("abandonment", {})
+
+        abandon_time_map = abandonment.get("vehicle_mean_abandon_time", {})
+        abandon_time_values.extend(
+            float(value) for value in abandon_time_map.values()
         )
-        walking_distance_values.extend(float(value) for value in walking_distance_map.values())
+
+        walking_distance_map = abandonment.get("vehicle_mean_walking_distance", {})
+        walking_distance_values.extend(
+            float(value) for value in walking_distance_map.values()
+        )
+
+    abandon_time_distribution = build_histogram_from_values(
+        abandon_time_values,
+        ABANDON_TIME_BIN_EDGES,
+    )
 
     walking_distance_distribution = build_histogram_from_values(
         walking_distance_values,
@@ -595,12 +609,11 @@ def build_requested_output_for_scenario(
         "scenario": scenario,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "average_count_metrics": average_count_metrics,
-        "average_count_metrics": average_count_metrics,
         "cdf_source": cdf_source,
         "arrival_time_cdf": arrival_time_cdf,
+        "abandon_time_distribution": abandon_time_distribution,
         "walking_distance_distribution": walking_distance_distribution,
     }
-
 
 def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> None:
     plt.figure(figsize=(10, 6))
