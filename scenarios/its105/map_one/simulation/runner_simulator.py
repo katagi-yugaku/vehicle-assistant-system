@@ -332,7 +332,13 @@ def control_vehicles():
                     if traci.simulation.getTime() % 5 == 0:
                         neighbor_vehicle_abandant_count: int = utilities.count_near_abandoned_vehicle_in_right_lane(vehID=current_vehID, agent_list=agent_list, pedestrianID_list=pedstrianID_list)
                         # 運転者の車両乗り捨て行動の実装　渋滞継続時間が一定時間を超えたら、車両を乗り捨てる
-                        if traci.vehicle.getLaneIndex(current_vehID) == 1:
+                        if (
+                            not (current_edgeID == "E15")
+                            and (
+                                traci.vehicle.getLaneIndex(current_vehID) == 1 
+                                or traci.vehicle.getLaneIndex(current_vehID) == 2 
+                                )
+                            ):
                             if utilities.is_driver_vehicle_abandant(agent_by_target_vehID=agent_by_current_vehID, vehInfo_by_target_vehID=vehInfo_by_current_vehID, current_time=current_time, neighbor_vehicle_abandant_nums=neighbor_vehicle_abandant_count):
                                 traci.vehicle.setColor(current_vehID,(0, 103,192))
                                 PEDESTRIAN_COUNT, pedestrianID, walking_distance= utilities.vehicle_abandant_behavior(
