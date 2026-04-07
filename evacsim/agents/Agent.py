@@ -12,10 +12,11 @@ class Agent():
         self.near_edgeID_by_target_shelter = "" #　車両が向かう避難所に接続するedgeID
         self.target_abandoned_vehID = ""
         self.candidate_edge_by_shelterID = {} #　車両が向かう避難所の候補地
-        self.congestion_duration = 0 #　渋滞継続時間
+        self.congestion_duration = 100000 #　渋滞継続時間
         self.tunning_threshold = tunning_threshold # Agentの行動を変更するstress->tunningへの耐久時間
         self.route_change_threshold = route_change_threshold # Agentの行動を変更するtunnig->change渋滞継続時間の耐久時間
         self.route_change_threhold_list = [] #　耐久時間リスト
+        self.reserved_vehicle_abandonment_edgeID = "" # 車両放棄予約のedgeID
         self.lane_change_decision_threshold = lane_change_init_threshold # 車線変更動機付け閾値
         self.minimum_motivation_value = lane_minimum_motivation_value
         self.obtain_info_time = 0.0 # 情報取得時間
@@ -47,6 +48,7 @@ class Agent():
         self.vehicle_abandoned_flg = False # 車両放棄フラグ
         self.encounted_congestion_flg = False # 渋滞に遭遇したフラグ
         self.avoiding_abandoned_vehicle_flg = False # 車両放棄回避フラグ
+        self.failed_vehicle_abandonment_flg = False # 車両放棄回避失敗フラグ
         self.arrival_shelter_flg = False # 避難所到着フラグ
         self.tsunami_info_obtaiend_flg = False # 津波情報取得フラグ
 
@@ -144,6 +146,12 @@ class Agent():
         return self.route_change_threshold
     def set_route_change_threshold(self, route_change_threshold:int):
         self.route_change_threshold = route_change_threshold
+    
+    # 車両放棄予約のedgeIDの取得・設定
+    def get_reserved_vehicle_abandonment_edgeID(self):
+        return self.reserved_vehicle_abandonment_edgeID
+    def set_reserved_vehicle_abandonment_edgeID(self, reserved_vehicle_abandonment_edgeID:str):
+        self.reserved_vehicle_abandonment_edgeID = reserved_vehicle_abandonment_edgeID
 
     # 現在の車線変更動機付けの取得・設定
     def get_lane_change_decision_threshold(self):
@@ -338,6 +346,12 @@ class Agent():
         return self.avoiding_abandoned_vehicle_flg
     def set_avoiding_abandoned_vehicle_flg(self, avoiding_abandoned_vehicle_flg:bool):
         self.avoiding_abandoned_vehicle_flg = avoiding_abandoned_vehicle_flg
+    
+    # 車両放棄回避失敗フラグの取得・設定
+    def get_failed_vehicle_abandonment_flg(self):
+        return self.failed_vehicle_abandonment_flg
+    def set_failed_vehicle_abandonment_flg(self, failed_vehicle_abandonment_flg:bool):
+        self.failed_vehicle_abandonment_flg = failed_vehicle_abandonment_flg
     
     # 避難所到着フラグの取得・設定
     def get_arrival_shelter_flg(self):
