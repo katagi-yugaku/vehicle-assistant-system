@@ -63,6 +63,11 @@ WALKING_DISTANCE_BIN_EDGES = [
     600, 650, 700, 750, 800, 850, 900, 950, 1000,
 ]
 
+ABANDON_TIME_BIN_EDGES = [
+    800, 900, 1000, 1100, 1200, 1300, 1400, 1500,
+    1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300,
+]
+
 def is_close_float(a: float, b: float, tol: float = 1e-9) -> bool:
     return abs(a - b) < tol
 
