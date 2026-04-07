@@ -12,6 +12,18 @@ def normalize_scenario_arg(arg: str) -> str:
     return arg
 
 
+# def load_walking_distance_distribution(json_path: Path) -> dict:
+#     if not json_path.exists():
+#         raise FileNotFoundError(f"JSON file not found: {json_path}")
+
+#     with json_path.open("r", encoding="utf-8") as f:
+#         data = json.load(f)
+
+#     if "walking_distance_distribution" not in data:
+#         raise KeyError(f"'walking_distance_distribution' not found in {json_path}")
+
+#     return data["walking_distance_distribution"]
+
 def load_walking_distance_distribution(json_path: Path) -> dict:
     if not json_path.exists():
         raise FileNotFoundError(f"JSON file not found: {json_path}")
@@ -19,10 +31,11 @@ def load_walking_distance_distribution(json_path: Path) -> dict:
     with json_path.open("r", encoding="utf-8") as f:
         data = json.load(f)
 
-    if "walking_distance_distribution" not in data:
-        raise KeyError(f"'walking_distance_distribution' not found in {json_path}")
+    if "abandon_time_distribution" not in data:
+        raise KeyError(f"'abandon_time_distribution' not found in {json_path}")
 
-    return data["walking_distance_distribution"]
+    return data["abandon_time_distribution"]
+
 
 
 def plot_distribution(dist: dict, label_suffix: str) -> None:
