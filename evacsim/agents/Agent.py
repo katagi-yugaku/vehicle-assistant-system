@@ -34,7 +34,7 @@ class Agent():
         self.vehicle_abandoned_threshold = vehicle_abandoned_threshold # 車両放棄閾値
         self.normalcy_value_about_vehicle_abandonment = normalcy_value_about_vehicle_abandonment # 車両放棄に対する正常性バイアス
         self.majority_value_about_vehicle_abandonment = majority_value_about_vehicle_abandonment # 車両放棄に対する同調性バイアス
-        self.tsunami_info_obtaiend_time = 0.0 # 津波情報取得時間
+        self.tsunami_info_obtaiend_time =  1000000.0 # 津波情報取得時間
         self.vehicle_abandoned_time = 0.0
         self.shelter_occupancy_rate_threshold = shelter_occupancy_rate_threshold # 避難所の混雑率
         self.created_time_flg = False # エージェント作成時間設定フラグ

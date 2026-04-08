@@ -528,12 +528,12 @@ def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_v
         neighbor_vehicle_abandant_nums = 8
 
     encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
-    current_vehicle_abandantment_value = 1.0*max(0, (current_time - encounted_congestion_time)**2) + 1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + neighbor_vehicle_abandant_nums*agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
+    current_vehicle_abandantment_value = 0.1*max(0, (current_time - encounted_congestion_time)**2) + 30.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + neighbor_vehicle_abandant_nums*agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
     if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
-        # print(f"Check {current_vehicle_abandantment_value} ({current_time} - {encounted_congestion_time} + {1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
+        print(f"Check_{current_time}:  {current_vehicle_abandantment_value} =  (jam: {current_time} - {encounted_congestion_time} + info 30.0*{max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
         return True
     # else:
-    #     if traci.simulation.getTime() % 20 == 0:
+    #     if traci.simulation.getTime() % 5 == 0:
     #         print(f"Failed {current_vehicle_abandantment_value} ({current_time} - {encounted_congestion_time} + {1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
     return False
 
