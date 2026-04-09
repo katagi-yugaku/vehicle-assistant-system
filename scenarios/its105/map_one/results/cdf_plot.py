@@ -87,8 +87,8 @@ def plot_cdfs(data_dict: dict[str, list[float]], label_suffix: str):
 
     plt.xlabel("Arrival time [s]", fontsize=20, fontweight="semibold")
     plt.ylabel("CDF", fontsize=20, fontweight="semibold")
-    plt.legend(fontsize=14)
-    plt.grid(True, alpha=0.3)
+    # plt.legend(fontsize=14)
+    # plt.grid(True, alpha=0.3)
 
     save_path = f'/Users/kashiisamutakeshi/lane_ingight{label_suffix}_normalcy400700_result.pdf'
     plt.savefig(save_path, bbox_inches="tight")
