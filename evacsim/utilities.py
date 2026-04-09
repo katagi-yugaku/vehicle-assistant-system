@@ -524,17 +524,29 @@ def get_new_shelterID_and_near_edgeID_by_vehID_based_on_distance(current_edgeID,
     return from_edgeID, new_shelterID, new_edgeID_near_shelter
 
 def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, current_time: float, neighbor_vehicle_abandant_nums: int):
-    if neighbor_vehicle_abandant_nums > 8:
-        neighbor_vehicle_abandant_nums = 8
+    if neighbor_vehicle_abandant_nums > 4:
+        neighbor_vehicle_abandant_nums = 4
+    current_vehID = agent_by_target_vehID.get_vehID()
+    encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
+    tsunami_info_obtain_time = agent_by_target_vehID.get_tsunami_info_obtaiend_time()
+    if agent_by_target_vehID.get_created_time() >  agent_by_target_vehID.get_tsunami_info_obtaiend_time():
+        tsunami_info_obtain_time = agent_by_target_vehID.get_created_time()
+    current_vehicle_abandantment_value = 0.1*max(0, (current_time - encounted_congestion_time)**2) + 30.0*max(0, current_time - tsunami_info_obtain_time) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + neighbor_vehicle_abandant_nums*agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
+    if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
+        print(f"Check_{current_vehID}_{current_time}:  {current_vehicle_abandantment_value} =  (jam: {current_time} - {encounted_congestion_time} + info 30.0*{max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
+        return True
+    return False
 
+def is_again_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, current_time: float, neighbor_vehicle_abandant_nums: int):
+    if neighbor_vehicle_abandant_nums > 2:
+        neighbor_vehicle_abandant_nums = 2
+    current_vehID = agent_by_target_vehID.get_vehID()
     encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
     current_vehicle_abandantment_value = 0.1*max(0, (current_time - encounted_congestion_time)**2) + 30.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time()) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + neighbor_vehicle_abandant_nums*agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
     if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
-        print(f"Check_{current_time}:  {current_vehicle_abandantment_value} =  (jam: {current_time} - {encounted_congestion_time} + info 30.0*{max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
+        print(f"Check_{current_vehID}_{current_time}:  {current_vehicle_abandantment_value} =  (jam: {current_time} - {encounted_congestion_time} + info 30.0*{max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
         return True
-    # else:
-    #     if traci.simulation.getTime() % 5 == 0:
-    #         print(f"Failed {current_vehicle_abandantment_value} ({current_time} - {encounted_congestion_time} + {1.0*max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
+    print(f"Failed {current_vehID}_{current_time}:  {current_vehicle_abandantment_value} =  (jam: {current_time} - {encounted_congestion_time} + info 30.0*{max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) <= { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
     return False
 
 def count_near_abandoned_vehicle_in_right_lane(
@@ -560,10 +572,10 @@ def is_vehicle_abandant_this_position(current_vehID: str, current_edgeID: str, a
 
     # 念のため downstream 条件を保証
     if stop_pos >= current_lane_length - 2.0:
-        # print(f"停止位置がレーンの終端に近すぎるため、車両 {current_vehID} は放棄されませんでした。 stop_pos: {stop_pos}, lane_length: {current_lane_length}")
+        print(f"停止位置がレーンの終端に近すぎるため、車両 {current_vehID} は放棄されませんでした。 stop_pos: {stop_pos}, lane_length: {current_lane_length}")
         return False
     if stop_pos <= edge_position + 2.0:
-        # print(f"停止位置が車両の直近すぎるため、車両 {current_vehID} は放棄されませんでした。 stop_pos: {stop_pos}, edge_position: {edge_position}")
+        print(f"停止位置が車両の直近すぎるため、車両 {current_vehID} は放棄されませんでした。 stop_pos: {stop_pos}, edge_position: {edge_position}")
         return False
 
     try:
@@ -590,6 +602,7 @@ def vehicle_abandant_behavior(current_vehID: str, current_edgeID: str, agent_by_
         traci.vehicle.setColor(current_vehID, (128, 128, 128, 255))  # 灰色に変更
         walking_distance = calculate_remaining_route_distance(vehID=current_vehID, to_edge=vehInfo_by_target_vehID.get_edgeID_connect_target_shelter(), shelter=shelter)
         PEDESTRIAN_COUNT += 1
+        agent_by_current_vehID.set_vehicle_abandoned_flg(True)
         return PEDESTRIAN_COUNT, person_id, walking_distance
 
     except traci.exceptions.TraCIException as e:
@@ -838,22 +851,35 @@ def init_vehicleInfo_list(vehIDs: list, shelter_list: list, approach_edgeIDs_by_
             vehInfo.set_vehicle_comm_enabled_flag(False)
     return vehInfo_list
 
-def init_vehicleInfo_list_base(vehIDs: list, shelter_list: list):
+def init_vehicleInfo_list_base(vehIDs: list, shelter_list: list, v2v_capable_vehicle_rate: float):
     vehInfo_list = []
     for vehID in vehIDs:
         part_vehID = vehID.split("_")[1] + "_" + vehID.split("_")[2]
         target_shelter = next((shelter for shelter in shelter_list if shelter.get_shelterID() == part_vehID), None)
         if target_shelter is None:
             continue  # 対応する避難所がない場合はスキップ
-        vehicleInfo = VehicleInfo(
-                            vehID=vehID,
-                            target_shelter=target_shelter.get_shelterID(),
-                            edgeID_connect_target_shelter=target_shelter.get_near_edgeID(),
-                            create_time=traci.simulation.getTime()
-                            )
-        [vehicleInfo.init_set_congestion_level_by_shelter(shelter.get_shelterID(), 0, traci.simulation.getTime()) for shelter in shelter_list]
-        [vehicleInfo.init_set_avg_evac_time_by_route_by_recive_time()]
-        [vehicleInfo.init_set_tsunami_precursor_info()]
+        if random_true(v2v_capable_vehicle_rate):
+            vehicleInfo = VehicleInfo(
+                                vehID=vehID,
+                                target_shelter=target_shelter.get_shelterID(),
+                                edgeID_connect_target_shelter=target_shelter.get_near_edgeID(),
+                                create_time=traci.simulation.getTime()
+                                )
+            [vehicleInfo.init_set_congestion_level_by_shelter(shelter.get_shelterID(), 0, traci.simulation.getTime()) for shelter in shelter_list]
+            [vehicleInfo.init_set_avg_evac_time_by_route_by_recive_time()]
+            [vehicleInfo.init_set_tsunami_precursor_info()]
+            [vehicleInfo.set_vehicle_comm_enabled_flag(True)]
+        else:
+            vehicleInfo = VehicleInfo(
+                                vehID=vehID,
+                                target_shelter=target_shelter.get_shelterID(),
+                                edgeID_connect_target_shelter=target_shelter.get_near_edgeID(),
+                                create_time=traci.simulation.getTime()
+                                )
+            [vehicleInfo.init_set_congestion_level_by_shelter(shelter.get_shelterID(), 0, traci.simulation.getTime()) for shelter in shelter_list]
+            [vehicleInfo.init_set_avg_evac_time_by_route_by_recive_time()]
+            [vehicleInfo.init_set_tsunami_precursor_info()]
+            [vehicleInfo.set_vehicle_comm_enabled_flag(False)]
         vehInfo_list.append(vehicleInfo)
     return vehInfo_list
 

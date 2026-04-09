@@ -32,8 +32,15 @@ def load_cdf_source(json_path: Path) -> dict:
     return cdf_source
 
 
-def plot_cdfs(data_dict: dict[str, list[float]], save_path: Path) -> None:
+def plot_cdfs(
+    data_dict: dict[str, list[float]],
+    save_path: Path,
+    hidden_keys: set[str] | None = None,
+) -> None:
     plt.figure(figsize=(10, 6))
+
+    if hidden_keys is None:
+        hidden_keys = set()
 
     style_map = {
         "0.1": {"color": "r", "linestyle": "-", "label": "early_rate=0.1"},
@@ -45,6 +52,9 @@ def plot_cdfs(data_dict: dict[str, list[float]], save_path: Path) -> None:
     plot_order = ["0.1", "0.5", "0.9", "nosystem"]
 
     for key in plot_order:
+        if key in hidden_keys:
+            continue
+
         if key not in data_dict:
             continue
 
@@ -69,14 +79,15 @@ def plot_cdfs(data_dict: dict[str, list[float]], save_path: Path) -> None:
             linewidth=2,
         )
     max_time = 2200
-    min_time = 0
+    min_time = 200
+    ylim_min = 0.2
     plt.xlim(min_time, max_time)
-    plt.ylim(0.0, 1.0)
-    plt.xticks(np.arange(min_time, max_time+50, 100), fontsize=12, fontweight="semibold")
-    plt.yticks(np.arange(0.1, 1.01, 0.1), fontsize=12, fontweight="semibold")
+    plt.ylim(ylim_min, 1.0)
+    plt.xticks(np.arange(min_time, max_time+50, 200), fontsize=14, fontweight="semibold")
+    plt.yticks(np.arange(ylim_min, 1.01, 0.1), fontsize=14, fontweight="semibold")
 
-    plt.xlabel("Arrival time [s]", fontsize=14, fontweight="semibold")
-    plt.ylabel("CDF", fontsize=14, fontweight="semibold")
+    # plt.xlabel("Arrival time [s]", fontsize=14, fontweight="semibold")
+    # plt.ylabel("CDF", fontsize=14, fontweight="semibold")
     # plt.legend(fontsize=14)
     # plt.grid(True, alpha=0.3)
 
@@ -87,12 +98,14 @@ def plot_cdfs(data_dict: dict[str, list[float]], save_path: Path) -> None:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 cdf_plot.py <scenarioID>")
+        print("Usage: python3 cdf_plot.py <scenarioID> [hidden_key1 hidden_key2 ...]")
         print("Example: python3 cdf_plot.py scenario1")
-        print("Example: python3 cdf_plot.py 1")
+        print("Example: python3 cdf_plot.py scenario1 0.5 0.1")
+        print("Example: python3 cdf_plot.py 1 nosystem")
         sys.exit(1)
 
     scenario_id = normalize_scenario_arg(sys.argv[1])
+    hidden_keys = set(arg.strip() for arg in sys.argv[2:])
 
     base_dir = Path(__file__).resolve().parent
     scenario_dir = base_dir / scenario_id
@@ -100,8 +113,10 @@ def main():
     output_path = scenario_dir / "lane_insight30_normalcy400700_result.pdf"
 
     cdf_source = load_cdf_source(json_path)
-    plot_cdfs(cdf_source, output_path)
+    plot_cdfs(cdf_source, output_path, hidden_keys)
 
+    if hidden_keys:
+        print(f"[INFO] Hidden keys: {sorted(hidden_keys)}")
     print(f"[INFO] CDF plot saved: {output_path}")
 
 

@@ -38,7 +38,7 @@ import datetime
 # =========================
 # Runtime config / seeds
 # =========================
-# random.seed(318)  # 乱数シードを固定（再現性）
+random.seed()  # 乱数シードを固定（再現性）
 random.seed()
 random.seed(os.getpid() + int(datetime.datetime.now().timestamp()))
 np.random.seed(os.getpid() + int(datetime.datetime.now().timestamp()))
@@ -138,14 +138,13 @@ def run():
     while traci.simulation.getTime() < END_SIMULATION_TIME:
         traci.simulationStep()
         control_vehicles()
-    # if traci.simulatioo
     traci.close()
     sys.stdout.flush()
 
 
 def control_vehicles():
     vehIDs = traci.vehicle.getIDList()
-    pedestrianIDs = traci.person.getIDList()
+    personIDs = traci.person.getIDList()
     current_time = traci.simulation.getTime()
     global NEW_VEHICLE_COUNT
     global LANE_CHANGED_VEHICLE_COUNT
@@ -166,43 +165,20 @@ def control_vehicles():
         shelter_for_current_vehID: Shelter = utilities.find_shelter_by_edgeID_connect_target_shelter(vehInfo_by_current_vehID.get_edgeID_connect_target_shelter(), shelter_list)
         agent_by_current_vehID: Agent = utilities.find_agent_by_vehID(current_vehID, agent_list)
         current_edgeID: str = traci.vehicle.getRoadID(current_vehID)
-
-        if current_edgeID == "E43" or current_edgeID == "E22":
-            traci.vehicle.changeLane(current_vehID, 1, 5)
-            traci.vehicle.setLaneChangeMode(current_vehID, 1)
-
-        if current_edgeID == agent_by_current_vehID.get_reserved_vehicle_abandonment_edgeID() and agent_by_current_vehID.get_avoiding_abandoned_vehicle_flg():
-            print("予約していた乗り捨てエッジに到達 current_vehID: {}, current_edgeID: {}, time: {}".format(current_vehID, current_edgeID, current_time))
-            neighbor_vehicle_abandant_count: int = utilities.count_near_abandoned_vehicle_in_right_lane(vehID=current_vehID, agent_list=agent_list, pedestrianID_list=pedestrianIDs)
-            # 乗り捨てられるかテスト
-            if utilities.is_again_driver_vehicle_abandant(agent_by_target_vehID=agent_by_current_vehID, 
-                                                                        vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                        current_time=current_time, 
-                                                                        neighbor_vehicle_abandant_nums=neighbor_vehicle_abandant_count):
-                print("乗り捨てに成功 current_vehID: {}, current_edgeID: {}, time: {}".format(current_vehID, current_edgeID, current_time))
-                agent_by_current_vehID.set_avoiding_abandoned_vehicle_flg(False)
-    
-        if (not agent_by_current_vehID.get_tsunami_info_obtaiend_flg() 
-            and list(vehInfo_by_current_vehID.get_tsunami_precursor_info().values())[0][0] 
-            and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
-            ):
+        
+        if not agent_by_current_vehID.get_tsunami_info_obtaiend_flg() and list(vehInfo_by_current_vehID.get_tsunami_precursor_info().values())[0][0]:
             tsunami_info = vehInfo_by_current_vehID.get_tsunami_precursor_info()
             min_time = min(info[1] for info in tsunami_info.values())
-            # print(f"Vehicle {current_vehID} obtained tsunami precursor
-            # min info at time {min_time}")
-            if min_time > agent_by_current_vehID.get_created_time():
-                min_time = agent_by_current_vehID.get_created_time()
+            # print(f"Vehicle {current_vehID} obtained tsunami precursor info at time {min_time}")
             agent_by_current_vehID.set_tsunami_info_obtaiend_time(min_time)
             agent_by_current_vehID.set_tsunami_info_obtaiend_flg(True)
-
 
         if not agent_by_current_vehID.get_created_time_flg():
             agent_by_current_vehID.set_created_time(traci.simulation.getTime())
             agent_by_current_vehID.set_created_time_flg(True)
 
         # 到着処理 # 到着によってparked_flagがTrue 到着車両に関しての処理
-        if (traci.vehicle.isStoppedParking(current_vehID) 
-            and not vehInfo_by_current_vehID.get_parked_flag()):
+        if traci.vehicle.isStoppedParking(current_vehID) and not vehInfo_by_current_vehID.get_parked_flag():
             utilities.handle_arrival(
                             current_vehID=current_vehID,
                             vehInfo_by_current_vehID=vehInfo_by_current_vehID,
@@ -213,7 +189,6 @@ def control_vehicles():
                             arrival_time_by_vehID_dict=arrival_time_by_vehID_dict,
                             elapsed_time_list=elapsed_time_list
                             )
-                            
 
         if not vehInfo_by_current_vehID.get_decline_edge_arrival_flag():  # 減速処理を行う
             #避難地に接続する(直前の)道路にいる場合、減速する
@@ -230,7 +205,7 @@ def control_vehicles():
                 utilities.apply_gap_density_speed_control(
                                                             vehID=current_vehID,
                                                             local_density=local_density,
-                                                            v_free=4.0,     # 自由流速度
+                                                            v_free=6.0,     # 自由流速度
                                                             v_min=2.0,      # 最低速度
                                                             gap_min=7.0,    # 強い減速を始めるギャップ
                                                             tau=1.8,        # ギャップ→速度変換の傾き
@@ -241,9 +216,9 @@ def control_vehicles():
                 # それ以外は自由流走行
                 traci.vehicle.slowDown(current_vehID, 5.0, 1.0)
 
-        if not vehInfo_by_current_vehID.get_arrival_flag(): # 未到着の車両に対して処理を実行
+        if not vehInfo_by_current_vehID.get_arrival_flag():
             # 通信可能範囲内にいる車両と通信を行う　通信可能範囲は100m設定になる
-            if vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag() and current_time < VEHICLE_NUM*VEHICLE_INTERVAL+100:
+            if vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag():
                 if traci.simulation.getTime() % 10 == 0:
                     around_vehIDs: list = utilities.get_around_vehIDs(target_vehID=current_vehID, custome_edge_list=custome_edge_list)
                     utilities.v2v_communication(
@@ -284,12 +259,38 @@ def control_vehicles():
                     if routeID is not None and not agent_by_current_vehID.get_evacuation_route_changed_flg():
                         # print("Route change for vehicle {} at time {}: new routeID {}".format(current_vehID, traci.simulation.getTime(), routeID))
                         traci.vehicle.setRouteID(current_vehID, routeID)
-                        traci.vehicle.setColor(current_vehID,(60, 180, 120))
+                        traci.vehicle.setColor(current_vehID,(60, 180, 120)) # 緑
                         agent_by_current_vehID.set_evacuation_route_changed_flg(True)
                         ROUTE_CHANGED_VEHICLE_COUNT += 1
 
-            if current_edgeID in ["E14", "E15", "E38", "E39", "E40", "E41", "E42", "E7"]:
-                # not agent_by_current_vehID.get_evacuation_route_changed_flg()
+            if (agent_by_current_vehID.get_failed_vehicle_abandonment_flg() 
+                and current_edgeID == agent_by_current_vehID.get_reserved_vehicle_abandonment_edgeID() 
+                and not agent_by_current_vehID.get_vehicle_abandoned_flg()
+                ):
+                print(f"Vehicle {current_vehID} failed to abandon vehicle; reserved next edge for abandonment: {agent_by_current_vehID.get_reserved_vehicle_abandonment_edgeID()}")
+                if not utilities.is_vehicle_abandant_this_position(
+                                                                current_vehID=current_vehID, 
+                                                                current_edgeID=current_edgeID,
+                                                                agent_by_current_vehID=agent_by_current_vehID, 
+                                                                vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                PEDESTRIAN_COUNT=PEDESTRIAN_COUNT, 
+                                                                STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
+                                                                shelter=shelter_for_current_vehID
+                                                                ):
+                    agent_by_current_vehID.set_failed_vehicle_abandonment_flg(True)
+                    edgeIDs = tuple(traci.vehicle.getRoute(current_vehID))
+                    next_edgeID = utilities.get_next_edge(edgeIDs=edgeIDs, current_edgeID=current_edgeID)
+                    agent_by_current_vehID.set_reserved_vehicle_abandonment_edgeID(next_edgeID)
+                    print(f" current_edgeID: {current_edgeID},  next_edgeID: {next_edgeID} edgeIDs: {edgeIDs},")
+                    print(f"[WARN] pedestrian was not created for {current_vehID}; skip abandonment registration")
+                    continue
+            #     agent_by_current_vehID.set_vehicle_abandoned_flg(True)
+            #     agent_by_current_vehID.set_vehicle_abandoned_time(traci.simulation.getTime())
+            #     vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = agent_by_current_vehID.get_vehicle_abandoned_time()
+            #     walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
+            #     pedstrianID_list.append(pedestrianID)
+
+            if current_edgeID in ["E14", "E15", "E38", "E39", "E40", "E41", "E42", "E7"] and not agent_by_current_vehID.get_evacuation_route_changed_flg():
                 leader_info = traci.vehicle.getLeader(vehID=current_vehID, dist=10.0)
                 current_lane_index = traci.vehicle.getLaneIndex(current_vehID)
 
@@ -325,10 +326,9 @@ def control_vehicles():
                                 right_lane_is_safe = False
 
                         if (not right_lane_has_abandoned_vehicle) and right_lane_is_safe:
-                            # print(f"leader_agent.get_vehicle_abandoned_flg():{leader_agent.get_vehicle_abandoned_flg()}")
                             # print(f"lane 1->2Time {traci.simulation.getTime()}: Vehicle {current_vehID} is changing lane to avoid abandoned vehicle {leader_vehID}")
                             traci.vehicle.changeLane(current_vehID, 2, 10)
-                            traci.vehicle.slowDown(current_vehID, 2.0, 1.0)
+                            traci.vehicle.slowDown(current_vehID, 1.2, 1.0)
                             traci.vehicle.setLaneChangeMode(current_vehID, 1621)
 
                             # 回避対象の放置車両を記録
@@ -348,73 +348,55 @@ def control_vehicles():
                             agent_list=agent_list
                         )
                         )
-                    ):                    # 渋滞に巻き込まれたら、渋滞継続時間測定のためにフラグをTrueにし、計測時間を作る
-                    traci.vehicle.setColor(current_vehID,(225, 90, 40))
+                    ):
+                    # 渋滞に巻き込まれたら、渋滞継続時間測定のためにフラグをTrueにし、計測時間を作る
+                    traci.vehicle.setColor(current_vehID,(225, 90, 40)) # オレンジ
                     if not agent_by_current_vehID.get_encounted_congestion_flg():
                         agent_by_current_vehID.set_congestion_duration(traci.simulation.getTime())
                         agent_by_current_vehID.set_encounted_congestion_flg(True)
                     
                     if traci.simulation.getTime() % 5 == 0:
+                        neighbor_vehicle_abandant_count: int = utilities.count_near_abandoned_vehicle_in_right_lane(vehID=current_vehID, agent_list=agent_list, pedestrianID_list=personIDs)
                         # 運転者の車両乗り捨て行動の実装　渋滞継続時間が一定時間を超えたら、車両を乗り捨てる
-                        if not (current_edgeID == "E15"):
-                            if not agent_by_current_vehID.get_vehicle_abandoned_flg() and not agent_by_current_vehID.get_avoiding_abandoned_vehicle_flg():
-                                neighbor_vehicle_abandant_count: int = utilities.count_near_abandoned_vehicle_in_right_lane(vehID=current_vehID, agent_list=agent_list, pedestrianID_list=pedestrianIDs)
-                                if (utilities.is_driver_vehicle_abandant(agent_by_target_vehID=agent_by_current_vehID, 
-                                                                        vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                        current_time=current_time, 
-                                                                        neighbor_vehicle_abandant_nums=neighbor_vehicle_abandant_count)
-                                    or agent_by_current_vehID.get_congestion_duration() - current_time > 600): # 600秒を超えたら強制的に乗り捨てる
-                                    traci.vehicle.setColor(current_vehID,(0, 103,192))
+                        if (
+                            not (current_edgeID == "E15")
+                            and (
+                                traci.vehicle.getLaneIndex(current_vehID) == 1 
+                                or traci.vehicle.getLaneIndex(current_vehID) == 2 
+                                )
+                            ):
+                            if utilities.is_driver_vehicle_abandant(agent_by_target_vehID=agent_by_current_vehID, vehInfo_by_target_vehID=vehInfo_by_current_vehID, current_time=current_time, neighbor_vehicle_abandant_nums=neighbor_vehicle_abandant_count):
+                                traci.vehicle.setColor(current_vehID,(0, 103,192)) # 青色
+                                # 現在位置で車両を乗り捨てるかを確認
+                                if not utilities.is_vehicle_abandant_this_position(
+                                                                                current_vehID=current_vehID, 
+                                                                                current_edgeID=current_edgeID,
+                                                                                agent_by_current_vehID=agent_by_current_vehID, 
+                                                                                vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                                PEDESTRIAN_COUNT=PEDESTRIAN_COUNT, 
+                                                                                STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
+                                                                                shelter=shelter_for_current_vehID
+                                                                                ):
+                                    agent_by_current_vehID.set_failed_vehicle_abandonment_flg(True)
+                                    edgeIDs = tuple(traci.vehicle.getRoute(current_vehID))
+                                    next_edgeID = utilities.get_next_edge(edgeIDs=edgeIDs, current_edgeID=current_edgeID)
+                                    agent_by_current_vehID.set_reserved_vehicle_abandonment_edgeID(next_edgeID)
                                     agent_by_current_vehID.set_vehicle_abandoned_flg(True)
-                                    if utilities.is_vehicle_abandant_this_position(
-                                                                            current_vehID=current_vehID, 
-                                                                            current_edgeID=current_edgeID,
-                                                                            agent_by_current_vehID=agent_by_current_vehID, 
-                                                                            vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                            PEDESTRIAN_COUNT=PEDESTRIAN_COUNT, 
-                                                                            STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
-                                                                            shelter=shelter_for_current_vehID
-                                                                            ):
-                                        PEDESTRIAN_COUNT, pedestrianID, walking_distance= utilities.vehicle_abandant_behavior(
-                                                                                                            current_vehID=current_vehID, 
-                                                                                                            current_edgeID=current_edgeID,
-                                                                                                            agent_by_current_vehID=agent_by_current_vehID, 
-                                                                                                            vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                                                            PEDESTRIAN_COUNT=PEDESTRIAN_COUNT, 
-                                                                                                            STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
-                                                                                                            shelter=shelter_for_current_vehID
-                                                                                                            )
-                                        
-                                        # print(f"Vehicle {current_vehID} has been abandoned at edge {current_edgeID} and changed to pedestrian {pedestrianID}")
-                                        if pedestrianID is None:
-                                            print(f"[WARN] pedestrian was not created for {current_vehID}; skip abandonment registration")
-                                            continue
-                                        agent_by_current_vehID.set_vehicle_abandoned_flg(True)
-                                        vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = agent_by_current_vehID.get_vehicle_abandoned_time()
-                                        walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
-                                        pedstrianID_list.append(pedestrianID)
-                                        print("予約なしで車両乗り捨てを行いました")
-                                    else:
-                                        print("車両乗り捨てを予約しました current_vehID: {}, current_edgeID: {}, time: {}".format(current_vehID, current_edgeID, current_time))
-                                        PEDESTRIAN_COUNT, pedestrianID, walking_distance= utilities.vehicle_abandant_behavior(
-                                                                                                                current_vehID=current_vehID, 
-                                                                                                                current_edgeID=current_edgeID,
-                                                                                                                agent_by_current_vehID=agent_by_current_vehID, 
-                                                                                                                vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                                                                PEDESTRIAN_COUNT=PEDESTRIAN_COUNT, 
-                                                                                                                STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
-                                                                                                                shelter=shelter_for_current_vehID
-                                                                                                                )
-                                        agent_by_current_vehID.set_vehicle_abandoned_flg(True)
-                                        vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = agent_by_current_vehID.get_vehicle_abandoned_time()
-                                        walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
-                                        pedstrianID_list.append(pedestrianID)
-                                        edgeIDs_of_target_vehID = traci.route.getEdges(traci.vehicle.getRouteID(current_vehID))
-                                        next_edge_of_current_edgeID = utilities.get_next_edge(edgeIDs=edgeIDs_of_target_vehID, current_edgeID=current_edgeID)
-                                        print(f"current_vehID: {current_vehID}, cur_edge: {current_edgeID}, 予約した乗り捨てエッジnext_edge_of_current_edgeID: {next_edge_of_current_edgeID}")
-                                        agent_by_current_vehID.set_reserved_vehicle_abandonment_edgeID(next_edge_of_current_edgeID)
-                                        agent_by_current_vehID.set_avoiding_abandoned_vehicle_flg(True)
-                                        traci.vehicle.highlight(current_vehID, (255, 0, 0))                           
+                                PEDESTRIAN_COUNT, pedestrianID, walking_distance= utilities.vehicle_abandant_behavior(
+                                                                                                        current_vehID=current_vehID, 
+                                                                                                        current_edgeID=current_edgeID,
+                                                                                                        agent_by_current_vehID=agent_by_current_vehID, 
+                                                                                                        vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                                                        PEDESTRIAN_COUNT=PEDESTRIAN_COUNT, 
+                                                                                                        STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
+                                                                                                        shelter=shelter_for_current_vehID
+                                                                                                        )
+                                # print(f"Vehicle {current_vehID} has been abandoned at edge {current_edgeID} and changed to pedestrian {pedestrianID}")
+                                agent_by_current_vehID.set_vehicle_abandoned_flg(True)
+                                agent_by_current_vehID.set_vehicle_abandoned_time(traci.simulation.getTime())
+                                vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = agent_by_current_vehID.get_vehicle_abandoned_time()
+                                walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
+                                pedstrianID_list.append(pedestrianID)
 
             if current_edgeID == "E0":
                 if traci.simulation.getTime() > TSUNAMI_SIGN_START_TIME and traci.simulation.getTime() < TSUNAMI_SIGN_END_TIME:
@@ -557,7 +539,7 @@ if __name__ == "__main__":
                     "-c", str(SUMO_CFG),
                     "--tripinfo-output", "tripinfo.xml",
                     "--tls.all-off", "true" ,
-                    "--time-to-teleport", "1000" 
+                    "--time-to-teleport", "-1" 
                 ],
                 traceFile="traci_log.txt",
                 traceGetters=False,
@@ -637,7 +619,7 @@ if __name__ == "__main__":
         print(f"  {cat}: {count} ({count / total:.2%})")
     # 車両情報の初期化
     # ここで調整がいる
-    vehInfo_list:list = utilities.init_vehicleInfo_list_base(vehIDs=vehID_list, shelter_list=shelter_list, v2v_capable_vehicle_rate=v2v_capable_vehicle_rate) 
+    vehInfo_list:list = utilities.init_vehicleInfo_list_base(vehIDs=vehID_list, shelter_list=shelter_list,v2v_capable_vehicle_rate=v2v_capable_vehicle_rate) 
 
     # Agentの初期化
     # 乗り捨てに関する初期化
@@ -685,10 +667,10 @@ if __name__ == "__main__":
         traci.vehicle.setMaxSpeed(vehID, 7.0)
     run()
     print(f"mean elapsed_time: {np.mean(elapsed_time_list)}")
-    if len(arrival_time_by_vehID_dict) == NUM_VEHICLES:
+    if len(arrival_time_list) == NUM_VEHICLES:
         print("OK all vehs arrived ")
     else:
-        print(f"NG all vehs not arrived {len(arrival_time_by_vehID_dict)}")
+        print(f"NG all vehs not arrived {len(arrival_time_list)}")
     check_vehicle_abandonment_count = 0
     for agent in agent_list:
         if agent.get_vehicle_abandoned_flg():
@@ -697,7 +679,7 @@ if __name__ == "__main__":
         print("OK all vehicle abandonment were detected")
     else:
         print(f"NG not all vehicle abandonment were detected {check_vehicle_abandonment_count} / {PEDESTRIAN_COUNT}")
-    
+
     print("===== Simlation Result Summary =====")
     print(f"arrival_time_by_vehID_dict:{arrival_time_by_vehID_dict}")
     print(f"vehicle_abandant_time_by_pedestrianID_dict:{vehicle_abandant_time_by_pedestrianID_dict}")
@@ -710,7 +692,3 @@ if __name__ == "__main__":
     print(f"info_obtained_lanechange_count:{OBTAIN_INFO_LANE_CHANGE_COUNT}")
     print(f"elapsed_time_lanechange_count:{ELAPSED_TIME_LANE_CHANGE_COUNT}")
     print(f"majority_bias_lanechange_count:{POSITIVE_MAJORITY_BIAS_COUNT}")
-
-
-
-

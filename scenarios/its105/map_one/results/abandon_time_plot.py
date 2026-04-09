@@ -45,8 +45,6 @@ def build_bin_edges(xmin: int, xmax: int, bin_width: int) -> np.ndarray:
     if bin_width <= 0:
         raise ValueError("bin_width must be positive")
 
-    # 例: xmin=1200, xmax=1800, bin_width=50
-    # -> [1200, 1250, ..., 1800]
     return np.arange(xmin, xmax + bin_width, bin_width)
 
 
@@ -62,14 +60,31 @@ def count_events_in_bins(
     return counts
 
 
+def parse_keys_arg(raw_keys: list[str] | None, exclude_nosystem: bool) -> list[str]:
+    default_order = ["0.1", "0.5", "0.9", "nosystem"]
+
+    if raw_keys is None or len(raw_keys) == 0:
+        keys = default_order.copy()
+    else:
+        keys = raw_keys.copy()
+
+    if exclude_nosystem:
+        keys = [k for k in keys if k != "nosystem"]
+
+    if len(keys) == 0:
+        raise ValueError("No keys to plot. Check --keys or --exclude-nosystem.")
+
+    return keys
+
+
 def plot_abandon_time_grouped_bars(
     data_dict: dict[str, list[float]],
     save_path: Path,
     bin_width: int,
     xmin: int,
     xmax: int,
+    plot_keys: list[str],
 ) -> None:
-    plot_order = ["0.1", "0.5", "0.9", "nosystem"]
     style_map = {
         "0.1": {"color": "r", "label": "early_rate=0.1"},
         "0.5": {"color": "blue", "label": "early_rate=0.5"},
@@ -80,37 +95,42 @@ def plot_abandon_time_grouped_bars(
     bin_edges = build_bin_edges(xmin, xmax, bin_width)
     bin_lefts = bin_edges[:-1]
     bin_rights = bin_edges[1:]
-    bin_labels = [f"{int(l)}-{int(r)}" for l, r in zip(bin_lefts, bin_rights)]
+    bin_labels = [f"{int(l)}-" for l, r in zip(bin_lefts, bin_rights)]
 
     group_x = np.arange(len(bin_labels))
-    n_series = len(plot_order)
+    n_series = len(plot_keys)
     total_group_width = 0.8
     bar_width = total_group_width / n_series
 
     plt.figure(figsize=(14, 6))
 
     max_count = 0
-    for i, key in enumerate(plot_order):
+    for i, key in enumerate(plot_keys):
         values = data_dict.get(key, [])
         counts = count_events_in_bins(values, bin_edges, xmin, xmax)
         max_count = max(max_count, int(counts.max()) if len(counts) > 0 else 0)
 
         offset = (i - (n_series - 1) / 2) * bar_width
+        style = style_map.get(
+            key,
+            {"color": "gray", "label": key},
+        )
+
         plt.bar(
             group_x + offset,
             counts,
             width=bar_width,
-            label=style_map[key]["label"],
-            color=style_map[key]["color"],
+            label=style["label"],
+            color=style["color"],
             align="center",
         )
 
-    plt.xticks(group_x, bin_labels, rotation=45, ha="right", fontsize=12, fontweight="semibold")
-    plt.yticks(fontsize=12, fontweight="semibold")
-    plt.xlabel("Abandon time interval [s]", fontsize=14, fontweight="semibold")
-    plt.ylabel("Count", fontsize=14, fontweight="semibold")
+    plt.xticks(group_x, bin_labels, rotation=45, ha="right", fontsize=20, fontweight="semibold")
+    plt.yticks(fontsize=20, fontweight="semibold")
+    # plt.xlabel("Abandon time interval [s]", fontsize=14, fontweight="semibold")
+    # plt.ylabel("Count", fontsize=14, fontweight="semibold")
     plt.ylim(0, max_count + max(1, int(max_count * 0.1)))
-    plt.legend(fontsize=12)
+    # plt.legend(fontsize=12)
     plt.grid(axis="y", alpha=0.3)
     plt.tight_layout()
 
@@ -120,33 +140,76 @@ def plot_abandon_time_grouped_bars(
 
 
 def main():
-    if len(sys.argv) != 5:
-        print("Usage: python3 abandon_time_plot.py <scenarioID> <bin_width> <xmin> <xmax>")
-        print("Example: python3 abandon_time_plot.py scenario1 50 1200 1800")
-        print("Example: python3 abandon_time_plot.py 1 50 1200 1800")
+    raw_args = sys.argv[1:]
+
+    if len(raw_args) < 4:
+        print("Usage:")
+        print("  python3 abandon_time_plot.py <scenarioID> <bin_width> <xmin> <xmax> [--exclude-nosystem]")
+        print("  python3 abandon_time_plot.py <scenarioID> <bin_width> <xmin> <xmax> --keys 0.1 0.5 0.9")
+        print("  python3 abandon_time_plot.py <scenarioID> <bin_width> <xmin> <xmax> exclude 0.1 0.5")
+        print("Examples:")
+        print("  python3 abandon_time_plot.py scenario1 50 1200 1800")
+        print("  python3 abandon_time_plot.py scenario1 50 1200 1800 --exclude-nosystem")
+        print("  python3 abandon_time_plot.py scenario1 50 1200 1800 --keys 0.1 0.9")
+        print("  python3 abandon_time_plot.py scenario1 50 1200 1800 exclude 0.1 0.5")
         sys.exit(1)
 
-    scenario_id = normalize_scenario_arg(sys.argv[1])
-    bin_width = int(sys.argv[2])
-    xmin = int(sys.argv[3])
-    xmax = int(sys.argv[4])
+    scenario_id = normalize_scenario_arg(raw_args[0])
+    bin_width = int(raw_args[1])
+    xmin = int(raw_args[2])
+    xmax = int(raw_args[3])
+
+    exclude_nosystem = "--exclude-nosystem" in raw_args
+
+    raw_keys = None
+    if "--keys" in raw_args:
+        idx = raw_args.index("--keys")
+        raw_keys = []
+        for token in raw_args[idx + 1:]:
+            if token.startswith("--") or token == "exclude":
+                break
+            raw_keys.append(token)
+
+    plot_keys = parse_keys_arg(raw_keys, exclude_nosystem)
+
+    exclude_keys = []
+    if "exclude" in raw_args:
+        idx = raw_args.index("exclude")
+        for token in raw_args[idx + 1:]:
+            if token.startswith("--"):
+                break
+            if token == "=":
+                continue
+            exclude_keys.append(token.strip())
+
+    if exclude_keys:
+        plot_keys = [k for k in plot_keys if k not in exclude_keys]
+
+    if len(plot_keys) == 0:
+        raise ValueError("No keys to plot after applying exclude.")
 
     base_dir = Path(__file__).resolve().parent
     scenario_dir = base_dir / scenario_id
     json_path = scenario_dir / "output.json"
-    output_path = scenario_dir / f"abandon_time_count_{xmin}_{xmax}_bw{bin_width}.pdf"
+
+    suffix = "_".join(plot_keys).replace(".", "p")
+    output_path = scenario_dir / f"abandon_time_count_{xmin}_{xmax}_bw{bin_width}_{suffix}.pdf"
 
     all_abandon_time_events = load_all_abandon_time_events(json_path)
+
     plot_abandon_time_grouped_bars(
-        all_abandon_time_events,
-        output_path,
-        bin_width,
-        xmin,
-        xmax,
+        data_dict=all_abandon_time_events,
+        save_path=output_path,
+        bin_width=bin_width,
+        xmin=xmin,
+        xmax=xmax,
+        plot_keys=plot_keys,
     )
 
+    print(f"[INFO] plot_keys = {plot_keys}")
     print(f"[INFO] Abandon time grouped-bar plot saved: {output_path}")
 
 
 if __name__ == "__main__":
+    # python3 abandon_time_plot.py scenario1 50 750 1500 exclude 0.1 0.5
     main()
