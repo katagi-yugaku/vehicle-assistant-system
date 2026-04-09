@@ -68,11 +68,12 @@ def plot_cdfs(data_dict: dict[str, list[float]], save_path: Path) -> None:
             linestyle=style["linestyle"],
             linewidth=2,
         )
-    max_time = 2500
-    plt.xlim(400, max_time)
-    plt.ylim(0.2, 1.0)
-    plt.xticks(np.arange(400, max_time+50, 200), fontsize=12, fontweight="semibold")
-    plt.yticks(np.arange(0.2, 1.01, 0.1), fontsize=12, fontweight="semibold")
+    max_time = 2200
+    min_time = 0
+    plt.xlim(min_time, max_time)
+    plt.ylim(0.0, 1.0)
+    plt.xticks(np.arange(min_time, max_time+50, 100), fontsize=12, fontweight="semibold")
+    plt.yticks(np.arange(0.1, 1.01, 0.1), fontsize=12, fontweight="semibold")
 
     plt.xlabel("Arrival time [s]", fontsize=14, fontweight="semibold")
     plt.ylabel("CDF", fontsize=14, fontweight="semibold")
