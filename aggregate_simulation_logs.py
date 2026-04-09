@@ -533,7 +533,6 @@ def get_requested_output_key(early_rate: float, v2v_rate: float) -> Optional[str
 
     return None
 
-
 def build_requested_output_for_scenario(
     scenario: int,
     scenario_results: Dict[str, Dict[str, Any]],
@@ -541,7 +540,7 @@ def build_requested_output_for_scenario(
     """
     ユーザー指定形式の output.json を構築する。
     0.1 / 0.5 / 0.9 / nosystem ごとに
-    abandon_time_distribution と walking_distance_distribution を持たせる。
+    all_abandon_time_events を含めて出力する。
     """
     ordered_keys = ["0.1", "0.5", "0.9", "nosystem"]
 
@@ -557,6 +556,8 @@ def build_requested_output_for_scenario(
     arrival_time_cdf: Dict[str, Dict[str, List[float]]] = {}
     average_count_metrics: Dict[str, Dict[str, float]] = {}
 
+    all_abandon_time_events: Dict[str, List[float]] = {}
+
     abandon_time_distribution: Dict[str, Dict[str, Any]] = {}
     walking_distance_distribution: Dict[str, Dict[str, Any]] = {}
 
@@ -567,6 +568,8 @@ def build_requested_output_for_scenario(
             cdf_source[output_key] = []
             arrival_time_cdf[output_key] = {"x": [], "y": []}
             average_count_metrics[output_key] = {}
+            all_abandon_time_events[output_key] = []
+
             abandon_time_distribution[output_key] = build_histogram_from_values(
                 [],
                 ABANDON_TIME_BIN_EDGES,
@@ -599,8 +602,14 @@ def build_requested_output_for_scenario(
 
         abandonment = condition_result.get("abandonment", {})
 
-        abandon_time_map = abandonment.get("vehicle_mean_abandon_time", {})
-        abandon_time_values = [float(value) for value in abandon_time_map.values()]
+        # 追加: 全乗り捨てイベント時刻
+        abandon_time_values = [
+            float(value)
+            for value in abandonment.get("all_abandon_time_events", [])
+        ]
+        all_abandon_time_events[output_key] = abandon_time_values
+
+        # 既存の histogram も残したいならこれでOK
         abandon_time_distribution[output_key] = build_histogram_from_values(
             abandon_time_values,
             ABANDON_TIME_BIN_EDGES,
@@ -619,10 +628,11 @@ def build_requested_output_for_scenario(
         "average_count_metrics": average_count_metrics,
         "cdf_source": cdf_source,
         "arrival_time_cdf": arrival_time_cdf,
+        "all_abandon_time_events": all_abandon_time_events,
+
         "abandon_time_distribution": abandon_time_distribution,
         "walking_distance_distribution": walking_distance_distribution,
     }
-
 
 def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> None:
     plt.figure(figsize=(10, 6))
@@ -773,37 +783,40 @@ def aggregate_condition(
     arrival_time_list = sorted(vehicle_mean_arrival_time.values())
 
     result: Dict[str, Any] = {
-        "scenario": scenario,
-        "early_rate": early_rate,
-        "v2v_rate": v2v_rate,
-        "run_status": {
-            "expected_run_ids": expected_run_ids,
-            "found_run_ids": found_run_ids,
-            "missing_run_ids": missing_run_ids,
-            "parsed_run_ids": parsed_run_ids,
-            "failed_run_ids": failed_run_ids,
+    "scenario": scenario,
+    "early_rate": early_rate,
+    "v2v_rate": v2v_rate,
+    "run_status": {
+        "expected_run_ids": expected_run_ids,
+        "found_run_ids": found_run_ids,
+        "missing_run_ids": missing_run_ids,
+        "parsed_run_ids": parsed_run_ids,
+        "failed_run_ids": failed_run_ids,
+    },
+    "count_averages": count_averages,
+    "arrival_time": {
+        "arrival_time_list": arrival_time_list,
+        "vehicle_mean_arrival_time": {
+            vehicle_id: vehicle_mean_arrival_time[vehicle_id]
+            for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_arrival_time.keys())
         },
-        "count_averages": count_averages,
-        "arrival_time": {
-            "arrival_time_list": arrival_time_list,
-            "vehicle_mean_arrival_time": {
-                vehicle_id: vehicle_mean_arrival_time[vehicle_id]
-                for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_arrival_time.keys())
-            },
+    },
+    "abandonment": {
+        "mean_abandon_time": safe_mean(abandon_time_all_events),
+        "mean_walking_distance": safe_mean(walking_distance_all_events),
+
+        "all_abandon_time_events": sorted(float(v) for v in abandon_time_all_events),
+
+        "vehicle_mean_abandon_time": {
+            vehicle_id: vehicle_mean_abandon_time[vehicle_id]
+            for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_abandon_time.keys())
         },
-        "abandonment": {
-            "mean_abandon_time": safe_mean(abandon_time_all_events),
-            "mean_walking_distance": safe_mean(walking_distance_all_events),
-            "vehicle_mean_abandon_time": {
-                vehicle_id: vehicle_mean_abandon_time[vehicle_id]
-                for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_abandon_time.keys())
-            },
-            "vehicle_mean_walking_distance": {
-                vehicle_id: vehicle_mean_walking_distance[vehicle_id]
-                for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_walking_distance.keys())
-            },
+        "vehicle_mean_walking_distance": {
+            vehicle_id: vehicle_mean_walking_distance[vehicle_id]
+            for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_walking_distance.keys())
         },
-    }
+    },
+    }   
 
     return result
 
