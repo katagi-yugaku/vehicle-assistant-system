@@ -1,50 +1,47 @@
 import json
-import numpy as np
+import sys
+from pathlib import Path
 import matplotlib.pyplot as plt
+import numpy as np
 
 
-def load_cdf_source(json_path: str) -> dict[str, list[float]]:
-    """
-    JSON から cdf_source を取り出す
-    """
-    with open(json_path, "r", encoding="utf-8") as f:
-        obj = json.load(f)
-
-    if "cdf_source" not in obj:
-        raise KeyError("JSON に 'cdf_source' が存在しません。")
-
-    return obj["cdf_source"]
+def normalize_scenario_arg(arg: str) -> str:
+    arg = arg.strip()
+    if arg.isdigit():
+        return f"scenario{int(arg)}"
+    if arg.startswith("scenario") and arg[len("scenario"):].isdigit():
+        return f"scenario{int(arg[len('scenario'):])}"
+    return arg
 
 
-def plot_cdfs(data_dict: dict[str, list[float]], label_suffix: str):
-    """
-    各キーに対応する到着時間リストのCDFを描画する関数
+def load_cdf_source(json_path: Path) -> dict:
+    if not json_path.exists():
+        raise FileNotFoundError(f"JSON file not found: {json_path}")
 
-    Parameters
-    ----------
-    data_dict : dict[str, list[float]]
-        例:
-        {
-            "0.1": [...],
-            "0.5": [...],
-            "0.9": [...],
-            "nosystem": [...]
-        }
+    with json_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
 
-    label_suffix : str
-        保存ファイル名に付与するサフィックス
-    """
+    if "cdf_source" not in data:
+        raise KeyError(f"'cdf_source' not found in {json_path}")
+
+    cdf_source = data["cdf_source"]
+
+    if not isinstance(cdf_source, dict):
+        raise TypeError("'cdf_source' must be a dict")
+
+    return cdf_source
+
+
+def plot_cdfs(data_dict: dict[str, list[float]], save_path: Path) -> None:
     plt.figure(figsize=(10, 6))
 
-    # スタイル定義
     style_map = {
-        "0.1": {"color": "r",    "linestyle": "-",  "label": "early_rate=0.1"},
-        "0.5": {"color": "blue", "linestyle": "-",  "label": "early_rate=0.5"},
-        "0.9": {"color": "g",    "linestyle": "-",  "label": "early_rate=0.9"},
-        "nosystem": {"color": "black", "linestyle": "--", "label": "no system"},
+        "0.1": {"color": "r", "linestyle": "-", "label": "early_rate=0.1"},
+        "0.5": {"color": "blue", "linestyle": "-", "label": "early_rate=0.5"},
+        "0.9": {"color": "g", "linestyle": "-", "label": "early_rate=0.9"},
+        "nosystem": {"color": "blue", "linestyle": "--", "label": "no system"},
     }
 
-    # 描画順を固定
     plot_order = ["0.1", "0.5", "0.9", "nosystem"]
 
     for key in plot_order:
@@ -71,33 +68,41 @@ def plot_cdfs(data_dict: dict[str, list[float]], label_suffix: str):
             linestyle=style["linestyle"],
             linewidth=2,
         )
+    max_time = 2500
+    plt.xlim(400, max_time)
+    plt.ylim(0.2, 1.0)
+    plt.xticks(np.arange(400, max_time+50, 200), fontsize=12, fontweight="semibold")
+    plt.yticks(np.arange(0.2, 1.01, 0.1), fontsize=12, fontweight="semibold")
 
-    plt.xlim(600, 1250)
-    plt.ylim(0.5, 1.0)
-    plt.xticks(
-        ticks=np.arange(600, 1251, 100),
-        fontsize=20,
-        fontweight="semibold"
-    )
-    plt.yticks(
-        ticks=np.arange(0.5, 1.01, 0.1),
-        fontsize=20,
-        fontweight="semibold"
-    )
-
-    plt.xlabel("Arrival time [s]", fontsize=20, fontweight="semibold")
-    plt.ylabel("CDF", fontsize=20, fontweight="semibold")
+    plt.xlabel("Arrival time [s]", fontsize=14, fontweight="semibold")
+    plt.ylabel("CDF", fontsize=14, fontweight="semibold")
     # plt.legend(fontsize=14)
     # plt.grid(True, alpha=0.3)
 
-    save_path = f'/Users/kashiisamutakeshi/lane_ingight{label_suffix}_normalcy400700_result.pdf'
     plt.savefig(save_path, bbox_inches="tight")
     print(f"✅ Saved figure as: {save_path}")
+    plt.close()
 
-    plt.show()
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python3 cdf_plot.py <scenarioID>")
+        print("Example: python3 cdf_plot.py scenario1")
+        print("Example: python3 cdf_plot.py 1")
+        sys.exit(1)
+
+    scenario_id = normalize_scenario_arg(sys.argv[1])
+
+    base_dir = Path(__file__).resolve().parent
+    scenario_dir = base_dir / scenario_id
+    json_path = scenario_dir / "output.json"
+    output_path = scenario_dir / "lane_insight30_normalcy400700_result.pdf"
+
+    cdf_source = load_cdf_source(json_path)
+    plot_cdfs(cdf_source, output_path)
+
+    print(f"[INFO] CDF plot saved: {output_path}")
 
 
 if __name__ == "__main__":
-    json_path = "/mnt/data/output.json"   # 適宜変更
-    cdf_source = load_cdf_source(json_path)
-    plot_cdfs(cdf_source, label_suffix="30")
+    main()
