@@ -362,7 +362,8 @@ def control_vehicles():
                                 if (utilities.is_driver_vehicle_abandant(agent_by_target_vehID=agent_by_current_vehID, 
                                                                         vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
                                                                         current_time=current_time, 
-                                                                        neighbor_vehicle_abandant_nums=neighbor_vehicle_abandant_count)
+                                                                        neighbor_vehicle_abandant_nums=neighbor_vehicle_abandant_count,
+                                                                        alpha=ALPHA)
                                     or agent_by_current_vehID.get_congestion_duration() - current_time > 600): # 600秒を超えたら強制的に乗り捨てる
                                     traci.vehicle.setColor(current_vehID,(0, 103,192))
                                     agent_by_current_vehID.set_vehicle_abandoned_flg(True)
@@ -551,6 +552,7 @@ if __name__ == "__main__":
     CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  = _req(cfg, "cautious_majority_value_about_vehicle_abandonment_var", float)
     CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN: float = _req(cfg, "cautious_vehicle_abandoned_threshold_mean", float)
     CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR: float  = _req(cfg, "cautious_vehicle_abandoned_threshold_var", float)
+    ALPHA: float = _req(cfg, "alpha", float)
 
     traci.start(
                 [sumoBinary,

@@ -523,7 +523,7 @@ def get_new_shelterID_and_near_edgeID_by_vehID_based_on_distance(current_edgeID,
 
     return from_edgeID, new_shelterID, new_edgeID_near_shelter
 
-def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, current_time: float, neighbor_vehicle_abandant_nums: int):
+def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, current_time: float, neighbor_vehicle_abandant_nums: int, alpha: float):
     if neighbor_vehicle_abandant_nums > 4:
         neighbor_vehicle_abandant_nums = 4
     current_vehID = agent_by_target_vehID.get_vehID()
@@ -531,7 +531,7 @@ def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_v
     tsunami_info_obtain_time = agent_by_target_vehID.get_tsunami_info_obtaiend_time()
     if agent_by_target_vehID.get_created_time() >  agent_by_target_vehID.get_tsunami_info_obtaiend_time():
         tsunami_info_obtain_time = agent_by_target_vehID.get_created_time()
-    current_vehicle_abandantment_value = 0.1*max(0, (current_time - encounted_congestion_time)**2) + 30.0*max(0, current_time - tsunami_info_obtain_time) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + neighbor_vehicle_abandant_nums*agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
+    current_vehicle_abandantment_value = alpha*max(0, (current_time - encounted_congestion_time)**2) + 30.0*max(0, current_time - tsunami_info_obtain_time) - 1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment() + neighbor_vehicle_abandant_nums*agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
     if current_vehicle_abandantment_value > agent_by_target_vehID.get_vehicle_abandoned_threshold():
         print(f"Check_{current_vehID}_{current_time}:  {current_vehicle_abandantment_value} =  (jam: {current_time} - {encounted_congestion_time} + info 30.0*{max(0, current_time - agent_by_target_vehID.get_tsunami_info_obtaiend_time())} - {1.0*agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()} + {neighbor_vehicle_abandant_nums}*{agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()}) > { agent_by_target_vehID.get_vehicle_abandoned_threshold()}")
         return True
