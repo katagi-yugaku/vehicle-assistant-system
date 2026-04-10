@@ -394,6 +394,7 @@ def control_vehicles():
                                         print(f"test: {agent_by_current_vehID.get_vehicle_abandoned_time()} current_time: {current_time}")
                                         vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = current_time
                                         walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
+                                        agent_by_current_vehID.set_vehicle_abandoned_time(current_time)
                                         pedstrianID_list.append(pedestrianID)
                                         print("予約なしで車両乗り捨てを行いました")
                                     else:
