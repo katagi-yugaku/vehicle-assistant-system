@@ -42,4 +42,4 @@ cautious_majority_value_about_vehicle_abandonment_mean = 2000
 cautious_majority_value_about_vehicle_abandonment_var  = 500
 cautious_vehicle_abandoned_threshold_mean = 33000
 cautious_vehicle_abandoned_threshold_var  = 40000
-alpha = 0.10
+alpha = 0.30
