@@ -391,6 +391,7 @@ def control_vehicles():
                                             print(f"[WARN] pedestrian was not created for {current_vehID}; skip abandonment registration")
                                             continue
                                         agent_by_current_vehID.set_vehicle_abandoned_flg(True)
+                                        print(f"test: {agent_by_current_vehID.get_vehicle_abandoned_time()} current_time: {current_time}")
                                         vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = current_time
                                         walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
                                         pedstrianID_list.append(pedestrianID)
@@ -406,7 +407,8 @@ def control_vehicles():
                                                                                                                 STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
                                                                                                                 shelter=shelter_for_current_vehID
                                                                                                                 )
-                                        agent_by_current_vehID.set_vehicle_abandoned_flg(True)
+                                        agent_by_current_vehID.set_vehicle_abandoned_flg(vehicle_abandoned_flg=True)
+                                        print(f"test: {agent_by_current_vehID.get_vehicle_abandoned_time()} current_time: {current_time}")
                                         vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = agent_by_current_vehID.get_vehicle_abandoned_time()
                                         walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
                                         pedstrianID_list.append(pedestrianID)

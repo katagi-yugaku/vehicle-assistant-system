@@ -524,8 +524,8 @@ def get_new_shelterID_and_near_edgeID_by_vehID_based_on_distance(current_edgeID,
     return from_edgeID, new_shelterID, new_edgeID_near_shelter
 
 def is_driver_vehicle_abandant(agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, current_time: float, neighbor_vehicle_abandant_nums: int, alpha: float):
-    if neighbor_vehicle_abandant_nums > 4:
-        neighbor_vehicle_abandant_nums = 4
+    if neighbor_vehicle_abandant_nums > 6:
+        neighbor_vehicle_abandant_nums = 6
     current_vehID = agent_by_target_vehID.get_vehID()
     encounted_congestion_time = agent_by_target_vehID.get_congestion_duration()
     tsunami_info_obtain_time = agent_by_target_vehID.get_tsunami_info_obtaiend_time()
