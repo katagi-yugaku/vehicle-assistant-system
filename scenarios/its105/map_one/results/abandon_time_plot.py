@@ -89,7 +89,7 @@ def plot_abandon_time_grouped_bars(
         "0.1": {"color": "r", "label": "early_rate=0.1"},
         "0.5": {"color": "blue", "label": "early_rate=0.5"},
         "0.9": {"color": "g", "label": "early_rate=0.9"},
-        "nosystem": {"color": "black", "label": "no system"},
+        "nosystem": {"color": "cornflowerblue", "label": "no system"},
     }
 
     bin_edges = build_bin_edges(xmin, xmax, bin_width)
