@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-04-21 21:09:38 by Eclipse SUMO sumo Version 1.20.0
+-->
+
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+    <input>
+        <net-file value="ishinomaki_two_shelter.net.xml"/>
+        <!-- <route-files value="ishinomaki_two_shelter.rou.xml"/> -->
+        <additional-files value="ishinomaki_two_shelter.add.xml"/>
+    </input>
+    <processing>
+        <parking.maneuver value="true"/>
+    </processing>
+</configuration>

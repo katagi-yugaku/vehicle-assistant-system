@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-04-10 00:10:05 by Eclipse SUMO netedit Version 1.20.0
+<!-- generated on 2026-04-18 15:13:14 by Eclipse SUMO netedit Version 1.20.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/neteditConfiguration.xsd">
 
     <input>
@@ -34,7 +34,7 @@
 
 <net version="1.20" junctionCornerDetail="5" lefthand="true" limitTurnSpeed="5.50" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
 
-    <location netOffset="-520703.59,-4250601.64" convBoundary="4000.20,2759.51,11028.38,6227.14" origBoundary="141.237328,38.305646,141.419841,38.482093" projParameter="+proj=utm +zone=54 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
+    <location netOffset="-520703.59,-4250601.64" convBoundary="4000.20,2746.79,11028.38,6227.14" origBoundary="141.237328,38.305646,141.419841,38.482093" projParameter="+proj=utm +zone=54 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
 
     <type id="highway.tertiary" priority="10" numLanes="1" speed="22.22" disallow="tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" oneway="0"/>
     <type id="highway.trunk" priority="13" numLanes="2" speed="27.78" disallow="pedestrian bicycle tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" oneway="0"/>
@@ -324,7 +324,7 @@
         <lane id=":J1_2_0" index="0" disallow="pedestrian" speed="13.89" length="0.46" shape="5501.44,2963.61 5501.46,2963.74 5501.48,2963.83 5501.49,2963.93 5501.50,2964.07"/>
     </edge>
     <edge id=":J2_0" function="internal">
-        <lane id=":J2_0_0" index="0" disallow="pedestrian" speed="13.89" length="4.08" shape="5488.47,2866.38 5484.91,2864.36"/>
+        <lane id=":J2_0_0" index="0" disallow="pedestrian" speed="13.89" length="4.08" shape="5488.47,2866.37 5484.92,2864.37"/>
     </edge>
 
     <edge id="-E1" from="1203974086" to="1203974039" priority="-1">
@@ -335,8 +335,8 @@
         <lane id="-E14_1" index="1" disallow="pedestrian" speed="13.89" length="89.29" shape="5501.50,2964.07 5507.66,3053.15"/>
     </edge>
     <edge id="-E15" from="J2" to="J1" priority="-1">
-        <lane id="-E15_0" index="0" allow="pedestrian" speed="13.89" length="97.88" width="2.00" shape="5479.64,2868.15 5498.89,2964.12"/>
-        <lane id="-E15_1" index="1" disallow="pedestrian" speed="13.89" length="97.88" shape="5482.19,2867.64 5501.44,2963.61"/>
+        <lane id="-E15_0" index="0" allow="pedestrian" speed="13.89" length="97.88" width="2.00" shape="5479.64,2868.14 5498.89,2964.12"/>
+        <lane id="-E15_1" index="1" disallow="pedestrian" speed="13.89" length="97.88" shape="5482.19,2867.63 5501.44,2963.61"/>
     </edge>
     <edge id="-E17" from="461192779" to="918333525" priority="-1">
         <lane id="-E17_0" index="0" allow="pedestrian" speed="13.89" length="168.56" width="2.00" shape="5507.56,3488.71 5356.04,3562.55"/>
@@ -437,13 +437,13 @@
         <lane id="E14_2" index="2" disallow="pedestrian" speed="13.89" length="89.29" shape="5510.85,3052.92 5504.69,2963.84"/>
     </edge>
     <edge id="E15" from="J1" to="J2" priority="-1">
-        <lane id="E15_0" index="0" allow="pedestrian" speed="13.89" length="97.88" width="2.00" shape="5510.26,2961.84 5491.02,2865.87"/>
-        <lane id="E15_1" index="1" disallow="pedestrian" speed="13.89" length="97.88" shape="5507.71,2962.35 5488.47,2866.38"/>
-        <lane id="E15_2" index="2" disallow="pedestrian" speed="13.89" length="97.88" shape="5504.57,2962.98 5485.33,2867.01"/>
+        <lane id="E15_0" index="0" allow="pedestrian" speed="13.89" length="97.88" width="2.00" shape="5510.26,2961.84 5491.02,2865.86"/>
+        <lane id="E15_1" index="1" disallow="pedestrian" speed="13.89" length="97.88" shape="5507.71,2962.35 5488.47,2866.37"/>
+        <lane id="E15_2" index="2" disallow="pedestrian" speed="13.89" length="97.88" shape="5504.57,2962.98 5485.33,2867.00"/>
     </edge>
-    <edge id="E16" from="J2" to="J3" priority="-1">
-        <lane id="E16_0" index="0" allow="pedestrian" speed="13.89" length="105.70" width="2.00" shape="5487.50,2864.07 5475.62,2759.04"/>
-        <lane id="E16_1" index="1" disallow="pedestrian" speed="13.89" length="105.70" shape="5484.91,2864.36 5473.04,2759.33"/>
+    <edge id="E16" from="J2" to="J3" priority="-1" shape="5483.48,2865.92 5477.07,2808.52 5470.77,2746.79 5423.29,2750.07 5427.44,2812.86 5455.21,2811.66 5450.42,2756.09">
+        <lane id="E16_0" index="0" allow="pedestrian" speed="13.89" length="335.61" width="2.00" shape="5487.50,2864.08 5481.25,2808.07 5474.54,2742.32 5418.82,2746.17 5423.52,2817.23 5459.77,2815.67 5454.60,2755.73"/>
+        <lane id="E16_1" index="1" disallow="pedestrian" speed="13.89" length="335.61" shape="5484.92,2864.37 5478.66,2808.35 5472.20,2745.09 5421.59,2748.58 5425.95,2814.53 5456.95,2813.19 5452.01,2755.95"/>
     </edge>
     <edge id="E17" from="918333525" to="461192779" priority="-1">
         <lane id="E17_0" index="0" allow="pedestrian" speed="13.89" length="168.56" width="2.00" shape="5361.12,3572.98 5512.64,3499.14"/>
@@ -722,10 +722,10 @@
         <request index="1" response="000" foes="000" cont="0"/>
         <request index="2" response="000" foes="000" cont="0"/>
     </junction>
-    <junction id="J2" type="priority" x="5483.48" y="2865.92" incLanes="E15_0 E15_1 E15_2" intLanes=":J2_0_0" shape="5492.00,2865.67 5478.66,2868.34 5483.32,2864.54 5488.49,2863.96">
+    <junction id="J2" type="priority" x="5483.48" y="2865.92" incLanes="E15_0 E15_1 E15_2" intLanes=":J2_0_0" shape="5492.00,2865.67 5478.66,2868.34 5483.33,2864.55 5488.49,2863.97">
         <request index="0" response="0" foes="0" cont="0"/>
     </junction>
-    <junction id="J3" type="dead_end" x="5471.45" y="2759.51" incLanes="E16_0 E16_1" intLanes="" shape="5476.62,2758.93 5471.45,2759.51"/>
+    <junction id="J3" type="dead_end" x="5450.42" y="2756.09" incLanes="E16_0 E16_1" intLanes="" shape="5455.60,2755.64 5450.42,2756.09"/>
 
     <junction id=":1204037875_5_0" type="internal" x="5375.41" y="3036.47" incLanes=":1204037875_1_0 E42_1 E42_2" intLanes=":1204037875_2_0 :1204037875_2_1"/>
     <junction id=":1204037875_6_0" type="internal" x="5378.26" y="3036.62" incLanes=":1204037875_4_0 -E41_1" intLanes=":1204037875_0_0"/>
