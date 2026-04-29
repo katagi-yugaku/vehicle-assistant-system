@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-04-23 12:50:40 by Eclipse SUMO netedit Version 1.20.0
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <!-- Routes -->
+    <route id="r_0" edges="-E1 E100 E101 E102 E103 E104 E105 E106 E107 E2"/>
+    <route id="r_1" edges="-E1 E100 E101 E102 E103 E108 E109 E140 E141 E142 E143 E144 E128 E129 E130 E3"/>
+    <route id="r_2" edges="-E1 E100 E110 E111 E112 E113 E114 E115 E116 E122 E123 E124 E125 E126 E127 E128 E129 E130 E3"/>
+    <route id="r_3" edges="-E1 E100 E110 E111 E112 E113 E114 E115 E116 E122 E123 E124 E125 E126 E127 -E144 -E143 -E142 -E141 -E140 -E109 -E108 E104 E105 E106 E107 E2"/>
+    <route id="r_4" edges="E1 E120 E121 E122 E123 E124 E125 E126 E127 E128 E129 E130 E3"/>
+    <route id="r_5" edges="E1 E120 E121 -E116 -E115 -E114 -E113 -E112 -E111 -E110 E101 E102 E103 E104 E105 E106 E107 E2"/>
+    <route id="r_6" edges="E1 E120 E121 E122 E123 E124 E125 E126 E127 -E144 -E143 -E142 -E141 -E140 -E109 -E108 E104 E105 E106 E107 E2"/>
+    <route id="r_7" edges="E1 E120 E121 -E116 -E115 -E114 -E113 -E112 -E111 -E110 E101 E102 E103 E108 E109 E140 E141 E142 E143 E144 E128 E129 E130 E3"/>
+</routes>

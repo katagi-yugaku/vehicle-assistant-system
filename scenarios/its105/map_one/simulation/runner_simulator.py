@@ -182,7 +182,7 @@ def control_vehicles():
                 print("乗り捨てに成功 current_vehID: {}, current_edgeID: {}, time: {}".format(current_vehID, current_edgeID, current_time))
                 agent_by_current_vehID.set_avoiding_abandoned_vehicle_flg(False)
     
-        if (not agent_by_current_vehID.get_tsunami_info_obtaiend_flg() 
+        if (not agent_by_current_vehID.get_tsunami_info_obtained_flg() 
             and list(vehInfo_by_current_vehID.get_tsunami_precursor_info().values())[0][0] 
             and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
             ):
@@ -192,8 +192,8 @@ def control_vehicles():
             # min info at time {min_time}")
             if min_time > agent_by_current_vehID.get_created_time():
                 min_time = agent_by_current_vehID.get_created_time()
-            agent_by_current_vehID.set_tsunami_info_obtaiend_time(min_time)
-            agent_by_current_vehID.set_tsunami_info_obtaiend_flg(True)
+            agent_by_current_vehID.set_tsunami_info_obtained_time(min_time)
+            agent_by_current_vehID.set_tsunami_info_obtained_flg(True)
 
 
         if not agent_by_current_vehID.get_created_time_flg():
@@ -348,7 +348,8 @@ def control_vehicles():
                             agent_list=agent_list
                         )
                         )
-                    ):                    # 渋滞に巻き込まれたら、渋滞継続時間測定のためにフラグをTrueにし、計測時間を作る
+                    ):                    
+                    # 渋滞に巻き込まれたら、渋滞継続時間測定のためにフラグをTrueにし、計測時間を作る
                     traci.vehicle.setColor(current_vehID,(225, 90, 40))
                     if not agent_by_current_vehID.get_encounted_congestion_flg():
                         agent_by_current_vehID.set_congestion_duration(traci.simulation.getTime())

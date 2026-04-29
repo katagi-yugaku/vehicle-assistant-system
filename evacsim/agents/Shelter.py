@@ -22,10 +22,10 @@ class Shelter:
     # 避難地の混雑度を更新する
     def update_congestion_rate(self):
         # ガード節
-        if self.total_arrival_vehIDs > self._capacity:
+        if len(self.arrival_vehID_list) > self._capacity:
             self.congestion_rate = 1.0
         else:
-            self.congestion_rate = self.total_arrival_vehIDs / self._capacity
+            self.congestion_rate = len(self.arrival_vehID_list) / self._capacity
     
     # 車両周辺の車両情報を更新
     def update_evac_time_default_dict(self, vehID:str, route:list, evac_time:double):

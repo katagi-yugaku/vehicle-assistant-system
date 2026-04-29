@@ -12,7 +12,7 @@ class Agent():
         self.near_edgeID_by_target_shelter = "" #　車両が向かう避難所に接続するedgeID
         self.target_abandoned_vehID = ""
         self.candidate_edge_by_shelterID = {} #　車両が向かう避難所の候補地
-        self.congestion_duration = 100000 #　渋滞継続時間
+        self.congestion_duration = 0.0 #　渋滞継続時間
         self.tunning_threshold = tunning_threshold # Agentの行動を変更するstress->tunningへの耐久時間
         self.route_change_threshold = route_change_threshold # Agentの行動を変更するtunnig->change渋滞継続時間の耐久時間
         self.route_change_threhold_list = [] #　耐久時間リスト
@@ -25,8 +25,16 @@ class Agent():
         self.motivation_increase_due_to_following_neighbors = motivation_increase_due_to_following_neighbors  # 追従する近隣車両による動機付け増加量
         self.calculated_motivation_value = 0.0
         self.x_elapsed_time_for_lane_change_list = []
-        self.y_motivation_value_for_lane_change_list = []
+        self.x_elapsed_time = []
+        self.base_motivation_value_by_elapsed_time_dict = {} # 経過時間ごとの基本的な動機付け値の辞書
+        self.tsunami_precursor_normalcy_value_by_elapsed_time_dict = {} # 経過時間ごとの津波前兆に対する正常性バイアスの辞書
+        self.route_congestion_normalcy_value_by_elapsed_time_dict = {} # 経過時間ごとのルートの混雑に対する正常性バイアスの辞書
+        self.shelter_full_normalcy_value_by_elapsed_time_dict = {} # 経過時間ごとの避難所満杯に対する正常性バイアスの辞書
         self.lane_change_xy_dict = {}
+        self.encounted_congestion_time = 0.0 # 渋滞に遭遇した時間
+        self.tsunami_info_obtaiend_time = 0.0
+        self.route_congestion_info_obtained_time = 0.0
+        self.shelter_full_info_obtained_time = 0.0
         self.created_time = 0.0 # エージェント作成時間
         self.arrival_time = 0.0 # 避難地到着時間
         self.lane_change_time = 0.0 # 車線変更時間
@@ -34,7 +42,7 @@ class Agent():
         self.vehicle_abandoned_threshold = vehicle_abandoned_threshold # 車両放棄閾値
         self.normalcy_value_about_vehicle_abandonment = normalcy_value_about_vehicle_abandonment # 車両放棄に対する正常性バイアス
         self.majority_value_about_vehicle_abandonment = majority_value_about_vehicle_abandonment # 車両放棄に対する同調性バイアス
-        self.tsunami_info_obtaiend_time =  1000000.0 # 津波情報取得時間
+        self.tsunami_info_obtained_time =  1000000.0 # 津波情報取得時間
         self.vehicle_abandoned_time = 0.0
         self.shelter_occupancy_rate_threshold = shelter_occupancy_rate_threshold # 避難所の混雑率
         self.created_time_flg = False # エージェント作成時間設定フラグ
@@ -50,8 +58,10 @@ class Agent():
         self.avoiding_abandoned_vehicle_flg = False # 車両放棄回避フラグ
         self.failed_vehicle_abandonment_flg = False # 車両放棄回避失敗フラグ
         self.arrival_shelter_flg = False # 避難所到着フラグ
-        self.tsunami_info_obtaiend_flg = False # 津波情報取得フラグ
-
+        self.tsunami_info_obtained_flg = False # 津波情報取得フラグ
+        self.route_congestion_info_obtained_flg = False # ルートの混雑情報取得フラグ
+        self.shelter_full_info_obtained_flg = False # 避難所満杯情報取得フラグ
+    
     # ドライバーの現在の車線変更動機付け値の更新
     def update_calculated_motivation_value(self, current_time:float):
         # TODO ここが間違ってる
@@ -60,9 +70,8 @@ class Agent():
         self.set_calculated_motivation_value(current_motivation_value)
 
     #　渋滞継続時間の更新
-    def update_congestion_duration(self):
-        self.congestion_duration += 1
-
+    def update_congestion_duration(self, time_increment:float):
+        self.congestion_duration += time_increment
     #　渋滞継続時間のリセット
     def reset_congestion_duration(self):
         self.congestion_duration = 0
@@ -170,6 +179,38 @@ class Agent():
         return self.obtain_info_time
     def set_obtain_info_time(self, obtain_info_time:float):
         self.obtain_info_time = obtain_info_time
+    
+    # 渋滞に巻き込まれた時間
+    def get_encounted_congestion_time(self):
+        return self.encounted_congestion_time
+    def set_encounted_congestion_time(self, encounted_congestion_time:float):
+        self.encounted_congestion_time = encounted_congestion_time
+    def updated_encounted_congestion_time(self, time_increment:float):
+        self.encounted_congestion_time += time_increment
+    
+    # 津波情報取得時間の取得・設定
+    def get_tsunami_info_obtained_time(self):
+        return self.tsunami_info_obtained_time
+    def set_tsunami_info_obtained_time(self, tsunami_info_obtained_time:float):
+        self.tsunami_info_obtaiend_time = tsunami_info_obtained_time
+    def update_tsunami_info_obtained_time(self, time_increment:float):
+        self.tsunami_info_obtaiend_time += time_increment
+    
+    # ルートの混雑情報取得時間の取得・設定
+    def get_route_congestion_info_obtained_time(self):
+        return self.route_congestion_info_obtained_time
+    def set_route_congestion_info_obtained_time(self, route_congestion_info_obtained_time:float):
+        self.route_congestion_info_obtained_time = route_congestion_info_obtained_time
+    def update_route_congestion_info_obtained_time(self, time_increment:float):
+        self.route_congestion_info_obtained_time += time_increment
+
+    # 避難所満杯情報取得時間の取得・設定
+    def get_shelter_full_info_obtained_time(self):
+        return self.shelter_full_info_obtained_time
+    def set_shelter_full_info_obtained_time(self, shelter_full_info_obtained_time:float):
+        self.shelter_full_info_obtained_time = shelter_full_info_obtained_time
+    def update_shelter_full_info_obtained_time(self, time_increment:float):
+        self.shelter_full_info_obtained_time += time_increment
 
     # 情報受信による動機付け増加量の取得・設定
     def get_motivation_increase_from_info_receive(self):
@@ -205,16 +246,30 @@ class Agent():
     def pop_x_elapsed_time_for_lane_change_list(self):
         return self.x_elapsed_time_for_lane_change_list.pop()
 
-    # 車線変更y座標の取得・設定
-    def get_y_motivation_value_for_lane_change_list(self):
-        return self.y_motivation_value_for_lane_change_list
-    def set_y_motivation_value_for_lane_change_list(self, y_motivation_value_for_lane_change_list:list):
-        self.y_motivation_value_for_lane_change_list = y_motivation_value_for_lane_change_list
-    def append_y_motivation_value_for_lane_change_list(self, value:float):
-        self.y_motivation_value_for_lane_change_list.append(value)
-    def pop_y_motivation_value_for_lane_change_list(self):
-        return self.y_motivation_value_for_lane_change_list.pop()
-
+    # 基本的な動機付け値の経過時間ごとの辞書の取得・設定
+    def get_base_motivation_value_by_elapsed_time_dict(self):
+        return self.base_motivation_value_by_elapsed_time_dict
+    def set_base_motivation_value_by_elapsed_time_dict(self, base_motivation_value_by_elapsed_time_dict:dict):
+        self.base_motivation_value_by_elapsed_time_dict = base_motivation_value_by_elapsed_time_dict
+    
+    # 津波前兆に対する正常性バイアスの経過時間ごとの辞書の取得・設定
+    def get_tsunami_precursor_normalcy_value_by_elapsed_time_dict(self):
+        return self.tsunami_precursor_normalcy_value_by_elapsed_time_dict
+    def set_tsunami_precursor_normalcy_value_by_elapsed_time_dict(self, tsunami_precursor_normalcy_value_by_elapsed_time_dict:dict):
+        self.tsunami_precursor_normalcy_value_by_elapsed_time_dict = tsunami_precursor_normalcy_value_by_elapsed_time_dict
+    
+    # ルートの混雑に対する正常性バイアスの経過時間ごとの辞書の取得・設定
+    def get_route_congestion_normalcy_value_by_elapsed_time_dict(self):
+        return self.route_congestion_normalcy_value_by_elapsed_time_dict
+    def set_route_congestion_normalcy_value_by_elapsed_time_dict(self, route_congestion_normalcy_value_by_elapsed_time_dict:dict):
+        self.route_congestion_normalcy_value_by_elapsed_time_dict = route_congestion_normalcy_value_by_elapsed_time_dict
+    
+    # 避難所満杯に対する正常性バイアスの経過時間ごとの辞書の取得・設定
+    def get_shelter_full_normalcy_value_by_elapsed_time_dict(self):
+        return self.shelter_full_normalcy_value_by_elapsed_time_dict
+    def set_shelter_full_normalcy_value_by_elapsed_time_dict(self, shelter_full_normalcy_value_by_elapsed_time_dict:dict):
+        self.shelter_full_normalcy_value_by_elapsed_time_dict = shelter_full_normalcy_value_by_elapsed_time_dict
+    
     # 車線変更xy座標辞書の取得・設定
     def get_lane_change_xy_dict(self):
         return self.lane_change_xy_dict
@@ -276,10 +331,10 @@ class Agent():
         self.majority_value_about_vehicle_abandonment = majority_value_about_vehicle_abandonment
     
     # 津波情報取得時間の取得・設定
-    def get_tsunami_info_obtaiend_time(self):
-        return self.tsunami_info_obtaiend_time
-    def set_tsunami_info_obtaiend_time(self, tsunami_info_obtaiend_time:float):
-        self.tsunami_info_obtaiend_time = tsunami_info_obtaiend_time
+    def get_tsunami_info_obtained_time(self):
+        return self.tsunami_info_obtained_time
+    def set_tsunami_info_obtained_time(self, tsunami_info_obtained_time:float):
+        self.tsunami_info_obtaiend_time = tsunami_info_obtained_time
     
     # 車両乗り捨て時刻
     def get_vehicle_abandoned_time(self):
@@ -360,10 +415,22 @@ class Agent():
         self.arrival_shelter_flg = arrival_shelter_flg
 
     # 津波情報取得フラグの取得・設定
-    def get_tsunami_info_obtaiend_flg(self):
-        return self.tsunami_info_obtaiend_flg
-    def set_tsunami_info_obtaiend_flg(self, tsunami_info_obtaiend_flg:bool):
-        self.tsunami_info_obtaiend_flg = tsunami_info_obtaiend_flg
+    def get_tsunami_info_obtained_flg(self):
+        return self.tsunami_info_obtained_flg
+    def set_tsunami_info_obtained_flg(self, tsunami_info_obtained_flg:bool):
+        self.tsunami_info_obtained_flg = tsunami_info_obtained_flg
+    
+    # ルートの混雑情報取得フラグの取得・設定
+    def get_route_congestion_info_obtained_flg(self):
+        return self.route_congestion_info_obtained_flg
+    def set_route_congestion_info_obtained_flg(self, route_congestion_info_obtained_flg:bool):
+        self.route_congestion_info_obtained_flg = route_congestion_info_obtained_flg
+    
+    # 避難所満杯情報取得フラグの取得・設定
+    def get_shelter_full_info_obtained_flg(self):
+        return self.shelter_full_info_obtained_flg
+    def set_shelter_full_info_obtained_flg(self, shelter_full_info_obtained_flg:bool):
+        self.shelter_full_info_obtained_flg = shelter_full_info_obtained_flg
 
     #　エージェントの情報を表示
     def print_info(self):

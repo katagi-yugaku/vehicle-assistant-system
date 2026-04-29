@@ -6,7 +6,7 @@
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
     <input>
         <net-file value="ishinomaki_two_shelter.net.xml"/>
-        <!-- <route-files value="ishinomaki_two_shelter.rou.xml"/> -->
+        <route-files value="ishinomaki_two_shelter.rou.xml"/>
         <additional-files value="ishinomaki_two_shelter.add.xml"/>
     </input>
     <processing>
