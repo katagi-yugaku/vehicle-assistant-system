@@ -265,3 +265,29 @@ def init_agent_list(
         agent_list.append(agent)
 
     return agent_list
+
+
+def init_vehicleInfo_list(vehIDs: list, shelter_list: list, approach_edgeIDs_by_start_edgeID: dict, edgeIDs_within_junction_to_shelter_dict: dict, v2v_capable_vehicle_rate: float):
+    vehInfo_list = []
+    for vehID in vehIDs:
+        part_vehID = vehID.split("_")[1] + "_" + vehID.split("_")[2]
+        target_shelter = next((shelter for shelter in shelter_list if shelter.get_shelterID() == part_vehID), None)
+        if target_shelter is None:
+            continue  # 対応する避難所がない場合はスキップ
+        vehicleInfo = VehicleInfo(
+                            vehID=vehID,
+                            target_shelter=target_shelter.get_shelterID(),
+                            edgeID_connect_target_shelter=target_shelter.get_near_edgeID(),
+                            create_time=traci.simulation.getTime()
+                            )
+        [vehicleInfo.init_set_congestion_level_by_shelter(shelter.get_shelterID(), 0, traci.simulation.getTime()) for shelter in shelter_list]
+        [vehicleInfo.init_set_avg_evac_time_by_route_by_recive_time()]
+        [vehicleInfo.init_set_tsunami_precursor_info()]
+        [vehicleInfo.set_approach_edge_dict(approach_edgeIDs_by_start_edgeID)]
+        [vehicleInfo.set_edgeIDs_within_junction_to_shelter_dict(edgeIDs_within_junction_to_shelter_dict)]
+        vehInfo_list.append(vehicleInfo)
+    # 引数のv2v機能を有する車両の割合に応じて、フラグを設定する（初期は全車両True）
+    for vehInfo in vehInfo_list:
+        if not random_true(v2v_capable_vehicle_rate):
+            vehInfo.set_vehicle_comm_enabled_flag(False)
+    return vehInfo_list

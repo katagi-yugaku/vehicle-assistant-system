@@ -134,3 +134,12 @@ def is_again_driver_vehicle_abandant(
     )
 
     return False
+
+
+def is_candidate_shelter(agent_by_target_vehID:Agent, target_vehInfo:VehicleInfo):
+    for shelterID, nearedgeID in agent_by_target_vehID.get_candidate_edge_by_shelterID().items():
+        # 目的の避難地以外で空きのある避難地を探す
+        if not shelterID == target_vehInfo.get_target_shelter():
+            if target_vehInfo.get_congestion_level_by_shelter(shelterID)  > 0.99:
+                return True
+    return False
