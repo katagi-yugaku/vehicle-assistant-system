@@ -132,7 +132,7 @@ def control_vehicles():
         current_position = None
         elapsed_time = traci.simulation.getTime() - agent_by_current_vehID.get_created_time() if agent_by_current_vehID.get_created_time_flg() else 0.0
 
-        # 到着処理
+        # VEHINFO: 到着処理
         if (
             traci.vehicle.isStoppedParking(current_vehID)
             and not vehInfo_by_current_vehID.get_parked_flag()
@@ -149,7 +149,7 @@ def control_vehicles():
             )
             route_avg_dirty = True
 
-        # 避難所近くのエッジにいる場合、密度に応じて速度制御を行う
+        # VEHINFO: 避難所近くのエッジにいる場合、密度に応じて速度制御を行う
         if not vehInfo_by_current_vehID.get_decline_edge_arrival_flag():
             pre_edgeID_near_shelter_flag = utilities.is_pre_edgeID_near_shelter(
                 current_edgeID=current_edgeID,
@@ -171,7 +171,7 @@ def control_vehicles():
             else:
                 traci.vehicle.slowDown(current_vehID, 5.0, 1.0)
 
-        # 到着していない車両に対して処理を行う
+        # VEHINFO: 到着していない車両に対して処理を行う
         if not vehInfo_by_current_vehID.get_arrival_flag():
             # 乗り捨てが現在のpositionで成功しなかった場合、次の場所で乗り捨てを試みる
             if current_edgeID == agent_by_current_vehID.get_reserved_vehicle_abandonment_edgeID() and agent_by_current_vehID.get_avoiding_abandoned_vehicle_flg():
@@ -326,9 +326,13 @@ def control_vehicles():
                                                                                                         action="va",
                                                                                                         debug=False,
                                                                                                     )
-                        # AGENT: 渋滞脱出行動をとる
+                        # AGENT: 渋滞脱出行動をとる 
+                        # MOTIVATION: 車両乗り捨てに対するもモチベーションが閾値を超えているか否かを確認する
                         if current_motivation >= agent_by_current_vehID.get_vehicle_abandoned_threshold():
                             print("車両乗り捨てを行います current_vehID: {}, current_edgeID: {}, time: {}, motivation: {}, thresshold: {}".format(current_vehID, current_edgeID, current_time, current_motivation, agent_by_current_vehID.get_vehicle_abandoned_threshold()))
+                            
+                            # AGENT: 車両を乗り捨てる
+                            # TRACI: 車両をremove pedestrianを追加する
                             agent_by_current_vehID.set_vehicle_abandoned_flg(vehicle_abandoned_flg=True)
                             PEDESTRIAN_COUNT, pedestrianID, walking_distance = utilities.vehicle_abandant_behavior_with_vehicle_remove(
                                     current_vehID=current_vehID,
@@ -350,7 +354,8 @@ def control_vehicles():
                             agent_by_current_vehID.set_vehicle_abandoned_time(current_time)
                             pedstrianID_list.append(pedestrianID)
                             print("予約なしで車両乗り捨てを行いました")
-                            
+                        
+                    # MOTIVATION: agentの渋滞継続時間を更新する　次の計算用に時計を進める
                         agent_by_current_vehID.update_congestion_duration(5.0)
                         agent_by_current_vehID.updated_encounted_congestion_time(5.0)
                         agent_by_current_vehID.update_shelter_full_info_obtained_time(5.0)
@@ -455,9 +460,10 @@ def control_vehicles():
                 )
                 route_avg_dirty = True
 
+    # SHELTER: 経路ごとの平均避難時間を計算する
     if route_avg_dirty:
         utilities.calculate_avg_evac_time_by_route(shelter_list=shelter_list)
-    # 避難地の混雑率を計算する
+    # SHELTER: 避難地の混雑率を計算する
     for shelter in shelter_list:
         shelter.update_congestion_rate()
         # print(f"shelterID: {shelter.get_shelterID()}, congestion_rate: {shelter.get_congestion_rate()}, arrival_vehIDs: {shelter.get_arrival_vehID_list()}")

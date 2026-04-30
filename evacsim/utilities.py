@@ -40,8 +40,7 @@ from .agents.VehicleInfo import VehicleInfo
 # =========================
 # Runtime config
 # =========================
-random.seed(319)  # 乱数シードを314に設定（元のコメントを維持）　確率系にも影響を与えるのでかなり注意する
-# random.seed()
+random.seed()  # 乱数シードを314に設定（元のコメントを維持）　確率系にも影響を与えるのでかなり注意する
 
 VEHICLE_SHELTER_DURATION_TIME = 10000
 FREE_FLOW_SPEED = 13.0  # 迂回路（Uターン時）の想定速度 (m/s)
