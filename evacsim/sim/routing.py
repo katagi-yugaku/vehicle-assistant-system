@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from evacsim.agents.Agent import Agent
     from evacsim.agents.Shelter import Shelter
     from evacsim.agents.VehicleInfo import VehicleInfo
+    from evacsim.agents.CustomeEdge import CustomeEdge
 
 
 def get_new_shelterID_and_near_edgeID_by_vehID(
@@ -959,6 +960,17 @@ def find_alternative_better_choice_fixed(
         )
 
     return base_reroute_start_edgeID, shelterID, to_edge_list, time_gain, congestion_flg
+
+def _get_shelter_group(shelter_id: str) -> str:
+    """
+    避難所IDからグループ名（例: "ShelterA"）を抽出する。
+    例: "ShelterB_2" -> "ShelterB"
+    """
+    try:
+        return shelter_id.split('_')[0]
+    except IndexError:
+        return shelter_id # '_' がない場合はID全体をグループ名とみなす
+
 
 
 def is_route_time_difference_exceeding_threshold(current_edgeID, agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, shelter: Shelter, shelter_list: list[Shelter], custome_edge_list: list):
