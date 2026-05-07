@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+EARLY_RATE_KEYS = {"0.1", "0.5", "0.9", "nosystem"}
+
+
 def normalize_scenario_arg(arg: str) -> str:
     arg = arg.strip()
     if arg.isdigit():
@@ -33,8 +36,8 @@ def load_cdf_source(json_path: Path) -> dict:
 
 
 def plot_compare_cdfs(
-    scenario_to_values: dict[str, list[float]],
-    early_rate: str,
+    scenario_to_rate_values: dict[str, dict[str, list[float]]],
+    early_rates: list[str],
     save_path: Path,
 ) -> None:
     plt.figure(figsize=(10, 6))
@@ -50,43 +53,49 @@ def plot_compare_cdfs(
     # 線種は scenario の順番で決める
     linestyle_list = ["-", "--", "-.", ":", (0, (3, 1, 1, 1)), (0, (5, 2))]
 
-    base_style = style_map.get(
-        early_rate,
-        {"color": "gray", "label": f"early_rate={early_rate}"}
-    )
+    for scenario_id, rate_to_values in scenario_to_rate_values.items():
 
-    for i, (scenario_id, values) in enumerate(scenario_to_values.items()):
-        value = np.array(values, dtype=float)
-        if len(value) == 0:
-            print(f"[WARN] {scenario_id} の early_rate={early_rate} は空です。スキップします。")
-            continue
+        for early_rate in early_rates:
+            # system は実線，nosystem は点線
+            linestyle = "--" if early_rate == "nosystem" else "-"
 
-        value = np.sort(value)
-        cdf = np.arange(1, len(value) + 1) / len(value)
+            values = rate_to_values[early_rate]
 
-        linestyle = linestyle_list[i % len(linestyle_list)]
+            value = np.array(values, dtype=float)
+            if len(value) == 0:
+                print(f"[WARN] {scenario_id} の early_rate={early_rate} は空です。スキップします。")
+                continue
 
-        plt.plot(
-            value,
-            cdf,
-            label=scenario_id,
-            color=base_style["color"],
-            linestyle=linestyle,
-            linewidth=2,
-        )
+            value = np.sort(value)
+            cdf = np.arange(1, len(value) + 1) / len(value)
+
+            base_style = style_map.get(
+                early_rate,
+                {"color": "gray", "label": f"early_rate={early_rate}"}
+            )
+
+            plt.plot(
+                value,
+                cdf,
+                label=f"{scenario_id} / {base_style['label']}",
+                color=base_style["color"],
+                linestyle=linestyle,
+                linewidth=2,
+            )
 
     max_time = 2200
-    min_time = 0
-    y_min = 0.0
+    min_time = 600
+    y_min = 0.1
+
     plt.xlim(min_time, max_time)
     plt.ylim(y_min, 1.0)
     plt.xticks(np.arange(min_time, max_time + 50, 200), fontsize=12, fontweight="semibold")
     plt.yticks(np.arange(y_min, 1.01, 0.1), fontsize=12, fontweight="semibold")
 
-    plt.xlabel("Arrival time [s]", fontsize=14, fontweight="semibold")
-    plt.ylabel("CDF", fontsize=14, fontweight="semibold")
-    plt.title(f"CDF comparison ({base_style['label']})", fontsize=14, fontweight="semibold")
-    plt.legend(fontsize=12)
+    # plt.xlabel("Arrival time [s]", fontsize=14, fontweight="semibold")
+    # plt.ylabel("CDF", fontsize=14, fontweight="semibold")
+
+    early_rate_part = ", ".join(early_rates)
 
     plt.savefig(save_path, bbox_inches="tight")
     print(f"✅ Saved figure as: {save_path}")
@@ -95,20 +104,31 @@ def plot_compare_cdfs(
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python3 compare_cdf_plot.py <scenarioID1> <scenarioID2> ... <early_rate>")
-        print("Example: python3 compare_cdf_plot.py scenario1 scenario2 0.1")
-        print("Example: python3 compare_cdf_plot.py 1 2 3 0.5")
+        print("Usage: python3 compare_cdf_plot.py <scenarioID1> <scenarioID2> ... <early_rate1> <early_rate2> ...")
+        print("Example: python3 compare_cdf_plot.py scenario1 scenario2 0.5 nosystem")
+        print("Example: python3 compare_cdf_plot.py 1 2 3 0.1 0.5")
         sys.exit(1)
 
-    raw_args = sys.argv[1:]
-    early_rate = raw_args[-1].strip()
-    scenario_ids = [normalize_scenario_arg(arg) for arg in raw_args[:-1]]
+    raw_args = [arg.strip() for arg in sys.argv[1:]]
+
+    early_rates = [arg for arg in raw_args if arg in EARLY_RATE_KEYS]
+    scenario_args = [arg for arg in raw_args if arg not in EARLY_RATE_KEYS]
+
+    if not scenario_args:
+        raise ValueError("scenarioID が指定されていません。")
+
+    if not early_rates:
+        raise ValueError(
+            f"early_rate が指定されていません。指定可能: {sorted(EARLY_RATE_KEYS)}"
+        )
+
+    scenario_ids = [normalize_scenario_arg(arg) for arg in scenario_args]
 
     base_dir = Path(__file__).resolve().parent
     output_dir = base_dir / "compared"
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    scenario_to_values = {}
+    scenario_to_rate_values = {}
 
     for scenario_id in scenario_ids:
         scenario_dir = base_dir / scenario_id
@@ -116,26 +136,31 @@ def main():
 
         cdf_source = load_cdf_source(json_path)
 
-        if early_rate not in cdf_source:
-            raise KeyError(
-                f"early_rate='{early_rate}' not found in cdf_source of {json_path}. "
-                f"available keys = {list(cdf_source.keys())}"
-            )
+        scenario_to_rate_values[scenario_id] = {}
 
-        values = cdf_source[early_rate]
+        for early_rate in early_rates:
+            if early_rate not in cdf_source:
+                raise KeyError(
+                    f"early_rate='{early_rate}' not found in cdf_source of {json_path}. "
+                    f"available keys = {list(cdf_source.keys())}"
+                )
 
-        if not isinstance(values, list):
-            raise TypeError(
-                f"cdf_source['{early_rate}'] in {json_path} must be a list, "
-                f"but got {type(values).__name__}"
-            )
+            values = cdf_source[early_rate]
 
-        scenario_to_values[scenario_id] = values
+            if not isinstance(values, list):
+                raise TypeError(
+                    f"cdf_source['{early_rate}'] in {json_path} must be a list, "
+                    f"but got {type(values).__name__}"
+                )
+
+            scenario_to_rate_values[scenario_id][early_rate] = values
 
     scenario_part = "_vs_".join(scenario_ids)
-    output_path = output_dir / f"cdf_compare_{scenario_part}_early_rate_{early_rate}.pdf"
+    early_rate_part = "_".join(early_rates)
 
-    plot_compare_cdfs(scenario_to_values, early_rate, output_path)
+    output_path = output_dir / f"cdf_compare_{scenario_part}_early_rate_{early_rate_part}.pdf"
+
+    plot_compare_cdfs(scenario_to_rate_values, early_rates, output_path)
 
     print(f"[INFO] CDF comparison plot saved: {output_path}")
 
