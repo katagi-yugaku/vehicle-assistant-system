@@ -11,29 +11,47 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+import traci
 
 if TYPE_CHECKING:
     from evacsim.agents.Agent import Agent
+    from evacsim.agents.VehicleInfo import VehicleInfo
 
 from evacsim.sim.routing_distance import distance_each_vehIDs
+from evacsim.sim.traci_cache import get_vehicle_position_cached
+from evacsim.utils.lookup import (
+    find_shelter_by_edgeID_connect_target_shelter,
+    find_shelterID_by_edgeID_by_shelterID,
+    find_agent_by_vehID
+)
+from evacsim.sim.neighbors import (
+    get_around_vehIDs,
+)
 
 def two_stage_sigmoid(value: float):
     """
-    二段階上昇型シグモイド（ストレス上昇モデル向け）
+    二段階上昇型シグモイド（基礎モチベーション）
 
-    - 第1段階: x=150 を中心にゆるやかに上昇（予兆・軽い緊張）
-    - 第2段階: x=350 を中心に急激に上昇（危険察知による急上昇）
+    - 第1段階: 渋滞遭遇後，ゆるやかに危機感が上昇
+    - 第2段階: 平均渋滞滞在時間付近で急激に上昇
 
-    既存 utilities.py の挙動を維持する。
+    目標:
+      B(368.60) ≒ 4000
+      B_max = 5000
     """
-    k1 = 0.015   # 緩やかな傾き
-    x01 = 200    # 軽い上昇の中心
+    # k1 = 0.012   # 緩やかな上昇
+    # x01 = 280    # 第1段階の中心時刻 [sec.]
 
-    k2 = 0.045   # 急な立ち上がり
-    x02 = 330    # 急上昇の中心
+    # k2 = 0.035   # 急激な上昇
+    # x02 = 320    # 第2段階の中心時刻 [sec.]
+    k1 = 0.011
+    x01 = 310
+    k2 = 0.032
+    x02 = 350
+    ymax = 5000
 
     ymin = 0
-    ymax = 1000
+    ymax = 5000
 
     s1 = 1 / (1 + np.exp(-k1 * (value - x01)))
     s2 = 1 / (1 + np.exp(-k2 * (value - x02)))
@@ -43,7 +61,7 @@ def two_stage_sigmoid(value: float):
 
 
 def generate_motivation_curve(
-    max_time: int = 450,
+    max_time: int = 900,
     step: int = 1,
 ) -> dict[float, float]:
     """
@@ -76,7 +94,7 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
 def generate_info_activation_dict(
     rho: float,
     delta: float,
-    max_time: int = 450,
+    max_time: int = 900,
     step: int = 1,
 ) -> dict[float, float]:
     """
@@ -105,6 +123,89 @@ def generate_info_activation_dict(
         activation_dict[float(x)] = phi
 
     return activation_dict
+
+
+def multiply_time_dict(
+    value_by_time_dict: dict[float, float],
+    coefficient: float,
+) -> dict[float, float]:
+    """
+    時刻 -> 値 の dict に対して，全 value に係数を掛けた dict を返す。
+    """
+    return {
+        time: value * coefficient
+        for time, value in value_by_time_dict.items()
+    }
+
+
+def set_motivation_curve_dicts_to_agents(agent_list, rho, delta):
+    """
+    agent_list の各 Agent に，
+    base motivation と，正常性バイアス値を掛けた情報由来 motivation 曲線を設定する。
+
+    注意:
+    - generate_info_activation_dict() の返り値は 0〜1 の活性化度。
+    - Agent に保存する時点で normalcy_value_about_* を掛ける。
+    - そのため，保存後の dict は「活性化度」ではなく「motivation 値」として扱う。
+    """
+
+    base_motivation_value_for_elapsed_time_dict = generate_motivation_curve(
+        max_time=900,
+        step=1,
+    )
+
+    tsunami_activation_by_elapsed_time = generate_info_activation_dict(
+        rho=rho["tsu"],
+        delta=delta["tsu"],
+        max_time=900,
+        step=1,
+    )
+
+    jam_activation_by_elapsed_time = generate_info_activation_dict(
+        rho=rho["jam"],
+        delta=delta["jam"],
+        max_time=900,
+        step=1,
+    )
+
+    full_activation_by_elapsed_time = generate_info_activation_dict(
+        rho=rho["full"],
+        delta=delta["full"],
+        max_time=900,
+        step=1,
+    )
+
+    for agent in agent_list:
+        agent.set_base_motivation_value_by_elapsed_time_dict(
+            base_motivation_value_for_elapsed_time_dict
+        )
+
+        tsunami_motivation_by_elapsed_time = multiply_time_dict(
+            tsunami_activation_by_elapsed_time,
+            agent.get_normalcy_value_about_tsunami_precursor_info(),
+        )
+
+        jam_motivation_by_elapsed_time = multiply_time_dict(
+            jam_activation_by_elapsed_time,
+            agent.get_normalcy_value_about_route_congestion_info(),
+        )
+
+        full_motivation_by_elapsed_time = multiply_time_dict(
+            full_activation_by_elapsed_time,
+            agent.get_normalcy_value_about_shelter_full_info(),
+        )
+
+        agent.set_tsunami_precursor_normalcy_value_by_elapsed_time_dict(
+            tsunami_motivation_by_elapsed_time
+        )
+
+        agent.set_route_congestion_normalcy_value_by_elapsed_time_dict(
+            jam_motivation_by_elapsed_time
+        )
+
+        agent.set_shelter_full_normalcy_value_by_elapsed_time_dict(
+            full_motivation_by_elapsed_time
+        )
 
 
 def re_calculate_motivation_value(
@@ -167,8 +268,11 @@ def get_value_from_time_dict(
 def calculate_motivation_for_evacuation_action(
     agent: Agent,
     agent_list: list[Agent],
+    vehInfo: VehicleInfo,
     current_time: float,
     action: str,
+    agent_by_vehID_dict: dict,
+    custome_edge_list: list,
     debug: bool = False,
 ) -> float:
     """
@@ -181,16 +285,30 @@ def calculate_motivation_for_evacuation_action(
         agent.get_base_motivation_value_by_elapsed_time_dict()
     )
 
-    congestion_duration = agent.get_congestion_duration()
+    encounted_congestion_time = agent.get_encounted_congestion_time()
+    base_value = 0.0
     base_value = get_value_from_time_dict(
         value_by_time_dict=base_motivation_value_by_elapsed_time,
-        elapsed_time=congestion_duration,
+        elapsed_time=current_time-encounted_congestion_time,
         default=0.0,
     )
     # 情報取得による増加
-    info_motivation_value = calculate_motivation_for_obtained_info(agent=agent, current_time=current_time, action=action)
+    info_motivation_value = 0.0
+    if vehInfo.get_vehicle_comm_enabled_flag():
+        info_motivation_value = calculate_motivation_for_obtained_info(agent=agent, current_time=current_time, action=action)
+
+    majority_motivation_value = 0.0
     # 同調性バイアスによる増減
-    majority_motivation_value = calculate_motivation_for_majority_tunning_bias(agent=agent, vehInfo=0.0, agent_list=agent_list, candidate_action=action)
+    majority_motivation_value = calculate_motivation_for_majority_tunning_bias(
+        agent=agent, 
+        vehInfo=vehInfo, 
+        agent_list=agent_list, 
+        candidate_action=action, 
+        agent_by_vehID_dict=agent_by_vehID_dict, 
+        custome_edge_list=custome_edge_list,)
+
+    if base_value + majority_motivation_value < 0:
+        majority_motivation_value = 0.0
 
 
     motivation = base_value + info_motivation_value + majority_motivation_value
@@ -201,7 +319,6 @@ def calculate_motivation_for_evacuation_action(
             f"vehID={agent.get_vehID()}, "
             f"action={action}, "
             f"current_time={current_time}, "
-            f"congestion_duration={congestion_duration}, "
             f"base={base_value}, "
             f"motivation={motivation}"
         )
@@ -214,7 +331,8 @@ def calculate_motivation_for_obtained_info(
     current_time: float,
     action: str,
 ) -> float:
-    info_motivation_value = 0.0
+    Info_motivation_value = 0.0
+    encounted_congestion_time = agent.get_encounted_congestion_time()
     # 満杯情報に対するモチベーション増加のシグモイド関数
     shelter_full_activation_value_by_elapsed_time: dict = (
         agent.get_shelter_full_normalcy_value_by_elapsed_time_dict()
@@ -236,82 +354,96 @@ def calculate_motivation_for_obtained_info(
     # その情報の取得時間
     route_congestion_info_obtained_time = agent.get_route_congestion_info_obtained_time()
 
-    if action == "rc":
-        shelter_full_activation_value = (
-                                            agent.get_normalcy_value_about_shelter_full_info()
-                                            * get_value_from_time_dict(
-                                                value_by_time_dict=shelter_full_activation_value_by_elapsed_time,
-                                                elapsed_time=current_time - shelter_full_info_obtained_time,
-                                                default=0.0,
-                                            )
-                                        )
-        route_congestion_activation_value = (
-            agent.get_normalcy_value_about_route_congestion_info()
-            * get_value_from_time_dict(
-                value_by_time_dict=route_congestion_normalcy_value_by_elapsed_time,
-                elapsed_time=current_time - route_congestion_info_obtained_time,
-                default=0.0,
-            )
-        )
-        Info_motivation_vale = shelter_full_activation_value + route_congestion_activation_value
+    if encounted_congestion_time > shelter_full_info_obtained_time:
+        shelter_full_info_obtained_time = encounted_congestion_time
+        agent.set_shelter_full_info_obtained_time(shelter_full_info_obtained_time)
+    if encounted_congestion_time > tsunami_precursor_info_obtained_time:
+        tsunami_precursor_info_obtained_time = encounted_congestion_time
+        agent.set_tsunami_info_obtained_time(tsunami_precursor_info_obtained_time)
+    if encounted_congestion_time > route_congestion_info_obtained_time:
+        route_congestion_info_obtained_time = encounted_congestion_time
+        agent.set_route_congestion_info_obtained_time(route_congestion_info_obtained_time)
 
-    elif action == "ww":
-        route_congestion_activation_value = (
-            agent.get_normalcy_value_about_route_congestion_info()
-            * get_value_from_time_dict(
-                value_by_time_dict=route_congestion_normalcy_value_by_elapsed_time,
-                elapsed_time=current_time - route_congestion_info_obtained_time,
+    if action not in {"rc", "ww", "va"}:
+        raise ValueError(f"Invalid action: {action}. Expected one of 'rc', 'ww', 'va'.")
+    info_motivation_value = 0.0
+    if action == "rc":
+        if agent.get_route_congestion_info_obtained_flg():
+            info_motivation_value += get_value_from_time_dict(
+                route_congestion_normalcy_value_by_elapsed_time,
+                current_time - route_congestion_info_obtained_time,
                 default=0.0,
             )
-        )
-        tsunami_precursor_activation_value = (
-            agent.get_normalcy_value_about_tsunami_precursor_info()
-            * get_value_from_time_dict(
-                value_by_time_dict=tsunami_precursor_normalcy_value_by_elapsed_time,
-                elapsed_time=current_time - tsunami_precursor_info_obtained_time,
+        if agent.get_shelter_full_info_obtained_flg():
+            info_motivation_value += get_value_from_time_dict(
+                shelter_full_activation_value_by_elapsed_time,
+                current_time - shelter_full_info_obtained_time,
                 default=0.0,
             )
-        )
-        Info_motivation_vale = shelter_full_activation_value + tsunami_precursor_activation_value
+
+
+    if action == "ww":
+        if agent.get_tsunami_info_obtained_flg():
+            info_motivation_value += get_value_from_time_dict(
+                    value_by_time_dict=tsunami_precursor_normalcy_value_by_elapsed_time,
+                    elapsed_time=current_time - tsunami_precursor_info_obtained_time,
+                    default=0.0,
+                )
+            
+        if agent.get_route_congestion_info_obtained_flg():
+            info_motivation_value += get_value_from_time_dict(
+                    value_by_time_dict=route_congestion_normalcy_value_by_elapsed_time,
+                    elapsed_time=current_time - route_congestion_info_obtained_time,
+                    default=0.0,
+                )
     
-    elif action == "va":
-        shelter_full_activation_value = (
-        agent.get_normalcy_value_about_shelter_full_info()
-        * get_value_from_time_dict(
-            value_by_time_dict=shelter_full_activation_value_by_elapsed_time,
-            elapsed_time=shelter_full_info_obtained_time,
-            default=0.0,
-        )
-        )
-        tsunami_precursor_activation_value = (
-            agent.get_normalcy_value_about_tsunami_precursor_info()
-            * get_value_from_time_dict(
-                value_by_time_dict=tsunami_precursor_normalcy_value_by_elapsed_time,
-                elapsed_time=current_time - tsunami_precursor_info_obtained_time,
+    if action == "va":
+        if agent.get_shelter_full_info_obtained_flg(): 
+            info_motivation_value += get_value_from_time_dict(
+                value_by_time_dict=shelter_full_activation_value_by_elapsed_time,
+                elapsed_time=current_time - shelter_full_info_obtained_time,
                 default=0.0,
             )
-        )
-        Info_motivation_vale = shelter_full_activation_value + tsunami_precursor_activation_value
-    return float(Info_motivation_vale)
+
+        if agent.get_tsunami_info_obtained_flg():
+            info_motivation_value += get_value_from_time_dict(
+                        value_by_time_dict=tsunami_precursor_normalcy_value_by_elapsed_time,
+                        elapsed_time=current_time - tsunami_precursor_info_obtained_time,
+                        default=0.0,
+                    )
+    return float(info_motivation_value)
 
 
 def calculate_motivation_for_majority_tunning_bias(
     agent: Agent,
-    vehInfo: float,
+    vehInfo: VehicleInfo,
     agent_list: list[Agent],
     candidate_action: str,
+    agent_by_vehID_dict: dict,
+    custome_edge_list: list,
 ) -> float:
-    same_action_count, total_count = count_same_action_drivers(agent=agent, vehInfo=vehInfo, agent_list=agent_list, candidate_action=candidate_action)
-    if same_action_count == 0 or total_count == 0:
-        return float(-1 * agent.get_majority_value_decrease())
+    same_action_count, total_count = count_same_action_drivers(
+            agent=agent, vehInfo=vehInfo, 
+            agent_list=agent_list, 
+            candidate_action=candidate_action, 
+            agent_by_vehID_dict=agent_by_vehID_dict,
+            custome_edge_list=custome_edge_list)
+    if vehInfo.get_vehicle_comm_enabled_flag():
+        if total_count == 0:
+            return 0.0
+        if same_action_count == 0:
+            return -agent.get_majority_value_decrease()
+        return same_action_count * agent.get_majority_value_increase()
     else:
         return same_action_count * agent.get_majority_value_increase()
 
 def count_same_action_drivers(
     agent: Agent,
-    vehInfo: float,
+    vehInfo: VehicleInfo,
     agent_list: list[Agent],
     candidate_action: str,
+    agent_by_vehID_dict: dict,
+    custome_edge_list: list,
 ):
     """
     同調性バイアスの計算
@@ -323,14 +455,38 @@ def count_same_action_drivers(
     -------
     
     """
+    step_cache = None
+    around_vehIDs: list = get_around_vehIDs(
+                    target_vehID=agent.get_vehID(),
+                    custome_edge_list=custome_edge_list,
+                    step_cache=step_cache,
+                )
+    active_vehID_set = set(around_vehIDs)  
     # agent_listから、周囲の中で、同じ行動をとっている　かつ、周囲の50m以内の車両の数を数える
     same_action_count = 0
     total_count = 0
-    for other_agent in agent_list:
-        if other_agent == agent:
+    if agent.get_vehID() not in active_vehID_set:
+        print(f"Warning:  motivation package Agent's vehID {agent.get_vehID()} is not in active_vehID_set. This agent may have been removed from the simulation.")
+        return 0, 0
+
+    target_position = get_vehicle_position_cached(
+            agent.get_vehID(),
+            step_cache=step_cache,
+        )
+    for vehID in around_vehIDs:
+        if vehID == agent.get_vehID():
+            continue
+        other_agent = find_agent_by_vehID(vehID=vehID, agent_list=agent_list, agent_by_vehID_dict=agent_by_vehID_dict)
+        if other_agent == agent or other_agent.get_shelter_changed_flg() or other_agent.get_vehicle_abandoned_flg():
+            continue
+        if other_agent is None:
             continue
 
-        distance = distance_each_vehIDs(agent.get_vehID(), other_agent.get_vehID())
+        other_agent_position = get_vehicle_position_cached(
+            other_agent.get_vehID(),
+            step_cache=step_cache,
+        )
+        distance = distance_each_vehIDs(target_position, other_agent_position)
         if distance <= 50:
             total_count += 1
             if other_agent.get_agent_action_name() == candidate_action:

@@ -3,42 +3,97 @@ num_simulations = 50
 comm_range = 200
 num_vehicles = 400
 vehicle_interval = 5
-active_route_change_threshold_center = 240.0
-active_route_change_threshold_spread = 60.0
-cautious_route_change_threshold_center = 360.0
-cautious_route_change_threshold_spread = 60.0
-normalcy_value_about_route_change_center = 100.0
-normalcy_value_about_route_change_spread = 0.0
-active_wrong_way_driving_threshold_center = 1000.0
-active_wrong_way_driving_threshold_spread = 100.0
-cautious_wrong_way_driving_threshold_center = 950.0
-cautious_wrong_way_driving_threshold_spread = 150.0
-min_motivation_start = 500
-min_motivation_end = 700
-active_normalcy_value_about_tsunami_precursor_info_center = 4000.0
-active_normalcy_value_about_tsunami_precursor_info_spread = 800.0
-cautious_normalcy_value_about_tsunami_precursor_info_center = 6000.0
-cautious_normalcy_value_about_tsunami_precursor_info_spread = 800.0
-active_normalcy_value_about_route_congestion_info_center = 100.0
-active_normalcy_value_about_route_congestion_info_spread = 0.0
-cautious_normalcy_value_about_route_congestion_info_center = 100.0
-cautious_normalcy_value_about_route_congestion_info_spread = 0.0
-active_normalcy_value_about_shelter_full_info_center = 100.0
-active_normalcy_value_about_shelter_full_info_spread = 0.0
-cautious_normalcy_value_about_shelter_full_info_center = 100.0
-cautious_normalcy_value_about_shelter_full_info_spread = 0.0
-active_majority_increase_value_center = 2000.0
-active_majority_increase_value_spread = 500.0
-cautious_majority_increase_value_center = 2000.0
-cautious_majority_increase_value_spread = 500.0
-active_majority_decrease_value_center = 100.0
-active_majority_decrease_value_spread = 0.0
-cautious_majority_decrease_value_center = 100.0
-cautious_majority_decrease_value_spread = 0.0
+
+# ==================================================
+# 経路変更閾値
+# B(368.60) ≒ 4000 のため，
+# active は平均渋滞滞在時間より少し前，
+# cautious は平均渋滞滞在時間付近で発生し得る値にする
+# ==================================================
+active_route_change_threshold_center = 3000.0
+active_route_change_threshold_spread = 400.0
+cautious_route_change_threshold_center = 3600.0
+cautious_route_change_threshold_spread = 400.0
+
+# ==================================================
+# 経路変更に対する正常性バイアス
+# 自発的な経路変更を妨げすぎない程度にする
+# ==================================================
+normalcy_value_about_route_change_center = 300.0
+normalcy_value_about_route_change_spread = 100.0
+
+# ==================================================
+# 逆走・車両乗り捨て閾値
+# 現状実装では vehicle_abandoned_threshold も
+# この値から生成されるため，共通閾値として扱う
+# ==================================================
+active_wrong_way_driving_threshold_center = 3600.0
+active_wrong_way_driving_threshold_spread = 500.0
+cautious_wrong_way_driving_threshold_center = 4200.0
+cautious_wrong_way_driving_threshold_spread = 500.0
+
+# ==================================================
+# 逆走行為の最小動機付け値
+# 閾値よりやや低く設定し，時間経過だけでも到達可能にする
+# ==================================================
+min_motivation_start = 3200
+min_motivation_end = 3800
+
+# ==================================================
+# 津波接近情報に対する正常性バイアス
+# 自発的な車両乗り捨てを起こしたいので，
+# 4000 / 6000 のような強すぎる抑制は避ける
+# ==================================================
+active_normalcy_value_about_tsunami_precursor_info_center = 300.0
+active_normalcy_value_about_tsunami_precursor_info_spread = 100.0
+cautious_normalcy_value_about_tsunami_precursor_info_center = 600.0
+cautious_normalcy_value_about_tsunami_precursor_info_spread = 150.0
+
+# ==================================================
+# 経路混雑情報に対する正常性バイアス
+# 自発的な経路変更を許すため，小さめにする
+# ==================================================
+active_normalcy_value_about_route_congestion_info_center = 200.0
+active_normalcy_value_about_route_congestion_info_spread = 80.0
+cautious_normalcy_value_about_route_congestion_info_center = 400.0
+cautious_normalcy_value_about_route_congestion_info_spread = 100.0
+
+# ==================================================
+# 避難地満杯情報に対する正常性バイアス
+# 満杯情報があっても行動を抑制しすぎない程度
+# ==================================================
+active_normalcy_value_about_shelter_full_info_center = 300.0
+active_normalcy_value_about_shelter_full_info_spread = 100.0
+cautious_normalcy_value_about_shelter_full_info_center = 600.0
+cautious_normalcy_value_about_shelter_full_info_spread = 150.0
+
+# ==================================================
+# 周囲車両による同調性バイアス 増加
+# 自発的行動を主に見たいので，強すぎない値にする
+# ==================================================
+active_majority_increase_value_center = 1200.0
+active_majority_increase_value_spread = 300.0
+cautious_majority_increase_value_center = 1500.0
+cautious_majority_increase_value_spread = 350.0
+
+# ==================================================
+# 周囲車両による同調性バイアス 減少
+# 行動を完全に抑え込まない程度
+# ==================================================
+active_majority_decrease_value_center = 200.0
+active_majority_decrease_value_spread = 80.0
+cautious_majority_decrease_value_center = 300.0
+cautious_majority_decrease_value_spread = 100.0
+
+# ==================================================
+# 避難所混雑率閾値
+# ここは現状維持
+# ==================================================
 active_shelter_occupancy_rate_threshold_start = 0.65
 active_shelter_occupancy_rate_threshold_end = 0.8
 cautious_shelter_occupancy_rate_threshold_start = 0.8
 cautious_shelter_occupancy_rate_threshold_end = 0.95
+
 shelter_capacity_threshold = 1.0
 tsunami_sign_start_time = 600
 tsunami_sign_end_time = 800

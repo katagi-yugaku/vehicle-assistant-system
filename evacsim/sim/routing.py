@@ -983,8 +983,8 @@ def is_route_time_difference_exceeding_threshold(current_edgeID, agent_by_target
                                                                                                             custome_edge_list=custome_edge_list,
                                                                                                             debug=False
                                                                                                             )
-    if congestion_flg:
-        print(f"base_reroute_start_edgeID: {base_reroute_start_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}")
+    # if congestion_flg:
+        # print(f"base_reroute_start_edgeID: {base_reroute_start_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}")
     return congestion_flg
 
 

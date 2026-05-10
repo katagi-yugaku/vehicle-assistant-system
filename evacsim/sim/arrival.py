@@ -79,7 +79,6 @@ def handle_arrival(
 
 def handle_arrival_for_pedestrian(
     pedestrianID: str,
-    current_vehID: str,
     vehInfo_by_current_vehID: VehicleInfo,
     agent_by_current_vehID: Agent,
     shelter_for_current_vehID: Shelter,
@@ -107,15 +106,6 @@ def handle_arrival_for_pedestrian(
     shelter: Shelter = find_shelter_by_edgeID_connect_target_shelter(
         agent_by_current_vehID.get_near_edgeID_by_target_shelter(),
         shelter_list,
-    )
-
-    departure_time = traci.vehicle.getDeparture(current_vehID) + 100
-
-    # TODO 徒歩避難に切り替えた避難も同様に避難時間を記録するようにするのか？
-    shelter.update_evac_time_default_dict(
-        vehID=pedestrianID,
-        route=traci.vehicle.getRoute(current_vehID),
-        evac_time=vehInfo_by_current_vehID.get_evac_end_time() - departure_time,
     )
 
     # 到着フラグと駐車フラグを更新

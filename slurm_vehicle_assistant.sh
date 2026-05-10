@@ -14,7 +14,7 @@ EARLY_RATE="${2:?early_rate is required}"
 V2V_RATE="${3:?v2v_rate is required}"
 RUN_ID="${4:-0}"
 
-CONFIG="scenarios/its105/configs/config_scenario_${SCENARIO_ID}.toml"
+CONFIG="scenarios/dicomo2026/configs/config_scenario_${SCENARIO_ID}.toml"
 
 mkdir -p logs
 
@@ -30,7 +30,7 @@ echo "start     : $(date)"
 
 export RUN_ID
 
-python3.10 -W ignore::UserWarning -m scenarios.its105.map_one.simulation.runner_simulator \
+python3.10 -W ignore::UserWarning -m scenarios.dicomo2026.map_one.simulation.runner_simulator \
   --nogui "${CONFIG}" "${EARLY_RATE}" "${V2V_RATE}"
 # -W はwarning制御オプション
 # python3.10 -m scenarios.pervehicle.map_one.simulation.runner_simulator \

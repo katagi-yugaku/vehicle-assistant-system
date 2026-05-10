@@ -257,6 +257,8 @@ def generate_new_veh_based_on_route_time(
     new_shelterID: str,
     to_edgeID: str,
     color_mode: int,
+    agent_by_vehID_dict: dict,
+    vehInfo_by_vehID_dict: dict,
 ):
     """
     経路時間ベースで決定済みの from_edgeID / new_shelterID / to_edgeID に従い、
@@ -267,125 +269,91 @@ def generate_new_veh_based_on_route_time(
     if from_edgeID == "" and new_shelterID == "" and to_edgeID == "":
         return NEW_VEHICLE_COUNT
 
-    # 経由地点を取得する
-    via_edgeIDs_with_intial_end_edge: list = list(
-        traci.simulation.findRoute(from_edgeID, to_edgeID).edges
-    )
+    via_edgeIDs_with_intial_end_edge: list = list(traci.simulation.findRoute(from_edgeID, to_edgeID).edges)
 
-    if (
-        via_edgeIDs_with_intial_end_edge is None
-        or len(via_edgeIDs_with_intial_end_edge) == 0
-    ):
-        via_edgeIDs_with_intial_end_edge: list = list(
-            traci.simulation.findRoute(
-                get_opposite_edgeID_by_edgeID(from_edgeID),
-                to_edgeID,
-            ).edges
+    if via_edgeIDs_with_intial_end_edge is None or len(via_edgeIDs_with_intial_end_edge) == 0:
+        via_edgeIDs_with_intial_end_edge = list(
+            traci.simulation.findRoute(get_opposite_edgeID_by_edgeID(from_edgeID), to_edgeID).edges
         )
 
-        if (
-            via_edgeIDs_with_intial_end_edge is None
-            or len(via_edgeIDs_with_intial_end_edge) == 0
-        ):
+        if via_edgeIDs_with_intial_end_edge is None or len(via_edgeIDs_with_intial_end_edge) == 0:
             print(f"避難経路が存在しません from: {from_edgeID} to: {to_edgeID}")
             return NEW_VEHICLE_COUNT
 
-    # target_vehIDから数字をとる
     vehID_num = target_vehID.split("_")[3]
-
-    # 新しい車両IDを生成と出発時間を設定
-    new_veh_ID: str = "{}_{}_{}_{}".format(
-        "newveh",
-        new_shelterID,
-        vehID_num,
-        NEW_VEHICLE_COUNT,
-    )
-
+    new_veh_ID: str = "{}_{}_{}_{}".format("newveh", new_shelterID, vehID_num, NEW_VEHICLE_COUNT)
     deparet_time: float = traci.simulation.getTime()
 
-    # 現在のagentを無効にする
     agent_by_target_vehID.set_shelter_changed_flg(True)
-
-    # 候補地を更新
-    # TODO 満杯情報を受け取った後は、当該避難地を候補地から削除
     updated_candidate_shelter = agent_by_target_vehID.get_candidate_shelter()
+    old_vehID = agent_by_target_vehID.get_vehID()
 
-    # 元の vehID を削除し、新しい Agent を追加
     agent: Agent = Agent(
         vehID=new_veh_ID,
         target_shelter=new_shelterID,
-        tunning_threshold=copy.deepcopy(
-            agent_by_target_vehID.get_tunning_threshold()
-        ),
-        route_change_threshold=copy.deepcopy(
-            agent_by_target_vehID.get_route_change_threshold()
-        ),
-        lane_change_init_threshold=copy.deepcopy(
-            agent_by_target_vehID.get_lane_change_decision_threshold()
-        ),
-        normalcy_motivation_increase=copy.deepcopy(
-            agent_by_target_vehID.get_motivation_increase_from_info_receive()
-        ),
-        motivation_decrease_due_to_inactive_neighbors=copy.deepcopy(
-            agent_by_target_vehID.get_motivation_decrease_due_to_inactive_neighbors()
-        ),
-        motivation_increase_due_to_following_neighbors=copy.deepcopy(
-            agent_by_target_vehID.get_motivation_increase_due_to_following_neighbors()
-        ),
-        lane_minimum_motivation_value=copy.deepcopy(
-            agent_by_target_vehID.get_minimum_motivation_value()
-        ),
-        shelter_occupancy_rate_threshold=copy.deepcopy(
-            agent_by_target_vehID.get_shelter_occupancy_rate_threshold()
-        ),
-        vehicle_abandoned_threshold=copy.deepcopy(
-            agent_by_target_vehID.get_vehicle_abandoned_threshold()
-        ),
-        normalcy_value_about_vehicle_abandonment=copy.deepcopy(
-            agent_by_target_vehID.get_normalcy_value_about_vehicle_abandonment()
-        ),
-        majority_value_about_vehicle_abandonment=copy.deepcopy(
-            agent_by_target_vehID.get_majority_value_about_vehicle_abandonment()
-        ),
+        route_change_threshold=copy.deepcopy(agent_by_target_vehID.get_route_change_threshold()),
+        wrong_way_driving_threshold=copy.deepcopy(agent_by_target_vehID.get_wrong_way_driving_threshold()),
+        wrong_way_driving_min_motivation_value=copy.deepcopy(agent_by_target_vehID.get_wrong_way_driving_min_motivation_value()),
+        vehicle_abandoned_threshold=copy.deepcopy(agent_by_target_vehID.get_vehicle_abandoned_threshold()),
+        normalcy_value_about_tsunami_precursor_info=copy.deepcopy(agent_by_target_vehID.get_normalcy_value_about_tsunami_precursor_info()),
+        normalcy_value_about_route_congestion_info=copy.deepcopy(agent_by_target_vehID.get_normalcy_value_about_route_congestion_info()),
+        normalcy_value_about_shelter_full_info=copy.deepcopy(agent_by_target_vehID.get_normalcy_value_about_shelter_full_info()),
+        majority_value_increase=copy.deepcopy(agent_by_target_vehID.get_majority_value_increase()),
+        majority_value_decrease=copy.deepcopy(agent_by_target_vehID.get_majority_value_decrease()),
+        shelter_occupancy_rate_threshold=copy.deepcopy(agent_by_target_vehID.get_shelter_occupancy_rate_threshold()),
     )
 
-    agent.set_near_edgeID_by_target_shelter(
-        copy.deepcopy(agent_by_target_vehID.get_near_edgeID_by_target_shelter())
-    )
-    agent.set_candidate_edge_by_shelterID(updated_candidate_shelter)
-    agent.init_set_candidate_near_shelter(
-        shelter_edge_by_IDs=updated_candidate_shelter
-    )
-
-    agent.set_x_elapsed_time_for_lane_change_list(
-        copy.deepcopy(agent_by_target_vehID.get_x_elapsed_time_for_lane_change_list())
-    )
-    # 既存 utilities.py では y_motivation_value_for_lane_change_list はコピーしていない
-    agent.set_lane_change_xy_dict(
-        copy.deepcopy(agent_by_target_vehID.get_lane_change_xy_dict())
-    )
-
-    agent.set_motivation_decrease_due_to_inactive_neighbors(
-        copy.deepcopy(
-            agent_by_target_vehID.get_motivation_decrease_due_to_inactive_neighbors()
-        )
-    )
-    agent.set_motivation_increase_due_to_following_neighbors(
-        copy.deepcopy(
-            agent_by_target_vehID.get_motivation_increase_due_to_following_neighbors()
-        )
-    )
-    agent.set_calculated_motivation_value(
-        copy.deepcopy(agent_by_target_vehID.get_calculated_motivation_value())
-    )
     agent.set_near_edgeID_by_target_shelter(to_edgeID)
-    agent.set_shelter_full_flg(
-        copy.deepcopy(agent_by_target_vehID.get_shelter_full_flg())
-    )
+    agent.set_candidate_edge_by_shelterID(copy.deepcopy(updated_candidate_shelter))
+    agent.init_set_candidate_near_shelter(shelter_edge_by_IDs=copy.deepcopy(updated_candidate_shelter))
+    agent.set_shelter_occupancy_rate_dict(copy.deepcopy(agent_by_target_vehID.get_shelter_occupancy_rate_dict()))
 
+    agent.set_created_time(copy.deepcopy(agent_by_target_vehID.get_created_time()))
+    agent.set_created_time_flg(copy.deepcopy(agent_by_target_vehID.get_created_time_flg()))
+    agent.set_congestion_duration(copy.deepcopy(agent_by_target_vehID.get_congestion_duration()))
+    agent.set_encounted_congestion_time(copy.deepcopy(agent_by_target_vehID.get_encounted_congestion_time()))
+    agent.set_encounted_congestion_flg(copy.deepcopy(agent_by_target_vehID.get_encounted_congestion_flg()))
+
+    agent.set_obtain_info_time(copy.deepcopy(agent_by_target_vehID.get_obtain_info_time()))
+    agent.set_tsunami_info_obtained_time(copy.deepcopy(agent_by_target_vehID.get_tsunami_info_obtained_time()))
+    agent.set_route_congestion_info_obtained_time(copy.deepcopy(agent_by_target_vehID.get_route_congestion_info_obtained_time()))
+    agent.set_shelter_full_info_obtained_time(copy.deepcopy(agent_by_target_vehID.get_shelter_full_info_obtained_time()))
+    agent.set_tsunami_info_obtained_flg(copy.deepcopy(agent_by_target_vehID.get_tsunami_info_obtained_flg()))
+    agent.set_route_congestion_info_obtained_flg(copy.deepcopy(agent_by_target_vehID.get_route_congestion_info_obtained_flg()))
+    agent.set_shelter_full_info_obtained_flg(copy.deepcopy(agent_by_target_vehID.get_shelter_full_info_obtained_flg()))
+
+    agent.set_base_motivation_value_by_elapsed_time_dict(copy.deepcopy(agent_by_target_vehID.get_base_motivation_value_by_elapsed_time_dict()))
+    agent.set_tsunami_precursor_normalcy_value_by_elapsed_time_dict(copy.deepcopy(agent_by_target_vehID.get_tsunami_precursor_normalcy_value_by_elapsed_time_dict()))
+    agent.set_route_congestion_normalcy_value_by_elapsed_time_dict(copy.deepcopy(agent_by_target_vehID.get_route_congestion_normalcy_value_by_elapsed_time_dict()))
+    agent.set_shelter_full_normalcy_value_by_elapsed_time_dict(copy.deepcopy(agent_by_target_vehID.get_shelter_full_normalcy_value_by_elapsed_time_dict()))
+    agent.set_calculated_motivation_value(copy.deepcopy(agent_by_target_vehID.get_calculated_motivation_value()))
+
+    agent.set_x_elapsed_time_for_lane_change_list(copy.deepcopy(agent_by_target_vehID.get_x_elapsed_time_for_lane_change_list()))
+    agent.set_lane_change_xy_dict(copy.deepcopy(agent_by_target_vehID.get_lane_change_xy_dict()))
+    agent.set_normalcy_lane_change_motivation_flg(copy.deepcopy(agent_by_target_vehID.get_normalcy_lane_change_motivation_flg()))
+    agent.set_lane_minimum_motivation_value_flg(copy.deepcopy(agent_by_target_vehID.get_lane_minimum_motivation_value_flg()))
+    agent.set_acceleration_flag(copy.deepcopy(agent_by_target_vehID.get_acceleration_flag()))
+
+    agent.set_shelter_flg(copy.deepcopy(agent_by_target_vehID.get_shelter_flg()))
+    agent.set_shelter_changed_flg(True)
+    agent.set_shelter_full_flg(copy.deepcopy(agent_by_target_vehID.get_shelter_full_flg()))
+    agent.set_arrival_shelter_flg(copy.deepcopy(agent_by_target_vehID.get_arrival_shelter_flg()))
+    agent.set_agent_action_name(copy.deepcopy(agent_by_target_vehID.get_agent_action_name()))
+    agent.set_evacuation_route_changed_flg(copy.deepcopy(agent_by_target_vehID.get_evacuation_route_changed_flg()))
+    agent.set_wrong_way_driving_flg(copy.deepcopy(agent_by_target_vehID.get_wrong_way_driving_flg()))
+    agent.set_vehicle_abandoned_flg(copy.deepcopy(agent_by_target_vehID.get_vehicle_abandoned_flg()))
+    agent.set_avoiding_abandoned_vehicle_flg(copy.deepcopy(agent_by_target_vehID.get_avoiding_abandoned_vehicle_flg()))
+    agent.set_failed_vehicle_abandonment_flg(copy.deepcopy(agent_by_target_vehID.get_failed_vehicle_abandonment_flg()))
+
+    agent.set_vehicle_abandoned_time(copy.deepcopy(agent_by_target_vehID.get_vehicle_abandoned_time()))
+    agent.set_target_abandoned_vehID(copy.deepcopy(agent_by_target_vehID.get_target_abandoned_vehID()))
+    agent.set_reserved_vehicle_abandonment_edgeID(copy.deepcopy(agent_by_target_vehID.get_reserved_vehicle_abandonment_edgeID()))
+
+    agent_list[:] = [a for a in agent_list if a.get_vehID() != old_vehID]
+    agent_by_vehID_dict.pop(old_vehID, None)
+    agent_by_vehID_dict[new_veh_ID] = agent
     agent_list.append(agent)
 
-    # VehicleInfo を継承して新規作成
     new_vehInfo_by_target_vehID: VehicleInfo = VehicleInfo(
         vehID=new_veh_ID,
         target_shelter=new_shelterID,
@@ -393,49 +361,46 @@ def generate_new_veh_based_on_route_time(
         create_time=deparet_time,
     )
 
-    new_vehInfo_by_target_vehID.set_shelter_congestion_info(
-        copy.deepcopy(vehInfo_by_target_vehID.get_shelter_congestion_info())
-    )
-    new_vehInfo_by_target_vehID.set_avg_evac_time_by_route_by_recive_time(
-        copy.deepcopy(
-            vehInfo_by_target_vehID.get_avg_evac_time_by_route_by_recive_time()
-        )
-    )
-    new_vehInfo_by_target_vehID.set_approach_edge_dict(
-        copy.deepcopy(vehInfo_by_target_vehID.get_approach_edge_dict())
-    )
-    new_vehInfo_by_target_vehID.set_edgeIDs_within_junction_to_shelter_dict(
-        copy.deepcopy(
-            vehInfo_by_target_vehID.get_edgeIDs_within_junction_to_shelter_dict()
-        )
-    )
+    old_tsunami_info = copy.deepcopy(vehInfo_by_target_vehID.get_tsunami_precursor_info())
 
+    if old_tsunami_info:
+        first_value = list(old_tsunami_info.values())[0]
+        new_vehInfo_by_target_vehID.set_tsunami_precursor_info({
+            new_veh_ID: first_value
+        })
+    else:
+        new_vehInfo_by_target_vehID.init_set_tsunami_precursor_info()
+
+    new_vehInfo_by_target_vehID.set_shelter_congestion_info(copy.deepcopy(vehInfo_by_target_vehID.get_shelter_congestion_info()))
+
+    if not new_vehInfo_by_target_vehID.get_tsunami_precursor_info():
+        new_vehInfo_by_target_vehID.init_set_tsunami_precursor_info()
+
+    new_vehInfo_by_target_vehID.set_avg_evac_time_by_route_by_recive_time(copy.deepcopy(vehInfo_by_target_vehID.get_avg_evac_time_by_route_by_recive_time())    )
+    new_vehInfo_by_target_vehID.set_approach_edge_dict(copy.deepcopy(vehInfo_by_target_vehID.get_approach_edge_dict()))
+    new_vehInfo_by_target_vehID.set_edgeIDs_within_junction_to_shelter_dict(copy.deepcopy(vehInfo_by_target_vehID.get_edgeIDs_within_junction_to_shelter_dict()))
+
+    vehInfo_list[:] = [
+        v for v in vehInfo_list
+        if v.get_vehID() != old_vehID
+    ]
     vehInfo_list.append(new_vehInfo_by_target_vehID)
+    vehInfo_by_vehID_dict.pop(old_vehID, None)
+    vehInfo_by_vehID_dict[new_veh_ID] = new_vehInfo_by_target_vehID
+
     vehInfo_by_target_vehID.set_agent_changed_flag(True)
 
-    # edge上の始点からどこにいるのかを取得する
     edge_position = traci.vehicle.getLanePosition(target_vehID)
     current_laneID = traci.vehicle.getLaneID(target_vehID)
     current_edgeID_len = traci.lane.getLength(current_laneID)
 
-    if current_edgeID_len > 100:
-        depart_position = current_edgeID_len - edge_position - 10
-
-    if current_edgeID_len <= 100:
-        depart_position = current_edgeID_len - edge_position - 10
+    depart_position = current_edgeID_len - edge_position - 10
 
     traci.vehicle.remove(target_vehID)
 
-    new_route_ID: str = "{}_{}_{}".format(
-        "newroute",
-        new_shelterID,
-        NEW_VEHICLE_COUNT,
-    )
+    new_route_ID: str = "{}_{}_{}".format("newroute", new_shelterID, NEW_VEHICLE_COUNT)
 
-    traci.route.add(
-        routeID=new_route_ID,
-        edges=via_edgeIDs_with_intial_end_edge,
-    )
+    traci.route.add(routeID=new_route_ID, edges=via_edgeIDs_with_intial_end_edge)
 
     traci.vehicle.add(
         vehID=new_veh_ID,
@@ -450,10 +415,7 @@ def generate_new_veh_based_on_route_time(
         duration=100000,
     )
 
-    # color_mode は既存コードでもコメントアウトされているため未使用のまま維持
-
     NEW_VEHICLE_COUNT += 1
-
     return NEW_VEHICLE_COUNT
 
 

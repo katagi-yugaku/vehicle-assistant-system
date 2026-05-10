@@ -9,7 +9,7 @@ slurm の .out ログを条件別に集計し、平均値と CDF を出力する
 - ファイル名から scenario / early_rate / v2v_rate / run_id / jobid を自動抽出
 - 条件 (scenario, early_rate, v2v_rate) ごとに集計
 - ped_init_..._末尾番号 を init_... に正規化
-- count 系の平均値を算出
+- 今回の Simlation Result Summary に含まれる scalar 系キーの平均値を算出
 - arrival_time_by_vehID_dict の vehicle ごとの平均到着時刻を算出
 - 条件ごとに CDF グラフ (PNG) を出力
 - vehicle_abandant_time / walking_distance の平均を算出
@@ -45,15 +45,20 @@ COMPARISON_SYSTEM_V2V_RATE = 1.0
 COMPARISON_NOSYSTEM_EARLY_RATE = 0.5
 COMPARISON_NOSYSTEM_V2V_RATE = 0.0
 
+# output.json の average_count_metrics に出すキー。
+# runner_simulator.py 側の以下の print 出力名に合わせる。
 SUMMARY_COUNT_KEYS = [
-    "obtain_info_lane_change_count",
-    "elapsed_time_lane_change_count",
-    "normalcy_bias_count",
-    "negative_majority_bias_count",
-    "positive_majority_bias_count",
-    "lane_changed_vehicle_count",
+    "avg_congestion_duration",
     "pedestrian_count",
-    "route_changed_vehicle_count"
+    "route_changed_vehicle_count",
+    "wrong_way_driving_count",
+    "vehicle_abandonment_count",
+    "normalcy_bias_route_change_count",
+    "majority_bias_route_change_count",
+    "lane_changed_vehicle_count",
+    "info_obtained_lanechange_count",
+    "elapsed_time_lanechange_count",
+    "majority_bias_lanechange_count",
 ]
 
 
@@ -86,24 +91,21 @@ def build_output_dir_from_scenario_name(scenario_name: str) -> str:
 # 想定 run_id の上限。必要に応じて CLI 引数で上書き可能。
 DEFAULT_EXPECTED_MAX_RUN_ID = 50
 
-# 集計対象の count 系キー
-# ユーザー指定のキーをベースにしつつ、実ログ例で登場したキーも追加している。
+# 集計対象の scalar 系キー。
+# 今回のログ末尾の "===== Simlation Result Summary =====" で出力している
+# print(...) のキー名を canonical 名として扱う。
 COUNT_KEYS = [
-    "obtain_info_lane_change_count",
-    "elapsed_time_lane_change_count",
-    "normalcy_bias_count",
-    "negative_majority_bias_count",
-    "positive_majority_bias_count",
-    "lane_changed_vehicle_count",
+    "avg_congestion_duration",
+    "pedestrian_count",
     "route_changed_vehicle_count",
+    "wrong_way_driving_count",
+    "vehicle_abandonment_count",
     "normalcy_bias_route_change_count",
     "majority_bias_route_change_count",
-    "shelter_congestion_count",
-    "shelter_capacity_full_count",
-    "pedestrian_count",
-    # 実ログ例との互換性のため追加
+    "lane_changed_vehicle_count",
+    "info_obtained_lanechange_count",
+    "elapsed_time_lanechange_count",
     "majority_bias_lanechange_count",
-    "normalcy_bias_lanechange_count",
 ]
 
 # 集計対象の dict 系キー
@@ -116,31 +118,24 @@ DICT_KEYS = [
 # canonical key -> alias 一覧
 # 先頭が canonical 名で、後続が別名
 ALIAS_MAP = {
-    "obtain_info_lane_change_count": [
-        "obtain_info_lane_change_count",
-        "info_obtained_lanechange_count",
-        "info_obtained_lane_change_count",
-        "obtain_info_lanechange_count",
+    # scalar 系
+    "avg_congestion_duration": [
+        "avg_congestion_duration",
+        "average_congestion_duration",
     ],
-    "elapsed_time_lane_change_count": [
-        "elapsed_time_lane_change_count",
-        "elapsed_time_lanechange_count",
-    ],
-    "normalcy_bias_count": [
-        "normalcy_bias_count",
-        "normalcy_bias_lanechange_count",
-    ],
-    "negative_majority_bias_count": [
-        "negative_majority_bias_count",
-    ],
-    "positive_majority_bias_count": [
-        "positive_majority_bias_count",
-    ],
-    "lane_changed_vehicle_count": [
-        "lane_changed_vehicle_count",
+    "pedestrian_count": [
+        "pedestrian_count",
     ],
     "route_changed_vehicle_count": [
         "route_changed_vehicle_count",
+    ],
+    "wrong_way_driving_count": [
+        "wrong_way_driving_count",
+        "wrong_way_success_count",
+    ],
+    "vehicle_abandonment_count": [
+        "vehicle_abandonment_count",
+        "vehicle_abandonment_success_count",
     ],
     "normalcy_bias_route_change_count": [
         "normalcy_bias_route_change_count",
@@ -148,26 +143,34 @@ ALIAS_MAP = {
     "majority_bias_route_change_count": [
         "majority_bias_route_change_count",
     ],
-    "shelter_congestion_count": [
-        "shelter_congestion_count",
+    "lane_changed_vehicle_count": [
+        "lane_changed_vehicle_count",
     ],
-    "shelter_capacity_full_count": [
-        "shelter_capacity_full_count",
+    "info_obtained_lanechange_count": [
+        "info_obtained_lanechange_count",
+        # 旧ログ名との互換用
+        "obtain_info_lane_change_count",
+        "info_obtained_lane_change_count",
+        "obtain_info_lanechange_count",
     ],
-    "pedestrian_count": [
-        "pedestrian_count",
+    "elapsed_time_lanechange_count": [
+        "elapsed_time_lanechange_count",
+        # 旧ログ名との互換用
+        "elapsed_time_lane_change_count",
     ],
     "majority_bias_lanechange_count": [
         "majority_bias_lanechange_count",
+        # 旧ログ名との互換用
+        "positive_majority_bias_count",
     ],
-    "normalcy_bias_lanechange_count": [
-        "normalcy_bias_lanechange_count",
-    ],
+
+    # dict 系
     "arrival_time_by_vehID_dict": [
         "arrival_time_by_vehID_dict",
     ],
     "vehicle_abandant_time_by_pedestrianID_dict": [
         "vehicle_abandant_time_by_pedestrianID_dict",
+        # typo 修正後の名前にも対応
         "vehicle_abandon_time_by_pedestrianID_dict",
     ],
     "walking_distance_by_pedestrianID_dict": [
@@ -449,7 +452,7 @@ def parse_log_content(text: str) -> Tuple[Dict[str, Optional[float]], Dict[str, 
     ログ本文から集計対象を抽出する。
 
     戻り値:
-        count_values: canonical count key -> float or None
+        count_values: canonical scalar key -> float or None
         dict_values : canonical dict key -> normalized dict
         messages    : warning 相当の補足メッセージ
     """
@@ -457,13 +460,13 @@ def parse_log_content(text: str) -> Tuple[Dict[str, Optional[float]], Dict[str, 
     dict_values: Dict[str, Dict[str, float]] = {}
     messages: List[str] = []
 
-    # count 系
+    # scalar 系
     for canonical_key in COUNT_KEYS:
         aliases = ALIAS_MAP.get(canonical_key, [canonical_key])
         value = extract_scalar_by_aliases(text, aliases)
         count_values[canonical_key] = value
         if value is None:
-            messages.append(f"count key が見つかりませんでした: {canonical_key}")
+            messages.append(f"scalar key が見つかりませんでした: {canonical_key}")
 
     # dict 系
     for canonical_key in DICT_KEYS:

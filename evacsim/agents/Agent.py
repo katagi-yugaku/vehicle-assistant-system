@@ -130,6 +130,7 @@ class Agent:
 
         # --- 経路・逆走関連 ---
         self.evacuation_route_changed_flg: bool = False
+        self.wrong_way_driving_flg: bool = False
         self.normalcy_lane_change_motivation_flg: bool = False
         self.lane_minimum_motivation_value_flg: bool = False
         self.acceleration_flag: bool = False
@@ -473,6 +474,10 @@ class Agent:
         return self.evacuation_route_changed_flg
     def set_evacuation_route_changed_flg(self, evacuation_route_changed_flg:bool):
         self.evacuation_route_changed_flg = evacuation_route_changed_flg
+    def get_wrong_way_driving_flg(self):
+        return self.wrong_way_driving_flg
+    def set_wrong_way_driving_flg(self, wrong_way_driving_flg:bool):
+        self.wrong_way_driving_flg = wrong_way_driving_flg
     def get_normalcy_lane_change_motivation_flg(self):
         return self.normalcy_lane_change_motivation_flg
     def set_normalcy_lane_change_motivation_flg(self, normalcy_lane_change_motivation_flg:bool):
@@ -515,6 +520,9 @@ class Agent:
         return self.route_congestion_info_obtained_flg
     def set_route_congestion_info_obtained_flg(self, route_congestion_info_obtained_flg:bool):
         self.route_congestion_info_obtained_flg = route_congestion_info_obtained_flg
-
+    def get_shelter_full_info_obtained_flg(self):
+        return self.shelter_full_info_obtained_flg
+    def set_shelter_full_info_obtained_flg(self, shelter_full_info_obtained_flg:bool):
+        self.shelter_full_info_obtained_flg = shelter_full_info_obtained_flg
 
 
