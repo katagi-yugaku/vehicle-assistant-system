@@ -83,6 +83,7 @@ from evacsim.sim.communication import (
 from evacsim.sim.routing import (
     is_route_time_difference_exceeding_threshold,
     find_alternative_shelter_choice,
+    find_alternative_route_calculated_time,
 )
 
 from evacsim.core.motivation import (
@@ -212,6 +213,7 @@ def control_vehicles():
     global NEW_VEHICLE_COUNT
     global ROUTE_CHANGE_COUNT_AFTER_SHELTER_CAPACITY_FULL
 
+    # VEHINFO: 車両に対する処理を行う
     for current_vehID in vehIDs:
         vehInfo_by_current_vehID: VehicleInfo = vehInfo_by_vehID_dict.get(current_vehID)
         agent_by_current_vehID: Agent = agent_by_vehID_dict.get(current_vehID)
@@ -268,300 +270,21 @@ def control_vehicles():
 
         # VEHINFO: 到着していない車両に対して処理を行う
         if not vehInfo_by_current_vehID.get_arrival_flag():
-            # 乗り捨てが現在のpositionで成功しなかった場合、次の場所で乗り捨てを試みる
-            if current_edgeID == agent_by_current_vehID.get_reserved_vehicle_abandonment_edgeID() and agent_by_current_vehID.get_avoiding_abandoned_vehicle_flg():
-                print("予約していた乗り捨てエッジに到達 current_vehID: {}, current_edgeID: {}, time: {}".format(current_vehID, current_edgeID, current_time))
-                if current_position is None:
-                    current_position = get_vehicle_position_cached(current_vehID, step_cache=step_cache)
-                neighbor_vehicle_abandant_count: int = count_near_abandoned_vehicle_in_right_lane(
-                    vehID=current_vehID,
-                    agent_list=agent_list,
-                    pedestrianID_list=pedestrianIDs,
-                    veh_position=current_position,
-                    step_cache=step_cache,
-                )
-                if is_again_driver_vehicle_abandant(
-                    agent_by_target_vehID=agent_by_current_vehID,
-                    vehInfo_by_target_vehID=vehInfo_by_current_vehID,
-                    current_time=current_time,
-                    neighbor_vehicle_abandant_nums=neighbor_vehicle_abandant_count,
-                ):
-                    print("乗り捨てに成功 current_vehID: {}, current_edgeID: {}, time: {}".format(current_vehID, current_edgeID, current_time))
-                    agent_by_current_vehID.set_avoiding_abandoned_vehicle_flg(False)
-
-            # # 津波接近に関する情報を取得したか否かを確認する
-            # if (
-            #     not agent_by_current_vehID.get_tsunami_info_obtained_flg()
-            #     and list(vehInfo_by_current_vehID.get_tsunami_precursor_info().values())[0][0]
-            #     and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
-            # ):
-            #     tsunami_info = vehInfo_by_current_vehID.get_tsunami_precursor_info()
-            #     min_time = min(info[1] for info in tsunami_info.values())
-            #     if min_time > agent_by_current_vehID.get_created_time():
-            #         min_time = agent_by_current_vehID.get_created_time()
-            #     agent_by_current_vehID.set_tsunami_info_obtained_time(min_time)
-            #     agent_by_current_vehID.set_tsunami_info_obtained_flg(True)
-
-            # # 満杯情報を取得したか否かを確認する
-            # if (
-            #     not agent_by_current_vehID.get_shelter_full_info_obtained_flg()
-            #     and shelter_for_current_vehID.get_congestion_rate() > 0.99
-            #     and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
-            # ):
-            #     agent_by_current_vehID.set_shelter_full_info_obtained_flg(True)
-            
-            # # 経路の混雑情報を取得したか否かを確認する TODO ここを完成させる
-            # if (
-            #     not agent_by_current_vehID.get_route_congestion_info_obtained_flg()
-            #     and is_route_time_difference_exceeding_threshold(current_edgeID=current_edgeID, agent_by_target_vehID=agent_by_current_vehID, 
-            #                                                             shelter=shelter_for_current_vehID, vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-            #                                                             shelter_list=shelter_list, custome_edge_list=custome_edge_list)
-            #     and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
-            # ):
-            #     agent_by_current_vehID.set_route_congestion_info_obtained_flg(True)
-
-            if not agent_by_current_vehID.get_created_time_flg():
-                agent_by_current_vehID.set_created_time(current_time)
-                agent_by_current_vehID.set_created_time_flg(True)
-
-            # 車両間通信による情報共有
+            # V2V: 3つの接近情報（津波接近、満杯、混雑）を周囲の車両と通信
             if vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag():
-                if is_step_10:
-                    if current_position is None:
-                        current_position = get_vehicle_position_cached(current_vehID, step_cache=step_cache)
+                # MOTIVATION: モチベーションの計算
+                # AGENT: 経路変更の意思決定
+                # AGENT: 逆走行為の意思決定
+                # AGENT: 車両乗り捨て行為の意思決定
 
-                    around_vehIDs: list = get_around_vehIDs(
-                        target_vehID=current_vehID,
-                        custome_edge_list=custome_edge_list,
-                        step_cache=step_cache,
-                    )
-                    v2v_communication(
-                        target_vehID=current_vehID,
-                        target_vehInfo=vehInfo_by_current_vehID,
-                        around_vehIDs=around_vehIDs,
-                        agent_list=agent_list,
-                        vehInfo_list=vehInfo_list,
-                        COMMUNICATION_RANGE=COMM_RANGE,
-                        target_position=current_position,
-                        agent_by_vehID_dict=agent_by_vehID_dict,
-                        vehInfo_by_vehID_dict=vehInfo_by_vehID_dict,
-                        step_cache=step_cache,
-                    )
-
-                    v2shelter_communication(
-                        target_vehID=current_vehID,
-                        shelterID=vehInfo_by_current_vehID.get_target_shelter(),
-                        vehInfo_list=vehInfo_list,
-                        shelter_list=shelter_list,
-                        COMMUNICATION_RANGE=COMM_RANGE,
-                        target_vehInfo=vehInfo_by_current_vehID,
-                        target_position=current_position,
-                        vehInfo_by_vehID_dict=vehInfo_by_vehID_dict,
-                        step_cache=step_cache,
-                    )
-
-                    v2v_communication_about_tsunami_info(
-                        target_vehID=current_vehID,
-                        target_vehInfo=vehInfo_by_current_vehID,
-                        around_vehIDs=around_vehIDs,
-                        vehInfo_list=vehInfo_list,
-                        COMMUNICATION_RANGE=COMM_RANGE,
-                        target_position=current_position,
-                        vehInfo_by_vehID_dict=vehInfo_by_vehID_dict,
-                        step_cache=step_cache,
-                    )
-            
-            # 渋滞に巻き込まれているか否かを確認する
-            if is_vehID_in_congested_edge(vehID=current_vehID, threshold_speed=THRESHOLD_SPEED) and is_step_5:
-                traci.vehicle.setColor(current_vehID, (255, 0, 0)) # 赤色に変更
-                # 行動に対する基本的なモチベーションを増加させる
-                # re_calculate_motivation_value(info_activation_dict=agent_by_current_vehID.get_base_motivation_value_by_elapsed_time_dict(), elapsed_time=elapsed_time)
-                # 車両間通信が可能な場合、情報を取得するごとにモチベーションの値を更新する（正常性バイアスの領域）
-                if vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag():
-                    # *津波接近に関する情報を取得したか否かを確認する
-                    if (
-                        not agent_by_current_vehID.get_tsunami_info_obtained_flg()
-                        and list(vehInfo_by_current_vehID.get_tsunami_precursor_info().values())[0][0]
-                        and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
-                        ):
-                        tsunami_info = vehInfo_by_current_vehID.get_tsunami_precursor_info()
-                        min_time = min(info[1] for info in tsunami_info.values())
-                        if min_time > agent_by_current_vehID.get_created_time():
-                            min_time = agent_by_current_vehID.get_created_time()
-                        agent_by_current_vehID.set_tsunami_info_obtained_time(min_time)
-                        re_calculate_motivation_value(info_activation_dict=agent_by_current_vehID.get_tsunami_precursor_normalcy_value_by_elapsed_time_dict(), elapsed_time=current_time - agent_by_current_vehID.get_created_time())
-                        agent_by_current_vehID.set_tsunami_info_obtained_flg(True)
-
-                    # *満杯情報を取得したか否かを確認する
-                    if (
-                        not agent_by_current_vehID.get_shelter_full_info_obtained_flg()
-                        and shelter_for_current_vehID.get_congestion_rate() > 0.99
-                        and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
-                        ):
-                        re_calculate_motivation_value(info_activation_dict=agent_by_current_vehID.get_route_congestion_normalcy_value_by_elapsed_time_dict(), elapsed_time=current_time - agent_by_current_vehID.get_created_time())
-                        agent_by_current_vehID.set_shelter_full_info_obtained_flg(True)
-                    
-                    # *経路の混雑情報を取得したか否かを確認する
-                    if (
-                        not agent_by_current_vehID.get_route_congestion_info_obtained_flg()
-                        and is_route_time_difference_exceeding_threshold(current_edgeID=current_edgeID, agent_by_target_vehID=agent_by_current_vehID, 
-                                                                                shelter=shelter_for_current_vehID, vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-                                                                                shelter_list=shelter_list, custome_edge_list=custome_edge_list)
-                        and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
-                        ):
-                        agent_by_current_vehID.set_route_congestion_info_obtained_flg(True)
-                        re_calculate_motivation_value(info_activation_dict=agent_by_current_vehID.get_shelter_full_normalcy_value_by_elapsed_time_dict(), elapsed_time=current_time - agent_by_current_vehID.get_created_time())
-
-                    if agent_by_current_vehID.get_route_congestion_info_obtained_flg() or agent_by_current_vehID.get_shelter_full_info_obtained_flg() or agent_by_current_vehID.get_tsunami_info_obtained_flg():
-                        traci.vehicle.setColor(current_vehID, (255, 165, 0)) # オレンジ色に変更
-                        # MOTIVATION: 運転者が車両を乗り捨てるか否かを決める
-                        current_motivation = calculate_motivation_for_evacuation_action(
-                                                                                                        agent=agent_by_current_vehID,
-                                                                                                        current_time=current_time,
-                                                                                                        action="va",
-                                                                                                        debug=False,
-                                                                                                    )
-                        # AGENT: 渋滞脱出行動をとる 
-                        # MOTIVATION: 車両乗り捨てに対するもモチベーションが閾値を超えているか否かを確認する
-                        if current_motivation >= agent_by_current_vehID.get_vehicle_abandoned_threshold():
-                            print("車両乗り捨てを行います current_vehID: {}, current_edgeID: {}, time: {}, motivation: {}, thresshold: {}".format(current_vehID, current_edgeID, current_time, current_motivation, agent_by_current_vehID.get_vehicle_abandoned_threshold()))
-                            
-                            # AGENT: 車両を乗り捨てる
-                            # TRACI: 車両をremove pedestrianを追加する
-                            agent_by_current_vehID.set_vehicle_abandoned_flg(vehicle_abandoned_flg=True)
-                            PEDESTRIAN_COUNT, pedestrianID, walking_distance = vehicle_abandant_behavior_with_vehicle_remove(
-                                    current_vehID=current_vehID,
-                                    current_edgeID=current_edgeID,
-                                    agent_by_current_vehID=agent_by_current_vehID,
-                                    vehInfo_by_target_vehID=vehInfo_by_current_vehID,
-                                    PEDESTRIAN_COUNT=PEDESTRIAN_COUNT,
-                                    STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
-                                    shelter=shelter_for_current_vehID,
-                                )
-                            traci.vehicle.remove(current_vehID)
-                            if pedestrianID is None:
-                                print(f"[WARN] pedestrian was not created for {current_vehID}; skip abandonment registration")
-                                continue
-                            agent_by_current_vehID.set_vehicle_abandoned_flg(True)
-                            # print(f"test: {agent_by_current_vehID.get_vehicle_abandoned_time()} current_time: {current_time}")
-                            vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = current_time
-                            walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
-                            agent_by_current_vehID.set_vehicle_abandoned_time(current_time)
-                            pedstrianID_list.append(pedestrianID)
-                            print("予約なしで車両乗り捨てを行いました")
-                        
-                    # MOTIVATION: agentの渋滞継続時間を更新する　次の計算用に時計を進める
-                        agent_by_current_vehID.update_congestion_duration(5.0)
-                        agent_by_current_vehID.updated_encounted_congestion_time(5.0)
-                        agent_by_current_vehID.update_shelter_full_info_obtained_time(5.0)
-
-                    # *行動1：経路変更を行うか否かを決定する
-                    # *行動2: 逆走行為を行う
-                    # *行動3: 車両を乗り捨てる
-
-            if current_edgeID == "E100":
-                if traci.simulation.getTime() > TSUNAMI_SIGN_START_TIME and traci.simulation.getTime() < TSUNAMI_SIGN_END_TIME:
-                    vehInfo_by_current_vehID.update_tsunami_precursor_info(vehID=current_vehID, tsunami_precursor_flag=True, current_time=traci.simulation.getTime())
-            # # 避難地"E2"が満杯になったことを知った場合
-            # if shelter_for_current_vehID.get_congestion_rate() > 0.99 and not agent_by_current_vehID.get_shelter_full_flg():
-            #     # 避難地"E2"日和台方面で、満杯情報を取得した場合、車両乗り捨てあるいは経路変更を試みる
-            #     if current_edgeID in ["E106", "E15", "E104"]:
-            #         # print("shelter {} is congested. current_vehID: {}, current_edgeID: {}, time: {}".format(shelter_for_current_vehID.get_shelterID(), current_vehID, current_edgeID, current_time))
-            #         agent_by_current_vehID.set_shelter_full_flg(True)
-            #         if random.random() < 0.50: # 50%の確率で経路変更を試みる
-            #             agent_by_current_vehID.set_shelter_full_flg(True)
-            #             from_edgeID, shelterID, to_edge_list = find_alternative_shelter_choice(
-            #                                                                 current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
-            #                                                                 vehID=current_vehID,
-            #                                                                 current_edgeID=current_edgeID,
-            #                                                                 vehInfo=vehInfo_by_current_vehID,
-            #                                                                 shelter_list=shelter_list,
-            #                                                                 agent=agent_by_current_vehID,
-            #                                                                 )
-            #             if from_edgeID != "" and shelterID != "" and len(to_edge_list) > 0:
-            #                 NEW_VEHICLE_COUNT = generate_new_veh_based_on_route_time(
-            #                                                                     target_vehID=current_vehID, 
-            #                                                                     NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
-            #                                                                     agent_list=agent_list, 
-            #                                                                     vehInfo_list=vehInfo_list,
-            #                                                                     vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
-            #                                                                     agent_by_target_vehID=agent_by_current_vehID, 
-            #                                                                     from_edgeID=from_edgeID,
-            #                                                                     new_shelterID=shelterID,
-            #                                                                     to_edgeID=to_edge_list[0],
-            #                                                                     color_mode=0
-            #                                                                     )
-            #                 ROUTE_CHANGE_COUNT_AFTER_SHELTER_CAPACITY_FULL+= 1
-            #                 route_info_with_receive_time = vehInfo_by_current_vehID.get_avg_evac_time_by_route_by_recive_time()
-            #                 receive_time = list(route_info_with_receive_time.keys())[0]
-            #                 routes_dict = route_info_with_receive_time[receive_time]
-
-            #                 print(f"receive_time {receive_time}")
-            #                 print(f"routes_dict {routes_dict}")
-
-            #                 continue
-            #         else: # 経路変更を試みない場合、乗り捨てを試みる
-            #             agent_by_current_vehID.set_vehicle_abandoned_flg(vehicle_abandoned_flg=True)
-            #             PEDESTRIAN_COUNT, pedestrianID, walking_distance = vehicle_abandant_behavior_with_vehicle_remove(
-            #                     current_vehID=current_vehID,
-            #                     current_edgeID=current_edgeID,
-            #                     agent_by_current_vehID=agent_by_current_vehID,
-            #                     vehInfo_by_target_vehID=vehInfo_by_current_vehID,
-            #                     PEDESTRIAN_COUNT=PEDESTRIAN_COUNT,
-            #                     STOPPING_TIME_IN_SHELTER=STOPPING_TIME_IN_SHELTER,
-            #                     shelter=shelter_for_current_vehID,
-            #                 )
-            #             traci.vehicle.remove(current_vehID)
-            #             if pedestrianID is None:
-            #                 print(f"[WARN] pedestrian was not created for {current_vehID}; skip abandonment registration")
-            #                 continue
-            #             agent_by_current_vehID.set_vehicle_abandoned_flg(True)
-            #             # print(f"test: {agent_by_current_vehID.get_vehicle_abandoned_time()} current_time: {current_time}")
-            #             vehicle_abandant_time_by_pedestrianID_dict[pedestrianID] = current_time
-            #             walking_distance_by_pedestrianID_dict[pedestrianID] = walking_distance
-            #             agent_by_current_vehID.set_vehicle_abandoned_time(current_time)
-            #             pedstrianID_list.append(pedestrianID)
-            #             print("予約なしで車両乗り捨てを行いました")
-                
-            # 交差点手前で目的避難地の満杯情報あるいは混雑情報を取得した場合、経路変更を試みる
-            # if current_edgeID in ["E100","E101", "E102", "E103", "E120", "E121", "E122", "E123", "E124", "E125", "E126", "E127"]:
-                # print("route change")
-
-            # 逆走行為を実施するかの意思決定を行う
+            else:
+                # MOTIVATION: 車両間通信による情報伝達がない場合のモチベーションの計算
+                # AGENT: 経路変更の意思決定
+                # AGENT: 逆走行為の意思決定
+                # AGENT: 車両乗り捨て行為の意思決定
 
 
-    for pedestrianID in vehicle_abandant_time_by_pedestrianID_dict:
-        vehID_by_pedestrianID: str = extract_vehicle_id(pedestrianID)
-        agent_by_pedestrianID: Agent = agent_by_vehID_dict.get(vehID_by_pedestrianID)
-        vehInfo_by_pedestrianID: VehicleInfo = vehInfo_by_vehID_dict.get(vehID_by_pedestrianID)
-        if agent_by_pedestrianID is None or vehInfo_by_pedestrianID is None:
-            continue
-        shelter_by_pedestrianID: Shelter = find_shelter_by_edgeID_connect_target_shelter(
-            vehInfo_by_pedestrianID.get_edgeID_connect_target_shelter(),
-            shelter_list,
-        )
-        if not agent_by_pedestrianID.get_arrival_shelter_flg():
-            if traci.person.getRoadID(pedestrianID) in ["E2", "E3"]:
-                handle_arrival_for_pedestrian(
-                    pedestrianID=pedestrianID,
-                    current_vehID=current_vehID,
-                    vehInfo_by_current_vehID=vehInfo_by_pedestrianID,
-                    agent_by_current_vehID=agent_by_pedestrianID,
-                    shelter_for_current_vehID=shelter_by_pedestrianID,
-                    shelter_list=shelter_list,
-                    arrival_time_list=arrival_time_list,
-                    arrival_time_by_vehID_dict=arrival_time_by_vehID_dict,
-                    elapsed_time_list=elapsed_time_list,
-                )
-                route_avg_dirty = True
 
-    # SHELTER: 経路ごとの平均避難時間を計算する
-    if route_avg_dirty:
-        calculate_avg_evac_time_by_route(shelter_list=shelter_list)
-    # SHELTER: 避難地の混雑率を計算する
-    for shelter in shelter_list:
-        shelter.update_congestion_rate()
-        # print(f"shelterID: {shelter.get_shelterID()}, congestion_rate: {shelter.get_congestion_rate()}, arrival_vehIDs: {shelter.get_arrival_vehID_list()}")
 
 def extract_category(vehID):
     if "ShelterA_1" in vehID:
@@ -628,44 +351,49 @@ if __name__ == "__main__":
     else:
         sumoBinary = checkBinary('sumo-gui')
     cfg = load_toml(Path(toml_path))
-
     COMM_RANGE: float = _req(cfg, "comm_range", float)
     NUM_VEHICLES: int = _req(cfg, "num_vehicles", int)
     VEHICLE_INTERVAL: float = _req(cfg, "vehicle_interval", float)
-    ACTIVE_ROUTE_CHANGE_MEAN: float = _req(cfg, "active_route_change_mean", float)
-    ACTIVE_ROUTE_CHANGE_VAR: float = _req(cfg, "active_route_change_var", float)
-    CAUTIOUS_ROUTE_CHANGE_MEAN: float = _req(cfg, "cautious_route_change_mean", float)
-    CAUTIOUS_ROUTE_CHANGE_VAR: float = _req(cfg, "cautious_route_change_var", float)
+    ACTIVE_ROUTE_CHANGE_THRESHOLD_CENTER: float = _req(cfg, "active_route_change_threshold_center", float)
+    ACTIVE_ROUTE_CHANGE_THRESHOLD_SPREAD: float = _req(cfg, "active_route_change_threshold_spread", float)
+    CAUTIOUS_ROUTE_CHANGE_THRESHOLD_CENTER: float = _req(cfg, "cautious_route_change_threshold_center", float)
+    CAUTIOUS_ROUTE_CHANGE_THRESHOLD_SPREAD: float = _req(cfg, "cautious_route_change_threshold_spread", float)
+    NORMALCY_VALUE_ABOUT_ROUTE_CHANGE_CENTER: float = _req(cfg, "normalcy_value_about_route_change_center", float)
+    NORMALCY_VALUE_ABOUT_ROUTE_CHANGE_SPREAD: float = _req(cfg, "normalcy_value_about_route_change_spread", float)
+    ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_CENTER: float = _req(cfg, "active_wrong_way_driving_threshold_center", float)
+    ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD: float = _req(cfg, "active_wrong_way_driving_threshold_spread", float)
+    CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER: float = _req(cfg, "cautious_wrong_way_driving_threshold_center", float)
+    CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD: float = _req(cfg, "cautious_wrong_way_driving_threshold_spread", float)
+    MIN_MOTIVATION_START: float = _req(cfg, "min_motivation_start", float)
+    MIN_MOTIVATION_END: float = _req(cfg, "min_motivation_end", float)
+    ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER: float = _req(cfg, "active_normalcy_value_about_tsunami_precursor_info_center", float)
+    ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD: float = _req(cfg, "active_normalcy_value_about_tsunami_precursor_info_spread", float)
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER: float = _req(cfg, "cautious_normalcy_value_about_tsunami_precursor_info_center", float)
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD: float = _req(cfg, "cautious_normalcy_value_about_tsunami_precursor_info_spread", float)
+    ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER: float = _req(cfg, "active_normalcy_value_about_route_congestion_info_center", float)
+    ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD: float = _req(cfg, "active_normalcy_value_about_route_congestion_info_spread", float)
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER: float = _req(cfg, "cautious_normalcy_value_about_route_congestion_info_center", float)
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD: float = _req(cfg, "cautious_normalcy_value_about_route_congestion_info_spread", float)
+    ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER: float = _req(cfg, "active_normalcy_value_about_shelter_full_info_center", float)
+    ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD: float = _req(cfg, "active_normalcy_value_about_shelter_full_info_spread", float)
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER: float = _req(cfg, "cautious_normalcy_value_about_shelter_full_info_center", float)
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD: float = _req(cfg, "cautious_normalcy_value_about_shelter_full_info_spread", float)
+    ACTIVE_MAJORITY_INCREASE_VALUE_CENTER: float = _req(cfg, "active_majority_increase_value_center", float)
+    ACTIVE_MAJORITY_INCREASE_VALUE_SPREAD: float = _req(cfg, "active_majority_increase_value_spread", float)
+    CAUTIOUS_MAJORITY_INCREASE_VALUE_CENTER: float = _req(cfg, "cautious_majority_increase_value_center", float)
+    CAUTIOUS_MAJORITY_INCREASE_VALUE_SPREAD: float = _req(cfg, "cautious_majority_increase_value_spread", float)
+    ACTIVE_MAJORITY_DECREASE_VALUE_CENTER: float = _req(cfg, "active_majority_decrease_value_center", float)
+    ACTIVE_MAJORITY_DECREASE_VALUE_SPREAD: float = _req(cfg, "active_majority_decrease_value_spread", float)
+    CAUTIOUS_MAJORITY_DECREASE_VALUE_CENTER: float = _req(cfg, "cautious_majority_decrease_value_center", float)
+    CAUTIOUS_MAJORITY_DECREASE_VALUE_SPREAD: float = _req(cfg, "cautious_majority_decrease_value_spread", float)
+    ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START: float = _req(cfg, "active_shelter_occupancy_rate_threshold_start", float)
+    ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float = _req(cfg, "active_shelter_occupancy_rate_threshold_end", float)
+    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_start", float)
+    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_end", float)
     SHELTER_CAPACITY_THRESHOLD: float = _req(cfg, "shelter_capacity_threshold", float)
     TSUNAMI_SIGN_START_TIME: float = _req(cfg, "tsunami_sign_start_time", float)
     TSUNAMI_SIGN_END_TIME: float = _req(cfg, "tsunami_sign_end_time", float)
-    MOTIVATION_THRESHOLD_START: float = _req(cfg, "motivation_threshold_start", float)
-    MOTIVATION_THRESHOLD_END: float = _req(cfg, "motivation_threshold_end", float)
-    MIN_MOTIVATION_START: float = _req(cfg, "min_motivation_start", float)
-    MIN_MOTIVATION_END: float = _req(cfg, "min_motivation_end", float)
-    POSITIVE_LANECHANGE_START: float = _req(cfg, "positive_lanechange_start", float)
-    POSITIVE_LANECHANGE_END: float = _req(cfg, "positive_lanechange_end", float)
-    NEGATIVE_LANECHANGE_START: float = _req(cfg, "negative_lanechange_start", float)
-    NEGATIVE_LANECHANGE_END: float = _req(cfg, "negative_lanechange_end", float)
     DRIVER_VISIBILITY_DISTANCE: float = _req(cfg, "driver_visibility_distance", float)
-    POSITIVE_MAJORITY_BIAS: float = _req(cfg, "positive_majority_bias", float)
-    NEGATIVE_MAJORITY_BIAS: float = _req(cfg, "negative_majority_bias", float)
-    ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START:float = _req(cfg, "active_shelter_occupancy_rate_threshold_start", float)
-    ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float = _req(cfg, "active_shelter_occupancy_rate_threshold_end", float)
-    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START:float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_start", float)
-    CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END:float = _req(cfg, "cautious_shelter_occupancy_rate_threshold_end", float)
-    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float =  _req(cfg, "active_normalcy_value_about_vehicle_abandonment_mean", float)
-    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  = _req(cfg, "active_normalcy_value_about_vehicle_abandonment_var", float)
-    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float = _req(cfg, "active_majority_value_about_vehicle_abandonment_mean", float)
-    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  =  _req(cfg, "active_majority_value_about_vehicle_abandonment_var", float)
-    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN: float = _req(cfg, "active_vehicle_abandoned_threshold_mean", float)
-    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR: float  = _req(cfg, "active_vehicle_abandoned_threshold_var", float)
-    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float = _req(cfg, "cautious_normalcy_value_about_vehicle_abandonment_mean", float)
-    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  = _req(cfg, "cautious_normalcy_value_about_vehicle_abandonment_var", float)
-    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float = _req(cfg, "cautious_majority_value_about_vehicle_abandonment_mean", float)
-    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float  = _req(cfg, "cautious_majority_value_about_vehicle_abandonment_var", float)
-    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN: float = _req(cfg, "cautious_vehicle_abandoned_threshold_mean", float)
-    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR: float  = _req(cfg, "cautious_vehicle_abandoned_threshold_var", float)
     ALPHA: float = _req(cfg, "alpha", float)
 
     traci.start(
@@ -759,44 +487,57 @@ if __name__ == "__main__":
 
     # Agentの初期化
     # 乗り捨てに関する初期化
-    agent_list:list[Agent] = init_agent_list(
-                                                vehIDs=vehID_list, 
-                                                edgeID_by_shelterID=edgeID_by_shelterID, 
-                                                EARLY_AGENT_THRESHOLD_LIST=EARLY_AGENT_THRESHOLD_LIST, 
-                                                LATE_AGENT_THRESHOLD_LIST=LATE_AGENT_THRESHOLD_LIST, 
-                                                ATTR_RATE=early_rate,
-                                                MOTIVATION_THRESHOLD_START=MOTIVATION_THRESHOLD_START,
-                                                MOTIVATION_THRESHOLD_END=MOTIVATION_THRESHOLD_END,
-                                                MIN_MOTIVATION_START=MIN_MOTIVATION_START,
-                                                MIN_MOTIVATION_END=MIN_MOTIVATION_END,
-                                                ACTIVE_ROUTE_CHANGE_MEAN=ACTIVE_ROUTE_CHANGE_MEAN,
-                                                ACTIVE_ROUTE_CHANGE_VAR=ACTIVE_ROUTE_CHANGE_VAR,
-                                                CAUTIOUS_ROUTE_CHANGE_MEAN=CAUTIOUS_ROUTE_CHANGE_MEAN,
-                                                CAUTIOUS_ROUTE_CHANGE_VAR=CAUTIOUS_ROUTE_CHANGE_VAR,
-                                                POSITIVE_LANECHANGE_START=POSITIVE_LANECHANGE_START,
-                                                POSITIVE_LANECHANGE_END=POSITIVE_LANECHANGE_END,
-                                                NEGATIVE_LANECHANGE_START=NEGATIVE_LANECHANGE_START,
-                                                NEGATIVE_LANECHANGE_END=NEGATIVE_LANECHANGE_END,
-                                                POSITIVE_MAJORITY_BIAS=POSITIVE_MAJORITY_BIAS,
-                                                NEGATIVE_MAJORITY_BIAS=NEGATIVE_MAJORITY_BIAS,
-                                                ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
-                                                ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
-                                                CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
-                                                CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
-                                                ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN = ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
-                                                ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR = ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
-                                                ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN = ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
-                                                ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR = ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
-                                                ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN = ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN,
-                                                ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR = ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR,
-                                                CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN = CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
-                                                CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR = CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
-                                                CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN = CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
-                                                CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR = CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
-                                                CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN = CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN,
-                                                CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR = CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR,
-                                                )
+    agent_list: list[Agent] = init_agent_list(
+        vehIDs=vehID_list,
+        edgeID_by_shelterID=edgeID_by_shelterID,
+        ATTR_RATE=early_rate,
 
+        ACTIVE_ROUTE_CHANGE_THRESHOLD_CENTER=ACTIVE_ROUTE_CHANGE_THRESHOLD_CENTER,
+        ACTIVE_ROUTE_CHANGE_THRESHOLD_SPREAD=ACTIVE_ROUTE_CHANGE_THRESHOLD_SPREAD,
+        CAUTIOUS_ROUTE_CHANGE_THRESHOLD_CENTER=CAUTIOUS_ROUTE_CHANGE_THRESHOLD_CENTER,
+        CAUTIOUS_ROUTE_CHANGE_THRESHOLD_SPREAD=CAUTIOUS_ROUTE_CHANGE_THRESHOLD_SPREAD,
+
+        NORMALCY_VALUE_ABOUT_ROUTE_CHANGE_CENTER=NORMALCY_VALUE_ABOUT_ROUTE_CHANGE_CENTER,
+        NORMALCY_VALUE_ABOUT_ROUTE_CHANGE_SPREAD=NORMALCY_VALUE_ABOUT_ROUTE_CHANGE_SPREAD,
+
+        ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_CENTER=ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_CENTER,
+        ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD=ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD,
+        CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER=CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER,
+        CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD=CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD,
+
+        MIN_MOTIVATION_START=MIN_MOTIVATION_START,
+        MIN_MOTIVATION_END=MIN_MOTIVATION_END,
+
+        ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER=ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER,
+        ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD=ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD,
+        CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER=CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER,
+        CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD=CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD,
+
+        ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER=ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER,
+        ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD=ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD,
+        CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER=CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER,
+        CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD=CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD,
+
+        ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER=ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER,
+        ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD=ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD,
+        CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER=CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER,
+        CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD=CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD,
+
+        ACTIVE_MAJORITY_INCREASE_VALUE_CENTER=ACTIVE_MAJORITY_INCREASE_VALUE_CENTER,
+        ACTIVE_MAJORITY_INCREASE_VALUE_SPREAD=ACTIVE_MAJORITY_INCREASE_VALUE_SPREAD,
+        CAUTIOUS_MAJORITY_INCREASE_VALUE_CENTER=CAUTIOUS_MAJORITY_INCREASE_VALUE_CENTER,
+        CAUTIOUS_MAJORITY_INCREASE_VALUE_SPREAD=CAUTIOUS_MAJORITY_INCREASE_VALUE_SPREAD,
+
+        ACTIVE_MAJORITY_DECREASE_VALUE_CENTER=ACTIVE_MAJORITY_DECREASE_VALUE_CENTER,
+        ACTIVE_MAJORITY_DECREASE_VALUE_SPREAD=ACTIVE_MAJORITY_DECREASE_VALUE_SPREAD,
+        CAUTIOUS_MAJORITY_DECREASE_VALUE_CENTER=CAUTIOUS_MAJORITY_DECREASE_VALUE_CENTER,
+        CAUTIOUS_MAJORITY_DECREASE_VALUE_SPREAD=CAUTIOUS_MAJORITY_DECREASE_VALUE_SPREAD,
+
+        ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
+        ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
+        CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
+        CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END=CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
+    )
     # 時間経過に伴うモチベーションの増加を設定する
     INFOS = ("tsu", "jam", "full")
     rho: dict[str, float] = {

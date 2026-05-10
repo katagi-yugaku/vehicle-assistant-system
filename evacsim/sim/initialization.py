@@ -112,40 +112,93 @@ def init_vehicleInfo_list_base(
 def init_agent_list(
     vehIDs: list,
     edgeID_by_shelterID: dict,
-    EARLY_AGENT_THRESHOLD_LIST: list,
-    LATE_AGENT_THRESHOLD_LIST: list,
     ATTR_RATE: float,
-    MOTIVATION_THRESHOLD_START: float,
-    MOTIVATION_THRESHOLD_END: float,
+
+    # ==================================================
+    # 経路変更閾値
+    # 正規分布: N(mean, std)
+    # ==================================================
+    ACTIVE_ROUTE_CHANGE_THRESHOLD_CENTER: float,
+    ACTIVE_ROUTE_CHANGE_THRESHOLD_SPREAD: float,
+    CAUTIOUS_ROUTE_CHANGE_THRESHOLD_CENTER: float,
+    CAUTIOUS_ROUTE_CHANGE_THRESHOLD_SPREAD: float,
+
+    # ==================================================
+    # 経路変更に対する正常性バイアス
+    # 正規分布: N(mean, std)
+    # ==================================================
+    NORMALCY_VALUE_ABOUT_ROUTE_CHANGE_CENTER: float,
+    NORMALCY_VALUE_ABOUT_ROUTE_CHANGE_SPREAD: float,
+
+    # ==================================================
+    # 逆走行為に関する閾値
+    # 正規分布: N(mean, std)
+    # ==================================================
+    ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_CENTER: float,
+    ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD: float,
+    CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER: float,
+    CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD: float,
+
+    # ==================================================
+    # 逆走行為の最小動機付け値
+    # 一様分布: U(start, end)
+    # ==================================================
     MIN_MOTIVATION_START: float,
     MIN_MOTIVATION_END: float,
-    ACTIVE_ROUTE_CHANGE_MEAN: float,
-    ACTIVE_ROUTE_CHANGE_VAR: float,
-    CAUTIOUS_ROUTE_CHANGE_MEAN: float,
-    CAUTIOUS_ROUTE_CHANGE_VAR: float,
-    POSITIVE_LANECHANGE_START: float,
-    POSITIVE_LANECHANGE_END: float,
-    NEGATIVE_LANECHANGE_START: float,
-    NEGATIVE_LANECHANGE_END: float,
-    POSITIVE_MAJORITY_BIAS: float,
-    NEGATIVE_MAJORITY_BIAS: float,
+
+    # ==================================================
+    # 津波接近情報に対する正常性バイアス
+    # 正規分布: N(mean, std)
+    # ==================================================
+    ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER: float,
+    ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD: float,
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER: float,
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD: float,
+    
+    # ==================================================
+    # 経路変更情報に対する正常性バイアス
+    # 正規分布: N(mean, std)
+    # ==================================================
+    ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER: float,
+    ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD: float,
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER: float,
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD: float,
+
+    # ==================================================
+    # 満杯情報に対する正常性バイアス
+    # 正規分布: N(mean, std)
+    # ==================================================
+    ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER: float,
+    ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD: float,
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER: float,
+    CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD: float,
+
+    # ==================================================
+    # 周囲車両による同調性バイアス(増加)
+    # ==================================================
+    ACTIVE_MAJORITY_INCREASE_VALUE_CENTER: float,
+    ACTIVE_MAJORITY_INCREASE_VALUE_SPREAD: float,
+    CAUTIOUS_MAJORITY_INCREASE_VALUE_CENTER: float,
+    CAUTIOUS_MAJORITY_INCREASE_VALUE_SPREAD: float,
+    
+    # ==================================================
+    # 周囲車両による同調性バイアス(減少)
+    # ==================================================
+    ACTIVE_MAJORITY_DECREASE_VALUE_CENTER: float,
+    ACTIVE_MAJORITY_DECREASE_VALUE_SPREAD: float,
+    CAUTIOUS_MAJORITY_DECREASE_VALUE_CENTER: float,
+    CAUTIOUS_MAJORITY_DECREASE_VALUE_SPREAD: float,
+
+    # ==================================================
+    # 避難所混雑率閾値
+    # 一様分布: U(start, end)
+    # ==================================================
     ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START: float,
     ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float,
     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START: float,
     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END: float,
-    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float,
-    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float,
-    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float,
-    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float,
-    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN: float,
-    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR: float,
-    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float,
-    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float,
-    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN: float,
-    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR: float,
-    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN: float,
-    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR: float,
-):
+
+    ):
     """
     Agent の初期リストを作成する。
 
@@ -163,49 +216,50 @@ def init_agent_list(
 
     for vehID in vehIDs:
         target_shelter = vehID.split("_")[1] + "_" + vehID.split("_")[2]
-
         # せっかちな人はこっち
         if random_true(ATTR_RATE):
             agent: Agent = Agent(
                 vehID=vehID,
                 target_shelter=target_shelter,
-                tunning_threshold=random.randint(
-                    EARLY_AGENT_THRESHOLD_LIST[0],
-                    EARLY_AGENT_THRESHOLD_LIST[1],
-                ),
                 route_change_threshold=np.random.normal(
-                    loc=ACTIVE_ROUTE_CHANGE_MEAN,
-                    scale=ACTIVE_ROUTE_CHANGE_VAR,
+                    loc=ACTIVE_ROUTE_CHANGE_THRESHOLD_CENTER,
+                    scale=ACTIVE_ROUTE_CHANGE_THRESHOLD_SPREAD,
                 ),
-                lane_change_init_threshold=random.uniform(
-                    MOTIVATION_THRESHOLD_START,
-                    MOTIVATION_THRESHOLD_END,
+                wrong_way_driving_threshold=np.random.normal(
+                    ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_CENTER,
+                    ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD,
                 ),
-                normalcy_motivation_increase=random.uniform(
-                    POSITIVE_LANECHANGE_START,
-                    POSITIVE_LANECHANGE_END,
-                ),
-                motivation_decrease_due_to_inactive_neighbors=NEGATIVE_MAJORITY_BIAS,
-                motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
-                lane_minimum_motivation_value=random.uniform(
+                wrong_way_driving_min_motivation_value=random.uniform(
                     MIN_MOTIVATION_START,
                     MIN_MOTIVATION_END,
+                ),
+
+                normalcy_value_about_tsunami_precursor_info=np.random.normal(
+                    ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER,
+                    ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD,
+                ),
+
+                normalcy_value_about_route_congestion_info=np.random.normal(
+                    ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER,
+                    ACTIVE_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD,
+                ),
+
+                normalcy_value_about_shelter_full_info=np.random.normal(
+                    ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER,
+                    ACTIVE_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD,
+                ),
+
+                majority_value_increase=np.random.normal(
+                    ACTIVE_MAJORITY_INCREASE_VALUE_CENTER - ACTIVE_MAJORITY_INCREASE_VALUE_SPREAD,
+                    ACTIVE_MAJORITY_INCREASE_VALUE_CENTER + ACTIVE_MAJORITY_INCREASE_VALUE_SPREAD,
+                ),
+                majority_value_decrease=np.random.normal(
+                    ACTIVE_MAJORITY_DECREASE_VALUE_CENTER - ACTIVE_MAJORITY_DECREASE_VALUE_SPREAD,
+                    ACTIVE_MAJORITY_DECREASE_VALUE_CENTER + ACTIVE_MAJORITY_DECREASE_VALUE_SPREAD,
                 ),
                 shelter_occupancy_rate_threshold=random.uniform(
                     ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
                     ACTIVE_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
-                ),
-                vehicle_abandoned_threshold=random.uniform(
-                    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_MEAN,
-                    ACTIVE_VEHICLE_ABANDONED_THRESHOLD_VAR,
-                ),
-                normalcy_value_about_vehicle_abandonment=np.random.normal(
-                    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
-                    ACTIVE_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
-                ),
-                majority_value_about_vehicle_abandonment=np.random.normal(
-                    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
-                    ACTIVE_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
                 ),
             )
 
@@ -213,43 +267,41 @@ def init_agent_list(
             agent: Agent = Agent(
                 vehID=vehID,
                 target_shelter=target_shelter,
-                tunning_threshold=random.randint(
-                    LATE_AGENT_THRESHOLD_LIST[0],
-                    LATE_AGENT_THRESHOLD_LIST[1],
-                ),
                 route_change_threshold=np.random.normal(
-                    loc=CAUTIOUS_ROUTE_CHANGE_MEAN,
-                    scale=CAUTIOUS_ROUTE_CHANGE_VAR,
+                    CAUTIOUS_ROUTE_CHANGE_THRESHOLD_CENTER,
+                    CAUTIOUS_ROUTE_CHANGE_THRESHOLD_SPREAD,
                 ),
-                lane_change_init_threshold=random.uniform(
-                    MOTIVATION_THRESHOLD_START,
-                    MOTIVATION_THRESHOLD_END,
+                wrong_way_driving_threshold=np.random.normal(
+                    CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER,
+                    CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD,
                 ),
-                normalcy_motivation_increase=random.uniform(
-                    NEGATIVE_LANECHANGE_START,
-                    NEGATIVE_LANECHANGE_END,
-                ),
-                motivation_decrease_due_to_inactive_neighbors=NEGATIVE_MAJORITY_BIAS,
-                motivation_increase_due_to_following_neighbors=POSITIVE_MAJORITY_BIAS,
-                lane_minimum_motivation_value=random.uniform(
+                wrong_way_driving_min_motivation_value=random.uniform(
                     MIN_MOTIVATION_START,
                     MIN_MOTIVATION_END,
+                ),
+                normalcy_value_about_tsunami_precursor_info=np.random.normal(
+                    CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER,
+                    CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_SPREAD,
+                ),
+                normalcy_value_about_route_congestion_info=np.random.normal(
+                    CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_CENTER,
+                    CAUTIOUS_NORMALCY_VALUE_ABOUT_ROUTE_CONGESTION_INFO_SPREAD,
+                ),
+                normalcy_value_about_shelter_full_info=np.random.normal(
+                    CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_CENTER,
+                    CAUTIOUS_NORMALCY_VALUE_ABOUT_SHELTER_FULL_INFO_SPREAD,
+                ),
+                majority_value_increase=np.random.normal(
+                    CAUTIOUS_MAJORITY_INCREASE_VALUE_CENTER - CAUTIOUS_MAJORITY_INCREASE_VALUE_SPREAD,
+                    CAUTIOUS_MAJORITY_INCREASE_VALUE_CENTER + CAUTIOUS_MAJORITY_INCREASE_VALUE_SPREAD,
+                ),
+                majority_value_decrease=np.random.normal(
+                    CAUTIOUS_MAJORITY_DECREASE_VALUE_CENTER - CAUTIOUS_MAJORITY_DECREASE_VALUE_SPREAD,
+                    CAUTIOUS_MAJORITY_DECREASE_VALUE_CENTER + CAUTIOUS_MAJORITY_DECREASE_VALUE_SPREAD,
                 ),
                 shelter_occupancy_rate_threshold=random.uniform(
                     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_START,
                     CAUTIOUS_SHELTER_OCCUPANCY_RATE_THRESHOLD_END,
-                ),
-                vehicle_abandoned_threshold=random.uniform(
-                    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_MEAN,
-                    CAUTIOUS_VEHICLE_ABANDONED_THRESHOLD_VAR,
-                ),
-                normalcy_value_about_vehicle_abandonment=np.random.normal(
-                    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
-                    CAUTIOUS_NORMALCY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
-                ),
-                majority_value_about_vehicle_abandonment=np.random.normal(
-                    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_MEAN,
-                    CAUTIOUS_MAJORITY_VALUE_ABOUT_VEHICLE_ABANDONMENT_VAR,
                 ),
             )
 
