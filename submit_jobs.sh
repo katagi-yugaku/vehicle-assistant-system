@@ -23,6 +23,9 @@ SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
 AGGREGATE_SCRIPT_PATH="${SCRIPT_DIR}/aggregate_simulation_logs.py"
 SBATCH_SCRIPT_PATH="${SCRIPT_DIR}/slurm_vehicle_assistant.sh"
 
+# Git 1.8.x には git -C がないため、明示的にスクリプト配置場所へ移動する
+cd "${SCRIPT_DIR}"
+
 GIT_BRANCH_NAME="${GIT_BRANCH_NAME:-auto/aggregate-s${SCENARIO_FROM}-to-s${SCENARIO_TO}-$(date +%Y%m%d-%H%M%S)}"
 
 # =========================================
@@ -86,7 +89,7 @@ if [[ ! -f "${SBATCH_SCRIPT_PATH}" ]]; then
   exit 1
 fi
 
-if ! git -C "${SCRIPT_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "ERROR: このスクリプトの配置場所は Git リポジトリ内ではありません: ${SCRIPT_DIR}"
   exit 1
 fi
@@ -95,21 +98,21 @@ fi
 # job 作成前に branch 作成・switch
 # =========================================
 if [[ "${AUTO_GIT_PUSH}" == "1" ]]; then
-  if ! git -C "${SCRIPT_DIR}" remote get-url "${GIT_REMOTE}" >/dev/null 2>&1; then
+  if ! git config --get "remote.${GIT_REMOTE}.url" >/dev/null 2>&1; then
     echo "ERROR: Git remote '${GIT_REMOTE}' が存在しません"
     exit 1
   fi
 
   echo "[INFO] Git branch を作成して switch します: ${GIT_BRANCH_NAME}"
-  git -C "${SCRIPT_DIR}" checkout -b "${GIT_BRANCH_NAME}"
+  git checkout -b "${GIT_BRANCH_NAME}"
 
   echo "[INFO] submit / aggregate scripts を先に commit 対象として固定します"
-  git -C "${SCRIPT_DIR}" add "${SCRIPT_PATH}" "${AGGREGATE_SCRIPT_PATH}"
+  git add "${SCRIPT_PATH}" "${AGGREGATE_SCRIPT_PATH}"
 
-  if git -C "${SCRIPT_DIR}" diff --cached --quiet; then
+  if git diff --cached --quiet; then
     echo "[INFO] script に commit 対象の変更はありません"
   else
-    git -C "${SCRIPT_DIR}" commit -m "Add aggregation automation scripts"
+    git commit -m "Add aggregation automation scripts"
   fi
 else
   echo "[INFO] AUTO_GIT_PUSH=0 のため Git branch 作成・push はスキップします"
