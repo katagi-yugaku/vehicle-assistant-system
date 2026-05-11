@@ -135,6 +135,10 @@ ALIAS_MAP = {
         "wrong_way_driving_count",
         "wrong_way_success_count",
     ],
+    "rate_vehicle_abandonment": [
+        "rate_vehicle_abandonment",
+    ],
+    
     "vehicle_abandonment_count": [
         "vehicle_abandonment_count",
         "vehicle_abandonment_success_count",
