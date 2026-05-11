@@ -29,7 +29,6 @@ data/maps/*.osm.pbf
 # =========================
 # Slurm / simulation logs
 # =========================
-logs/
 slurm_logs/
 *.out
 *.err
