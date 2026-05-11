@@ -19,6 +19,8 @@ GIT_REMOTE="${GIT_REMOTE:-origin}"
 AGGREGATE_DEPENDENCY_TYPE="${AGGREGATE_DEPENDENCY_TYPE:-afterany}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
+
 SCRIPT_PATH="${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")"
 AGGREGATE_SCRIPT_PATH="${SCRIPT_DIR}/aggregate_simulation_logs.py"
 SBATCH_SCRIPT_PATH="${SCRIPT_DIR}/slurm_vehicle_assistant.sh"
@@ -94,7 +96,7 @@ if [[ ! -f "${SBATCH_SCRIPT_PATH}" ]]; then
   exit 1
 fi
 
-if ! git -C "${SCRIPT_DIR}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   echo "ERROR: このスクリプトの配置場所は Git リポジトリ内ではありません: ${SCRIPT_DIR}"
   exit 1
 fi
