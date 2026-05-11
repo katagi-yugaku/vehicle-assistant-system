@@ -298,63 +298,37 @@ def control_vehicles():
             )
             traci.vehicle.remove(current_vehID)
             continue
-        
+
         # 逆走車両とUターン経路変更車両が向かい合っているかを確認する
         if agent_by_current_vehID.get_wrong_way_driving_flg():
-            if current_time - agent_by_current_vehID.get_wrong_way_driving_encounted_other_vehicle_time()  > 15.0:
+            last_encounter_time = (agent_by_current_vehID.get_wrong_way_driving_encounted_other_vehicle_time())
+            # 直近15秒以内に対向車両を検知していたら，減速を継続する
+            if (
+                last_encounter_time >= 0.0
+                and current_time - last_encounter_time <= SLOW_DURATION
+            ):
+                traci.vehicle.setSpeed(current_vehID, SLOW_SPEED)
+                traci.vehicle.setColor(current_vehID, (255, 255, 0))
+            else:
+                # 15秒以上経過している場合は，通常速度制御に戻す
+                traci.vehicle.setSpeed(current_vehID, -1)
+                # 新しく対向車両を検知する
                 opposite_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID)
                 opposite_vehIDs = traci.edge.getLastStepVehicleIDs(opposite_edgeID)
                 current_lane_index = int(traci.vehicle.getLaneID(current_vehID).rsplit("_", 1)[1])
-
-                facing_vehicle_found = False
                 for opposite_vehID in opposite_vehIDs:
                     opposite_lane_index = int(traci.vehicle.getLaneID(opposite_vehID).rsplit("_", 1)[1])
                     if opposite_lane_index == 1 and current_lane_index == 2:
-                        # 逆走車両と向かい合っている場合の処理
-                        print(f"Vehicle {current_vehID} is facing opposite vehicle {opposite_vehID} on edge {current_edgeID} at time {current_time} and current_lane_index {current_lane_index} opposite_lane_index {opposite_lane_index}")
-                        facing_vehicle_found = True
-                    if facing_vehicle_found:
-                        traci.vehicle.setSpeed(current_vehID, 3.0)
+                        # 対向車両を検知した時刻を記録
                         agent_by_current_vehID.set_wrong_way_driving_encounted_other_vehicle_time(current_time)
+                        # 検知した瞬間から減速開始
+                        traci.vehicle.setSpeed(current_vehID, SLOW_SPEED)
                         traci.vehicle.setColor(current_vehID, (255, 255, 0))
-                        print(f"Vehicle {current_vehID} is slowing down due to facing opposite vehicle on edge {current_edgeID} at time {current_time}")
-            else:
-                traci.vehicle.setSpeed(current_vehID, -1)
-
-
-            # 逆走車両とUターン経路変更車両が向かい合っているかを確認する
-            if agent_by_current_vehID.get_wrong_way_driving_flg():
-                last_encounter_time = (agent_by_current_vehID.get_wrong_way_driving_encounted_other_vehicle_time())
-
-                # 直近15秒以内に対向車両を検知していたら，減速を継続する
-                if (
-                    last_encounter_time >= 0.0
-                    and current_time - last_encounter_time <= SLOW_DURATION
-                ):
-                    traci.vehicle.setSpeed(current_vehID, SLOW_SPEED)
-                    traci.vehicle.setColor(current_vehID, (255, 255, 0))
-                else:
-                    # 15秒以上経過している場合は，通常速度制御に戻す
-                    traci.vehicle.setSpeed(current_vehID, -1)
-                    # 新しく対向車両を検知する
-                    opposite_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID)
-                    opposite_vehIDs = traci.edge.getLastStepVehicleIDs(opposite_edgeID)
-                    current_lane_index = int(traci.vehicle.getLaneID(current_vehID).rsplit("_", 1)[1])
-
-                    for opposite_vehID in opposite_vehIDs:
-                        opposite_lane_index = int(traci.vehicle.getLaneID(opposite_vehID).rsplit("_", 1)[1])
-                        if opposite_lane_index == 1 and current_lane_index == 2:
-                            # 対向車両を検知した時刻を記録
-                            agent_by_current_vehID.set_wrong_way_driving_encounted_other_vehicle_time(current_time)
-
-                            # 検知した瞬間から減速開始
-                            traci.vehicle.setSpeed(current_vehID, SLOW_SPEED)
-                            traci.vehicle.setColor(current_vehID, (255, 255, 0))
-                            # print(
-                            #     f"Vehicle {current_vehID} is slowing down due to facing "
-                            #     f"opposite vehicle on edge {current_edgeID} at time {current_time}"
-                            # )
-                            break
+                        # print(
+                        #     f"Vehicle {current_vehID} is slowing down due to facing "
+                        #     f"opposite vehicle on edge {current_edgeID} at time {current_time}"
+                        # )
+                        break
 
 
         # VEHINFO: 避難所近くのエッジにいる場合、密度に応じて速度制御を行う
