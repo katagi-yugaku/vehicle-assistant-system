@@ -56,6 +56,7 @@ class Agent:
         self.wrong_way_driving_min_motivation_value: float = (
             wrong_way_driving_min_motivation_value
         )
+        self.wrong_way_driving_encounted_other_vehicle_time: float = -1.0
 
         self.lane_change_xy_dict: dict[float, Any] = {}
         self.x_elapsed_time_for_lane_change_list: list[float] = []
@@ -304,6 +305,12 @@ class Agent:
         return self.wrong_way_driving_min_motivation_value
     def set_wrong_way_driving_min_motivation_value(self, wrong_way_driving_min_motivation_value:float):
         self.wrong_way_driving_min_motivation_value = wrong_way_driving_min_motivation_value
+    
+    # 逆走行為で他車両に遭遇した時間の取得・設定
+    def get_wrong_way_driving_encounted_other_vehicle_time(self):
+        return self.wrong_way_driving_encounted_other_vehicle_time
+    def set_wrong_way_driving_encounted_other_vehicle_time(self, wrong_way_driving_encounted_other_vehicle_time:float):
+        self.wrong_way_driving_encounted_other_vehicle_time = wrong_way_driving_encounted_other_vehicle_time
 
     # 車線変更のxy座標辞書の取得・設定
     def get_lane_change_xy_dict(self):

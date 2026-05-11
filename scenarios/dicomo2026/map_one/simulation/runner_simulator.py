@@ -51,6 +51,7 @@ from evacsim.maps.edge_utils import (
     is_pre_edgeID_near_shelter,
     get_vehicle_start_edges,
     get_vehicle_end_edges,
+    get_opposite_edgeID_by_edgeID,
 )
 
 from evacsim.sim.congestion import (
@@ -148,6 +149,8 @@ SUMO_CFG = DATA_DIR / "ishinomaki_two_shelter.sumocfg"
 END_SIMULATION_TIME = 4500
 THRESHOLD_SPEED = 2.00 # 7.2km/h
 STOPPING_TIME_IN_SHELTER = 10000000
+SLOW_DURATION = 15.0
+SLOW_SPEED = 3.0
 
 # =========================
 # 2) 車両生成・発進関連
@@ -266,22 +269,22 @@ def control_vehicles():
             agent_by_current_vehID.set_created_time(current_time)
             agent_by_current_vehID.set_created_time_flg(True)
 
-        # VEHINFO: 到着処理
-        if (
-            traci.vehicle.isStoppedParking(current_vehID)
-            and not vehInfo_by_current_vehID.get_parked_flag()
-        ):
-            handle_arrival(
-                current_vehID=current_vehID,
-                vehInfo_by_current_vehID=vehInfo_by_current_vehID,
-                agent_by_current_vehID=agent_by_current_vehID,
-                shelter_for_current_vehID=shelter_for_current_vehID,
-                shelter_list=shelter_list,
-                arrival_time_list=arrival_time_list,
-                arrival_time_by_vehID_dict=arrival_time_by_vehID_dict,
-                elapsed_time_list=elapsed_time_list,
-            )
-        # 逆走した車両に対して、到着処理を行う
+        # # VEHINFO: 到着処理
+        # if (
+        #     traci.vehicle.isStoppedParking(current_vehID)
+        #     and not vehInfo_by_current_vehID.get_parked_flag()
+        # ):
+        #     handle_arrival(
+        #         current_vehID=current_vehID,
+        #         vehInfo_by_current_vehID=vehInfo_by_current_vehID,
+        #         agent_by_current_vehID=agent_by_current_vehID,
+        #         shelter_for_current_vehID=shelter_for_current_vehID,
+        #         shelter_list=shelter_list,
+        #         arrival_time_list=arrival_time_list,
+        #         arrival_time_by_vehID_dict=arrival_time_by_vehID_dict,
+        #         elapsed_time_list=elapsed_time_list,
+        #     )
+        # 到着処理を行う
         if current_edgeID in["E2", "E3"] and not vehInfo_by_current_vehID.get_arrival_flag():
             handle_arrival(
                 current_vehID=current_vehID,
@@ -295,6 +298,63 @@ def control_vehicles():
             )
             traci.vehicle.remove(current_vehID)
             continue
+        
+        # 逆走車両とUターン経路変更車両が向かい合っているかを確認する
+        if agent_by_current_vehID.get_wrong_way_driving_flg():
+            if current_time - agent_by_current_vehID.get_wrong_way_driving_encounted_other_vehicle_time()  > 15.0:
+                opposite_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID)
+                opposite_vehIDs = traci.edge.getLastStepVehicleIDs(opposite_edgeID)
+                current_lane_index = int(traci.vehicle.getLaneID(current_vehID).rsplit("_", 1)[1])
+
+                facing_vehicle_found = False
+                for opposite_vehID in opposite_vehIDs:
+                    opposite_lane_index = int(traci.vehicle.getLaneID(opposite_vehID).rsplit("_", 1)[1])
+                    if opposite_lane_index == 1 and current_lane_index == 2:
+                        # 逆走車両と向かい合っている場合の処理
+                        print(f"Vehicle {current_vehID} is facing opposite vehicle {opposite_vehID} on edge {current_edgeID} at time {current_time} and current_lane_index {current_lane_index} opposite_lane_index {opposite_lane_index}")
+                        facing_vehicle_found = True
+                    if facing_vehicle_found:
+                        traci.vehicle.setSpeed(current_vehID, 3.0)
+                        agent_by_current_vehID.set_wrong_way_driving_encounted_other_vehicle_time(current_time)
+                        traci.vehicle.setColor(current_vehID, (255, 255, 0))
+                        print(f"Vehicle {current_vehID} is slowing down due to facing opposite vehicle on edge {current_edgeID} at time {current_time}")
+            else:
+                traci.vehicle.setSpeed(current_vehID, -1)
+
+
+            # 逆走車両とUターン経路変更車両が向かい合っているかを確認する
+            if agent_by_current_vehID.get_wrong_way_driving_flg():
+                last_encounter_time = (agent_by_current_vehID.get_wrong_way_driving_encounted_other_vehicle_time())
+
+                # 直近15秒以内に対向車両を検知していたら，減速を継続する
+                if (
+                    last_encounter_time >= 0.0
+                    and current_time - last_encounter_time <= SLOW_DURATION
+                ):
+                    traci.vehicle.setSpeed(current_vehID, SLOW_SPEED)
+                    traci.vehicle.setColor(current_vehID, (255, 255, 0))
+                else:
+                    # 15秒以上経過している場合は，通常速度制御に戻す
+                    traci.vehicle.setSpeed(current_vehID, -1)
+                    # 新しく対向車両を検知する
+                    opposite_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID)
+                    opposite_vehIDs = traci.edge.getLastStepVehicleIDs(opposite_edgeID)
+                    current_lane_index = int(traci.vehicle.getLaneID(current_vehID).rsplit("_", 1)[1])
+
+                    for opposite_vehID in opposite_vehIDs:
+                        opposite_lane_index = int(traci.vehicle.getLaneID(opposite_vehID).rsplit("_", 1)[1])
+                        if opposite_lane_index == 1 and current_lane_index == 2:
+                            # 対向車両を検知した時刻を記録
+                            agent_by_current_vehID.set_wrong_way_driving_encounted_other_vehicle_time(current_time)
+
+                            # 検知した瞬間から減速開始
+                            traci.vehicle.setSpeed(current_vehID, SLOW_SPEED)
+                            traci.vehicle.setColor(current_vehID, (255, 255, 0))
+                            # print(
+                            #     f"Vehicle {current_vehID} is slowing down due to facing "
+                            #     f"opposite vehicle on edge {current_edgeID} at time {current_time}"
+                            # )
+                            break
 
 
         # VEHINFO: 避難所近くのエッジにいる場合、密度に応じて速度制御を行う
@@ -380,7 +440,7 @@ def control_vehicles():
                     # VEHINFO: 満杯情報を取得したか否かを確認する
                     if (
                         not agent_by_current_vehID.get_shelter_full_info_obtained_flg()
-                        and shelter_for_current_vehID.get_congestion_rate() > 0.99
+                        and vehInfo_by_current_vehID.has_shelter_full_info(shelterID=agent_by_current_vehID.get_target_shelter(), threshold=0.99)
                         and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
                         ):
                         agent_by_current_vehID.set_shelter_full_info_obtained_time(current_time)
@@ -471,7 +531,6 @@ def control_vehicles():
                                 agent_by_current_vehID.set_evacuation_route_changed_flg(True)
                                 ROUTE_CHANGED_VEHICLE_COUNT += 1
                                 route_changed = True
-                                print("Route change for vehicle {} at time {}: new shelterID {}, new routeID {}".format(current_vehID, traci.simulation.getTime(), shelterID, to_edge_list[0]))
                         if route_changed:
                             agent_by_current_vehID.set_evacuation_route_changed_flg(True)
                             agent_by_current_vehID.set_agent_action_name("rc")
@@ -495,7 +554,6 @@ def control_vehicles():
                         if current_edgeID not in ["E2", "E3", "E107", "E130", "-E130", "-E129", "-E128", "-E104", "-E105", "-E106"]:
                             print("逆走行為を行います current_vehID: {} current_edgeID: {}".format(current_vehID, current_edgeID))
                             current_road_id = traci.vehicle.getRoadID(current_vehID)
-                            lane_count = traci.edge.getLaneNumber(current_road_id)
                             traci.vehicle.changeLane(
                                 vehID=current_vehID,
                                 laneIndex=2,
@@ -521,6 +579,7 @@ def control_vehicles():
                             current_time=current_time,
                         )
                         WRONG_WAY_SUCCESS_COUNT += 1
+                        continue
                 # else:
                 #     if current_vehID == "init_ShelterB_1_250":
                 #         print("逆走行為を行いません current_vehID: {} current_edgeID: {} ww_current_value: {} threshold: {} current_time: {}".format(current_vehID, current_edgeID, ww_current_value, agent_by_current_vehID.get_wrong_way_driving_threshold(), current_time))
@@ -552,8 +611,7 @@ def control_vehicles():
                         print(f"Error during vehicle abandonment for vehicle {current_vehID} at time {traci.simulation.getTime()}: {e}")
                         continue
                 
-        # PEDESTRIAN: 乗り捨て後の歩行者に対する処理を行う
-    
+    # PEDESTRIAN: 乗り捨て後の歩行者に対する処理を行う
     for pedestrianID in pedestrianIDs:
         vehID_by_pedestrianID: str = extract_vehicle_id(pedestrianID)
         agent_by_pedestrianID: Agent = agent_by_vehID_dict.get(vehID_by_pedestrianID)
@@ -868,8 +926,8 @@ if __name__ == "__main__":
 
     run()
 
-    for vehID, vehInfo in vehInfo_by_vehID_dict.items():
-        print(f"vehID: {vehID}, {vehInfo.get_avg_evac_time_by_route_by_recive_time()}")
+    # for vehID, vehInfo in vehInfo_by_vehID_dict.items():
+    #     print(f"vehID: {vehID}, {vehInfo.get_avg_evac_time_by_route_by_recive_time()}")
     print(f"mean elapsed_time: {np.mean(elapsed_time_list)}")
     if len(arrival_time_by_vehID_dict) == NUM_VEHICLES:
         print("OK all vehs arrived ")

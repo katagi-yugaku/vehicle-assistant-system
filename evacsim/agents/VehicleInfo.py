@@ -88,6 +88,14 @@ class VehicleInfo():
             return self._shelter_congestion_info[shelter][0]
         except Exception as e:
             return 0
+    
+    # 特定の避難所の混雑情報があるかどうかを取得
+    def has_shelter_full_info(self, shelterID: str, threshold: float = 0.99) -> bool:
+        try:
+            congestion, time_stamp = self._shelter_congestion_info[shelterID]
+            return congestion >= threshold
+        except Exception:
+            return False
 
     def init_set_congestion_level_by_shelter(self, shelter:str, congestion:double, time_stamp:double):
         self._shelter_congestion_info[shelter] = [congestion, time_stamp]

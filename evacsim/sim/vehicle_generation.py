@@ -158,12 +158,12 @@ def generate_simple_init_vehID(
 
     depart_time = depart_time + generate_interval
 
-    # 新規の避難地を設定
-    traci.vehicle.setParkingAreaStop(
-        vehID=new_veh_ID,
-        stopID=shelterID,
-        duration=100000,
-    )
+    # # 新規の避難地を設定
+    # traci.vehicle.setParkingAreaStop(
+    #     vehID=new_veh_ID,
+    #     stopID=shelterID,
+    #     duration=100000,
+    # )
 
     generate_veh_count += 1
     generate_route_count += 1
