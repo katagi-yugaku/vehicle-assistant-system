@@ -39,24 +39,30 @@ def plot_compare_cdfs(
     scenario_to_rate_values: dict[str, dict[str, list[float]]],
     early_rates: list[str],
     save_path: Path,
+    no_legend: bool = False,
 ) -> None:
     plt.figure(figsize=(10, 6))
 
-    # 色は early_rate で決める
+    # early_rate ごとの色
     style_map = {
         "0.1": {"color": "r", "label": "early_rate=0.1"},
         "0.5": {"color": "blue", "label": "early_rate=0.5"},
         "0.9": {"color": "g", "label": "early_rate=0.9"},
         "nosystem": {"color": "blue", "label": "no system"},
+        "1.0": {"color": "magenta", "label": "early_rate=1.0"},
     }
 
-    # 線種は scenario の順番で決める
-    linestyle_list = ["-", "--", "-.", ":", (0, (3, 1, 1, 1)), (0, (5, 2))]
+    # scenario ごとの色
+    scenario_color_map = {
+        "scenario2": "r",
+        "scenario3": "blue",
+        "scenario4": "g",
+        "scenario5": "orange",
+    }
 
     for scenario_id, rate_to_values in scenario_to_rate_values.items():
 
         for early_rate in early_rates:
-            # system は実線，nosystem は点線
             linestyle = "--" if early_rate == "nosystem" else "-"
 
             values = rate_to_values[early_rate]
@@ -74,11 +80,19 @@ def plot_compare_cdfs(
                 {"color": "gray", "label": f"early_rate={early_rate}"}
             )
 
+            # early_rate=1.0 の比較では scenario ごとに色を変える
+            if early_rate == "1.0":
+                color = scenario_color_map.get(scenario_id, base_style["color"])
+                label = scenario_id
+            else:
+                color = base_style["color"]
+                label = f"{scenario_id} / {base_style['label']}"
+
             plt.plot(
                 value,
                 cdf,
-                label=f"{scenario_id} / {base_style['label']}",
-                color=base_style["color"],
+                label=label,
+                color=color,
                 linestyle=linestyle,
                 linewidth=2,
             )
@@ -92,24 +106,24 @@ def plot_compare_cdfs(
     plt.xticks(np.arange(min_time, max_time + 50, 200), fontsize=14, fontweight="semibold")
     plt.yticks(np.arange(y_min, 1.01, 0.1), fontsize=14, fontweight="semibold")
 
-    # plt.xlabel("Arrival time [s]", fontsize=14, fontweight="semibold")
-    # plt.ylabel("CDF", fontsize=14, fontweight="semibold")
-
-    early_rate_part = ", ".join(early_rates)
+    if not no_legend:
+        plt.legend(fontsize=12)
 
     plt.savefig(save_path, bbox_inches="tight")
     print(f"✅ Saved figure as: {save_path}")
     plt.close()
 
-
 def main():
     if len(sys.argv) < 3:
-        print("Usage: python3 compare_cdf_plot.py <scenarioID1> <scenarioID2> ... <early_rate1> <early_rate2> ...")
+        print("Usage: python3 compare_cdf_plot.py <scenarioID1> <scenarioID2> ... <early_rate1> <early_rate2> ... [--no_legend]")
         print("Example: python3 compare_cdf_plot.py scenario1 scenario2 0.5 nosystem")
-        print("Example: python3 compare_cdf_plot.py 1 2 3 0.1 0.5")
+        print("Example: python3 compare_cdf_plot.py 2 3 4 5 1.0 --no_legend")
         sys.exit(1)
 
     raw_args = [arg.strip() for arg in sys.argv[1:]]
+
+    no_legend = "--no_legend" in raw_args
+    raw_args = [arg for arg in raw_args if arg != "--no_legend"]
 
     early_rates = [arg for arg in raw_args if arg in EARLY_RATE_KEYS]
     scenario_args = [arg for arg in raw_args if arg not in EARLY_RATE_KEYS]
@@ -158,12 +172,18 @@ def main():
     scenario_part = "_vs_".join(scenario_ids)
     early_rate_part = "_".join(early_rates)
 
-    output_path = output_dir / f"cdf_compare_{scenario_part}_early_rate_{early_rate_part}.pdf"
+    legend_part = "_no_legend" if no_legend else ""
 
-    plot_compare_cdfs(scenario_to_rate_values, early_rates, output_path)
+    output_path = output_dir / f"cdf_compare_{scenario_part}_early_rate_{early_rate_part}{legend_part}.pdf"
+
+    plot_compare_cdfs(
+        scenario_to_rate_values,
+        early_rates,
+        output_path,
+        no_legend=no_legend,
+    )
 
     print(f"[INFO] CDF comparison plot saved: {output_path}")
-
 
 if __name__ == "__main__":
     main()

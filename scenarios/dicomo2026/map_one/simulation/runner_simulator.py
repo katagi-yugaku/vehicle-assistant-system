@@ -269,22 +269,7 @@ def control_vehicles():
             agent_by_current_vehID.set_created_time(current_time)
             agent_by_current_vehID.set_created_time_flg(True)
 
-        # # VEHINFO: 到着処理
-        # if (
-        #     traci.vehicle.isStoppedParking(current_vehID)
-        #     and not vehInfo_by_current_vehID.get_parked_flag()
-        # ):
-        #     handle_arrival(
-        #         current_vehID=current_vehID,
-        #         vehInfo_by_current_vehID=vehInfo_by_current_vehID,
-        #         agent_by_current_vehID=agent_by_current_vehID,
-        #         shelter_for_current_vehID=shelter_for_current_vehID,
-        #         shelter_list=shelter_list,
-        #         arrival_time_list=arrival_time_list,
-        #         arrival_time_by_vehID_dict=arrival_time_by_vehID_dict,
-        #         elapsed_time_list=elapsed_time_list,
-        #     )
-        # 到着処理を行う
+        # VEHINFO: 到着処理を行う
         if current_edgeID in["E2", "E3"] and not vehInfo_by_current_vehID.get_arrival_flag():
             handle_arrival(
                 current_vehID=current_vehID,
@@ -298,6 +283,50 @@ def control_vehicles():
             )
             traci.vehicle.remove(current_vehID)
             continue
+        
+        # 情報取得がない状態で、避難地まで到着したのちに、その避難地が満杯であれば、経路変更を試みる
+        if current_edgeID in ["E130", "E107"]:
+            if shelter_for_current_vehID.get_congestion_rate() >= 0.99:
+                # print(f"Vehicle {current_vehID} arrived at shelter {shelter_for_current_vehID.get_shelterID()} which is full at time {current_time}. Attempting route change.")
+                try:
+                    from_edgeID, shelterID, to_edge_list = find_alternative_shelter_choice(
+                                                                                                    current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
+                                                                                                    vehID=current_vehID,
+                                                                                                    current_edgeID=current_edgeID,
+                                                                                                    vehInfo=vehInfo_by_current_vehID,
+                                                                                                    shelter_list=shelter_list,
+                                                                                                    agent=agent_by_current_vehID,
+                                                                                                    )
+                    if from_edgeID != "" and shelterID != "" and to_edge_list != "":
+                        # print(f"from_edgeID: {from_edgeID} shelterID: {shelterID} to_edgeID: {to_edgeID}")
+                        NEW_VEHICLE_COUNT = generate_new_veh_based_on_route_time(
+                                                                            target_vehID=current_vehID, 
+                                                                            NEW_VEHICLE_COUNT= NEW_VEHICLE_COUNT, 
+                                                                            agent_list=agent_list, 
+                                                                            vehInfo_list=vehInfo_list,
+                                                                            vehInfo_by_target_vehID=vehInfo_by_current_vehID, 
+                                                                            agent_by_target_vehID=agent_by_current_vehID, 
+                                                                            from_edgeID=from_edgeID,
+                                                                            new_shelterID=shelterID,
+                                                                            to_edgeID=to_edge_list[0],
+                                                                            color_mode="",
+                                                                            agent_by_vehID_dict=agent_by_vehID_dict,
+                                                                            vehInfo_by_vehID_dict=vehInfo_by_vehID_dict,
+                                                                            )
+                        # print("Route Uturn change for vehicle {} at time {}: new shelterID {}, new routeID {}".format(current_vehID, traci.simulation.getTime(), shelterID, to_edge_list[0]))
+                        route_changed = True
+                        ROUTE_CHANGED_VEHICLE_COUNT += 1
+                        if route_changed:
+                            agent_by_current_vehID.set_evacuation_route_changed_flg(True)
+                            agent_by_current_vehID.set_agent_action_name("rc")
+                            reset_motivation_after_action(
+                                agent=agent_by_current_vehID,
+                                current_time=current_time,
+                            )
+                            continue 
+                except Exception as e:
+                    print(f"Error during route change after arrival for vehicle {current_vehID} at time {traci.simulation.getTime()}: {e}")
+                    continue
 
         # 逆走車両とUターン経路変更車両が向かい合っているかを確認する
         if agent_by_current_vehID.get_wrong_way_driving_flg():
@@ -400,7 +429,7 @@ def control_vehicles():
 
         # VEHINFO: 到着していない車両に対して処理を行う
         if not vehInfo_by_current_vehID.get_arrival_flag():
-
+            # V2V: 車両間通信が可能な場合、情報を取得する
             if vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag():
                 # VEHINFO: 津波接近に関する情報を取得したか否かを確認する
                 try:
@@ -408,15 +437,18 @@ def control_vehicles():
                         not agent_by_current_vehID.get_tsunami_info_obtained_flg()
                         and vehInfo_by_current_vehID.has_tsunami_precursor_info()
                         and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
-                    ):
+                    ):  
+                        # 動作確認済み
+                        # print(f"Vehicle {current_vehID} obtained tsunami precursor information at time {current_time}")
                         agent_by_current_vehID.set_tsunami_info_obtained_time(current_time)
                         agent_by_current_vehID.set_tsunami_info_obtained_flg(True)
                     # VEHINFO: 満杯情報を取得したか否かを確認する
                     if (
                         not agent_by_current_vehID.get_shelter_full_info_obtained_flg()
-                        and vehInfo_by_current_vehID.has_shelter_full_info(shelterID=agent_by_current_vehID.get_target_shelter(), threshold=0.99)
+                        and vehInfo_by_current_vehID.has_shelter_full_info(shelterID=agent_by_current_vehID.get_target_shelter(), threshold=0.98)
                         and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
                         ):
+                        # print(f"Vehicle {current_vehID} obtained shelter full information for shelter {agent_by_current_vehID.get_target_shelter()} at time {current_time}")
                         agent_by_current_vehID.set_shelter_full_info_obtained_time(current_time)
                         agent_by_current_vehID.set_shelter_full_info_obtained_flg(True)
                     
@@ -428,6 +460,7 @@ def control_vehicles():
                                                                                 shelter_list=shelter_list, custome_edge_list=custome_edge_list)
                         and vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
                         ):
+                        # 動作確認済み
                         agent_by_current_vehID.set_route_congestion_info_obtained_time(current_time)
                         agent_by_current_vehID.set_route_congestion_info_obtained_flg(True)
                 except Exception as e:
@@ -584,7 +617,12 @@ def control_vehicles():
                     except Exception as e:
                         print(f"Error during vehicle abandonment for vehicle {current_vehID} at time {traci.simulation.getTime()}: {e}")
                         continue
-                
+            
+            # INFO: 津波接近の前兆情報を取得した場合、車両情報を更新する
+            if current_edgeID == "E100":
+                if traci.simulation.getTime() > TSUNAMI_SIGN_START_TIME and traci.simulation.getTime() < TSUNAMI_SIGN_END_TIME:
+                    vehInfo_by_current_vehID.update_tsunami_precursor_info(vehID=current_vehID, tsunami_precursor_flag=True, current_time=traci.simulation.getTime())
+
     # PEDESTRIAN: 乗り捨て後の歩行者に対する処理を行う
     for pedestrianID in pedestrianIDs:
         vehID_by_pedestrianID: str = extract_vehicle_id(pedestrianID)
@@ -616,7 +654,7 @@ def control_vehicles():
     # SHELTER: 避難地の混雑率を計算する
     for shelter in shelter_list:
         shelter.update_congestion_rate()
-        # print(f"shelterID: {shelter.get_shelterID()}, congestion_rate: {shelter.get_congestion_rate()}, arrival_vehIDs: {shelter.get_arrival_vehID_list()}")
+        # if shelter.get_congestion_rate() > 0.9:
 
 
 def extract_category(vehID):
@@ -747,7 +785,7 @@ if __name__ == "__main__":
                 )
     
     # 避難地の情報をもとに、Shelter一覧を生成
-    shelter_capacity_by_ID:dict = {"ShelterA_1": 100, "ShelterB_1": 500}
+    shelter_capacity_by_ID:dict = {"ShelterA_1": 100, "ShelterB_1": 300}
     edgeID_by_shelterID:dict = {"ShelterA_1": 'E2', "ShelterB_1": "E3"}
     shelter_choice_prob_list = [1.0]
     for shelterID, near_edgeID in edgeID_by_shelterID.items():
@@ -757,6 +795,7 @@ if __name__ == "__main__":
                                                     near_edgeID=near_edgeID, 
                                                     shelter_list=shelter_list
                                                     )
+    print(f" shelter_list: {[shelter.get_shelterID() for shelter in shelter_list]}")
     custome_edge_list:list = init_custome_edge()
     vehicle_start_edges:list = get_vehicle_start_edges(custome_edge_list=custome_edge_list)
     vehicle_end_edges:list = get_vehicle_end_edges(custome_edge_list=custome_edge_list)

@@ -70,6 +70,7 @@ def handle_arrival(
     agent_by_current_vehID.set_arrival_time(
         traci.simulation.getTime()
     )
+    vehInfo_by_current_vehID.set_arrival_flag(True)
 
     elapsed_time_list.append(
         traci.simulation.getTime()

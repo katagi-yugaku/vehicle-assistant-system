@@ -78,9 +78,9 @@ def plot_cdfs(
             linestyle=style["linestyle"],
             linewidth=2,
         )
-    max_time = 2200
-    min_time = 600
-    ylim_min = 0.1
+    max_time = 1700
+    min_time = 100
+    ylim_min = 0.0
     plt.xlim(min_time, max_time)
     plt.ylim(ylim_min, 1.0)
     plt.xticks(np.arange(min_time, max_time+50, 200), fontsize=14, fontweight="semibold")

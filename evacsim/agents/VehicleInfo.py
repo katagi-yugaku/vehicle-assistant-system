@@ -90,9 +90,12 @@ class VehicleInfo():
             return 0
     
     # 特定の避難所の混雑情報があるかどうかを取得
-    def has_shelter_full_info(self, shelterID: str, threshold: float = 0.99) -> bool:
+    def has_shelter_full_info(self, shelterID: str, threshold: float = 0.98) -> bool:
         try:
             congestion, time_stamp = self._shelter_congestion_info[shelterID]
+            # print(f"_shelter_congestion_info {self.get_shelter_congestion_info()} congestion: {congestion}, time_stamp: {time_stamp}")
+            # if congestion > 0.97:
+            #     print(f"vehID: {self.get_vehID()} has shelter_congestion_info for shelterID: {shelterID} congestion: {congestion}, time_stamp: {time_stamp}")
             return congestion >= threshold
         except Exception:
             return False
