@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-EARLY_RATE_KEYS = {"0.1", "0.5", "0.9", "nosystem"}
+EARLY_RATE_KEYS = {"0.1", "0.5", "0.9", "nosystem", "1.0"}
 
 
 def normalize_scenario_arg(arg: str) -> str:
@@ -83,9 +83,9 @@ def plot_compare_cdfs(
                 linewidth=2,
             )
 
-    max_time = 2200
-    min_time = 600
-    y_min = 0.1
+    max_time = 1700
+    min_time = 100
+    y_min = 0.0
 
     plt.xlim(min_time, max_time)
     plt.ylim(y_min, 1.0)

@@ -52,6 +52,7 @@ SUMMARY_COUNT_KEYS = [
     "pedestrian_count",
     "route_changed_vehicle_count",
     "wrong_way_driving_count",
+    "rate_vehicle_abandonment",  # 追加: 乗り捨て率
     "vehicle_abandonment_count",
     "normalcy_bias_route_change_count",
     "majority_bias_route_change_count",
@@ -100,6 +101,7 @@ COUNT_KEYS = [
     "route_changed_vehicle_count",
     "wrong_way_driving_count",
     "vehicle_abandonment_count",
+    "rate_vehicle_abandonment",  # 追加: 乗り捨て率
     "normalcy_bias_route_change_count",
     "majority_bias_route_change_count",
     "lane_changed_vehicle_count",

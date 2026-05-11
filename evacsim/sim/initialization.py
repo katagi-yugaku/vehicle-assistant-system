@@ -139,6 +139,16 @@ def init_agent_list(
     CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER: float,
     CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD: float,
 
+
+    # ==================================================
+    # 車両放棄に関する閾値
+    # 正規分布: N(mean, std)
+    # ==================================================
+    ACTIVE_VEHICLE_ABANDANTMENT_THRESHOLD_CENTER: float,
+    ACTIVE_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD: float,
+    CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_CENTER: float,
+    CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD: float,
+
     # ==================================================
     # 逆走行為の最小動機付け値
     # 一様分布: U(start, end)
@@ -234,8 +244,9 @@ def init_agent_list(
                     MIN_MOTIVATION_END,
                 ),
                 vehicle_abandoned_threshold=np.random.normal(
-                    ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_CENTER,
-                    ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD,
+                    ACTIVE_VEHICLE_ABANDANTMENT_THRESHOLD_CENTER,
+                    ACTIVE_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD
+,
                 ),
 
                 normalcy_value_about_tsunami_precursor_info=np.random.normal(
@@ -284,8 +295,8 @@ def init_agent_list(
                     MIN_MOTIVATION_END,
                 ),
                 vehicle_abandoned_threshold=np.random.normal(
-                    CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER,
-                    CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD,
+                    CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_CENTER,
+                    CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD,
                 ),
                 normalcy_value_about_tsunami_precursor_info=np.random.normal(
                     CAUTIOUS_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER,

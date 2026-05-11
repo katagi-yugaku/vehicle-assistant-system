@@ -697,6 +697,11 @@ if __name__ == "__main__":
     ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD: float = _req(cfg, "active_wrong_way_driving_threshold_spread", float)
     CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER: float = _req(cfg, "cautious_wrong_way_driving_threshold_center", float)
     CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD: float = _req(cfg, "cautious_wrong_way_driving_threshold_spread", float)
+    ACTIVE_VEHICLE_ABANDANTMENT_THRESHOLD_CENTER: float = _req(cfg, "active_vehicle_abandantment_threshold_center", float)
+    ACTIVE_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD: float = _req(cfg, "active_vehicle_abandantment_threshold_spread", float)
+    CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_CENTER: float = _req(cfg, "cautious_vehicle_abandantment_threshold_center", float)
+    CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD: float = _req(cfg, "cautious_vehicle_abandantment_threshold_spread", float)
+
     MIN_MOTIVATION_START: float = _req(cfg, "min_motivation_start", float)
     MIN_MOTIVATION_END: float = _req(cfg, "min_motivation_end", float)
     ACTIVE_NORMALCY_VALUE_ABOUT_TSUNAMI_PRECURSOR_INFO_CENTER: float = _req(cfg, "active_normalcy_value_about_tsunami_precursor_info_center", float)
@@ -837,6 +842,11 @@ if __name__ == "__main__":
         ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD=ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_SPREAD,
         CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER=CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_CENTER,
         CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD=CAUTIOUS_WRONG_WAY_DRIVING_THRESHOLD_SPREAD,
+
+        ACTIVE_VEHICLE_ABANDANTMENT_THRESHOLD_CENTER=ACTIVE_VEHICLE_ABANDANTMENT_THRESHOLD_CENTER,
+        ACTIVE_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD=ACTIVE_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD,
+        CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_CENTER=CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_CENTER,
+        CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD=CAUTIOUS_VEHICLE_ABANDANTMENT_TTHRESHOLD_SPREAD,
 
         MIN_MOTIVATION_START=MIN_MOTIVATION_START,
         MIN_MOTIVATION_END=MIN_MOTIVATION_END,
