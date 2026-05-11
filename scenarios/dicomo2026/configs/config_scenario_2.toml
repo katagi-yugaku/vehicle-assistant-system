@@ -1,17 +1,17 @@
 scenario_id = 2
 num_simulations = 50
 comm_range = 200
-num_vehicles = 300
+num_vehicles = 400
 vehicle_interval = 5
 
-# シナリオ方針->同調性バイアスの項がかなり強い
+# シナリオ方針->閾値を高くする
 # ==================================================
 # 経路変更閾値
 # B(368.60) ≒ 4000 のため，
 # active は平均渋滞滞在時間より少し前，
 # cautious は平均渋滞滞在時間付近で発生し得る値にする
 # ==================================================
-active_route_change_threshold_center = 3000.0
+active_route_change_threshold_center = 3500.0
 active_route_change_threshold_spread = 400.0
 cautious_route_change_threshold_center = 3600.0
 cautious_route_change_threshold_spread = 400.0
@@ -28,7 +28,7 @@ normalcy_value_about_route_change_spread = 100.0
 # 現状実装では vehicle_abandoned_threshold も
 # この値から生成されるため，共通閾値として扱う
 # ==================================================
-active_wrong_way_driving_threshold_center = 3600.0
+active_wrong_way_driving_threshold_center = 4000.0
 active_wrong_way_driving_threshold_spread = 500.0
 cautious_wrong_way_driving_threshold_center = 4200.0
 cautious_wrong_way_driving_threshold_spread = 500.0

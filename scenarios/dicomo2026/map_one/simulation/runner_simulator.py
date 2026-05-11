@@ -935,6 +935,7 @@ if __name__ == "__main__":
     print(f"walking_distance_by_pedestrianID_dict:{walking_distance_by_pedestrianID_dict}")
     print(f"pedestrian_count:{PEDESTRIAN_COUNT}")
     print(f"route_changed_vehicle_count:{ROUTE_CHANGED_VEHICLE_COUNT}")
+    print(f"rate_vehicle_abandonment:{VEHICLE_ABANDONMENT_SUCCESS_COUNT / VEHICLE_NUM * 100:.2f}%")
     print(f"wrong_way_driving_count:{WRONG_WAY_SUCCESS_COUNT}")
     print(f"vehicle_abandonment_count:{VEHICLE_ABANDONMENT_SUCCESS_COUNT}")
     print(f"normalcy_bias_route_change_count:{NORMALCY_BIAS_ROUTE_CHANGE_COUNT}")

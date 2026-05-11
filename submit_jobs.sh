@@ -29,10 +29,18 @@ GIT_BRANCH_NAME="${GIT_BRANCH_NAME:-auto/aggregate-s${SCENARIO_FROM}-to-s${SCENA
 # 実験設定
 # =========================================
 n=50
-early_rate_list=(0.1 0.5 0.9)
 
-# v2v は固定
-base_v2v_capable_vehicle_rate=1.0
+# scenarioID 1 の比較条件
+scenario1_system_early_rate_list=(0.1 0.5 0.9)
+scenario1_nosystem_early_rate=0.5
+
+# scenarioID 2 以降のチューニング条件
+tuning_early_rate=1.0
+
+# システムあり / なし
+system_v2v_rate=1.0
+nosystem_v2v_rate=0.0
+
 
 # =========================================
 # 基本チェック
@@ -130,42 +138,99 @@ mkdir -p "${AGGREGATED_OUTPUT_DIR}"
 echo "Submitting simulation jobs..."
 echo "scenario range: ${SCENARIO_FROM}..${SCENARIO_TO}"
 echo "n=${n}"
-echo "early_rate_list=(${early_rate_list[*]})"
-echo "fixed_v2v_rate=${base_v2v_capable_vehicle_rate}"
+echo "scenario1_system_early_rate_list=(${scenario1_system_early_rate_list[*]})"
+echo "scenario1_nosystem_early_rate=${scenario1_nosystem_early_rate}"
+echo "tuning_early_rate=${tuning_early_rate}"
+echo "system_v2v_rate=${system_v2v_rate}"
+echo "nosystem_v2v_rate=${nosystem_v2v_rate}"
 echo "git_branch=${GIT_BRANCH_NAME}"
 echo "aggregate_dependency_type=${AGGREGATE_DEPENDENCY_TYPE}"
 
+
+# =========================================
+# simulation job 投入
+# =========================================
 job_ids=()
 
+submit_simulation_job() {
+  local scenarioID="$1"
+  local early_rate="$2"
+  local v2v_rate="$3"
+  local run_id="$4"
+  local condition_label="$5"
+
+  local job_name="va_s${scenarioID}_${condition_label}_e${early_rate}_v${v2v_rate}_r${run_id}"
+
+  local job_id
+  job_id=$(
+    sbatch \
+      --parsable \
+      --job-name="${job_name}" \
+      --chdir="${SCRIPT_DIR}" \
+      --output="${LOG_DIR}/%x_%j.out" \
+      --error="${LOG_DIR}/%x_%j.err" \
+      "${SBATCH_SCRIPT_PATH}" \
+      "${scenarioID}" \
+      "${early_rate}" \
+      "${v2v_rate}" \
+      "${run_id}"
+  )
+
+  # Slurm が jobid;cluster の形式で返す環境に対応
+  job_id="${job_id%%;*}"
+
+  job_ids+=("${job_id}")
+
+  echo "[INFO] submitted: ${job_name} -> job_id=${job_id}"
+}
+
 for (( scenarioID=SCENARIO_FROM; scenarioID<=SCENARIO_TO; scenarioID++ )); do
-  for early_rate in "${early_rate_list[@]}"; do
-    for run_id in $(seq 1 "${n}"); do
 
-      job_name="va_s${scenarioID}_e${early_rate}_v${base_v2v_capable_vehicle_rate}_r${run_id}"
-
-      job_id=$(
-        sbatch \
-          --parsable \
-          --job-name="${job_name}" \
-          --chdir="${SCRIPT_DIR}" \
-          --output="${LOG_DIR}/%x_%j.out" \
-          --error="${LOG_DIR}/%x_%j.err" \
-          "${SBATCH_SCRIPT_PATH}" \
+  if (( scenarioID == 1 )); then
+    # -----------------------------------------
+    # scenarioID 1:
+    # システムあり early_rate = 0.1, 0.5, 0.9
+    # -----------------------------------------
+    for early_rate in "${scenario1_system_early_rate_list[@]}"; do
+      for run_id in $(seq 1 "${n}"); do
+        submit_simulation_job \
           "${scenarioID}" \
           "${early_rate}" \
-          "${base_v2v_capable_vehicle_rate}" \
-          "${run_id}"
-      )
-
-      # Slurm が jobid;cluster の形式で返す環境に対応
-      job_id="${job_id%%;*}"
-
-      job_ids+=("${job_id}")
-
-      echo "[INFO] submitted: ${job_name} -> job_id=${job_id}"
-
+          "${system_v2v_rate}" \
+          "${run_id}" \
+          "system"
+      done
     done
-  done
+
+    # -----------------------------------------
+    # scenarioID 1:
+    # システムなし early_rate = 0.5
+    # -----------------------------------------
+    for run_id in $(seq 1 "${n}"); do
+      submit_simulation_job \
+        "${scenarioID}" \
+        "${scenario1_nosystem_early_rate}" \
+        "${nosystem_v2v_rate}" \
+        "${run_id}" \
+        "nosystem"
+    done
+
+  else
+    # -----------------------------------------
+    # scenarioID 2 以降:
+    # early_rate = 1.0，システムありのみ
+    # -----------------------------------------
+    for run_id in $(seq 1 "${n}"); do
+      submit_simulation_job \
+        "${scenarioID}" \
+        "${tuning_early_rate}" \
+        "${system_v2v_rate}" \
+        "${run_id}" \
+        "system"
+    done
+
+  fi
+
 done
 
 echo "[INFO] simulation job count: ${#job_ids[@]}"
