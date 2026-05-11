@@ -183,9 +183,6 @@ OUT_FILENAME_RE = re.compile(
     r"^va_s(?P<scenario>\d+)_e(?P<early_rate>\d+(?:\.\d+)?)_v(?P<v2v_rate>\d+(?:\.\d+)?)_r(?P<run_id>\d+)_(?P<jobid>\d+)\.out$"
 )
 
-# ped ID の正規化用
-PED_ID_RE = re.compile(r"^ped_(init_.+)_\d+$")
-
 
 # =========================================
 # データ構造
@@ -244,33 +241,49 @@ def ensure_output_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
+ORIGINAL_VEH_ID_RE = re.compile(
+    r"^(?:ped_)?(?:init|newveh)_Shelter[A-Za-z]+_\d+_(\d+)(?:_\d+)*$"
+)
+
 def normalize_vehicle_id(raw_id: str) -> str:
     """
-    ped_init_..._末尾番号 を init_... に正規化する。
-    例:
-        ped_init_ShelterA_1_286_3 -> init_ShelterA_1_286
-        init_ShelterA_1_286       -> init_ShelterA_1_286
+    車両ID・歩行者IDから元の車両番号を取り出す。
+
+    examples:
+        init_ShelterA_1_267 -> 267
+        newveh_ShelterA_1_267_138 -> 267
+        ped_init_ShelterA_1_197_44 -> 197
+        newveh_ShelterA_1_197_45 -> 197
+        ped_newveh_ShelterA_1_98_91_47 -> 98
     """
     raw_id = raw_id.strip()
-    match = PED_ID_RE.match(raw_id)
-    if match:
-        return match.group(1)
-    return raw_id
 
+    match = ORIGINAL_VEH_ID_RE.match(raw_id)
+    if match is None:
+        raise ValueError(f"Unexpected vehicle/pedestrian ID format: {raw_id}")
+
+    return match.group(1)
 
 def normalize_id_value_dict(raw_dict: Dict[Any, Any]) -> Dict[str, float]:
-    """
-    dict のキーを vehicle ID に正規化し、値を float 化する。
-    同一 run 内で正規化後に同じ key が衝突した場合は後勝ちにする。
-    """
     normalized: Dict[str, float] = {}
+
     for key, value in raw_dict.items():
         normalized_key = normalize_vehicle_id(str(key))
+
         try:
             normalized_value = float(value)
         except (TypeError, ValueError):
             continue
+
+        if normalized_key in normalized:
+            warn(
+                f"同一 run 内で元車両IDが重複しました: "
+                f"original_id={normalized_key}, "
+                f"old={normalized[normalized_key]}, new={normalized_value}, raw_id={key}"
+            )
+
         normalized[normalized_key] = normalized_value
+
     return normalized
 
 
@@ -555,6 +568,7 @@ def build_requested_output_for_scenario(
         if output_key is not None:
             selected_results[output_key] = condition_result
 
+    vehicle_mean_evacuation_time: Dict[str, Dict[str, float]] = {}
     cdf_source: Dict[str, List[float]] = {}
     arrival_time_cdf: Dict[str, Dict[str, List[float]]] = {}
     average_count_metrics: Dict[str, Dict[str, float]] = {}
@@ -571,6 +585,7 @@ def build_requested_output_for_scenario(
             cdf_source[output_key] = []
             arrival_time_cdf[output_key] = {"x": [], "y": []}
             average_count_metrics[output_key] = {}
+            vehicle_mean_evacuation_time[output_key] = {}
             all_abandon_time_events[output_key] = []
 
             abandon_time_distribution[output_key] = build_histogram_from_values(
@@ -589,6 +604,20 @@ def build_requested_output_for_scenario(
         ]
         arrival_values = sorted(arrival_values)
         cdf_source[output_key] = arrival_values
+
+        vehicle_mean_arrival_time_map = (
+            condition_result
+            .get("arrival_time", {})
+            .get("vehicle_mean_arrival_time", {})
+        )
+
+        vehicle_mean_evacuation_time[output_key] = {
+            str(vehicle_id): float(mean_time)
+            for vehicle_id, mean_time in sorted(
+                vehicle_mean_arrival_time_map.items(),
+                key=lambda item: int(item[0]) if str(item[0]).isdigit() else str(item[0]),
+            )
+        }
 
         x_values, y_values = compute_cdf_points(arrival_values)
         arrival_time_cdf[output_key] = {
@@ -629,6 +658,7 @@ def build_requested_output_for_scenario(
         "scenario": scenario,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "average_count_metrics": average_count_metrics,
+        "vehicle_mean_evacuation_time": vehicle_mean_evacuation_time,
         "cdf_source": cdf_source,
         "arrival_time_cdf": arrival_time_cdf,
         "all_abandon_time_events": all_abandon_time_events,
@@ -873,10 +903,55 @@ def create_cdf_plot(condition_key: str, values: List[float], output_dir: str) ->
 # =========================================
 
 def write_json(data: Dict[str, Any], output_path: str) -> None:
-    """結果 JSON を保存する"""
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2, sort_keys=False)
+    """
+    結果 JSON を保存する。
 
+    top-level は改行する。
+    top-level の値が dict の場合，その直下の key ごとに改行する。
+    その下の dict は 1 行で出力する。
+    """
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("{\n")
+
+        top_items = list(data.items())
+
+        for top_index, (top_key, top_value) in enumerate(top_items):
+            is_last_top = top_index == len(top_items) - 1
+            top_comma = "" if is_last_top else ","
+
+            if not isinstance(top_value, dict):
+                dumped_value = json.dumps(
+                    top_value,
+                    ensure_ascii=False,
+                    separators=(", ", ": "),
+                    sort_keys=False,
+                )
+                f.write(f'  "{top_key}": {dumped_value}{top_comma}\n')
+                continue
+
+            f.write(f'  "{top_key}": {{\n')
+
+            child_items = list(top_value.items())
+
+            for child_index, (child_key, child_value) in enumerate(child_items):
+                is_last_child = child_index == len(child_items) - 1
+                child_comma = "" if is_last_child else ","
+
+                dumped_child_value = json.dumps(
+                    child_value,
+                    ensure_ascii=False,
+                    separators=(", ", ": "),
+                    sort_keys=False,
+                )
+
+                f.write(
+                    f'    "{child_key}": {dumped_child_value}{child_comma}\n'
+                )
+
+            f.write(f"  }}{top_comma}\n")
+
+        f.write("}\n")
+        
 
 # =========================================
 # 全体処理

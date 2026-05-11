@@ -526,8 +526,8 @@ def control_vehicles():
                     ww_changed = False
                     try:
                         if current_edgeID not in ["E2", "E3", "E107", "E130", "-E130", "-E129", "-E128", "-E104", "-E105", "-E106"]:
-                            print("逆走行為を行います current_vehID: {} current_edgeID: {}".format(current_vehID, current_edgeID))
-                            current_road_id = traci.vehicle.getRoadID(current_vehID)
+                            # print("逆走行為を行います current_vehID: {} current_edgeID: {}".format(current_vehID, current_edgeID))
+                            # current_road_id = traci.vehicle.getRoadID(current_vehID)
                             traci.vehicle.changeLane(
                                 vehID=current_vehID,
                                 laneIndex=2,
