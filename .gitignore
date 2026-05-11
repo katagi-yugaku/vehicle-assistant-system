@@ -34,3 +34,5 @@ slurm_logs/
 *.out
 *.err
 *.pyc
+__pycache__/
+*.py[cod]
