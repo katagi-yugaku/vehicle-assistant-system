@@ -180,7 +180,12 @@ ALIAS_MAP = {
 
 # .out ファイル名規則
 OUT_FILENAME_RE = re.compile(
-    r"^va_s(?P<scenario>\d+)_e(?P<early_rate>\d+(?:\.\d+)?)_v(?P<v2v_rate>\d+(?:\.\d+)?)_r(?P<run_id>\d+)_(?P<jobid>\d+)\.out$"
+    r"^va_s(?P<scenario>\d+)"
+    r"(?:_(?P<mode>system|nosystem))?"
+    r"_e(?P<early_rate>\d+(?:\.\d+)?)"
+    r"_v(?P<v2v_rate>\d+(?:\.\d+)?)"
+    r"_r(?P<run_id>\d+)"
+    r"_(?P<jobid>\d+)\.out$"
 )
 
 
@@ -194,6 +199,7 @@ class LogFileInfo:
     path: str
     filename: str
     scenario: int
+    mode: Optional[str]
     early_rate: float
     v2v_rate: float
     run_id: int
@@ -201,8 +207,12 @@ class LogFileInfo:
 
     @property
     def condition_key(self) -> str:
-        return build_condition_key(self.scenario, self.early_rate, self.v2v_rate)
-
+        return build_condition_key(
+            self.scenario,
+            self.early_rate,
+            self.v2v_rate,
+            self.mode,
+        )
 
 # =========================================
 # 汎用ユーティリティ
@@ -218,9 +228,15 @@ def info(message: str) -> None:
     print(f"[INFO] {message}", file=sys.stdout)
 
 
-def build_condition_key(scenario: int, early_rate: float, v2v_rate: float) -> str:
+def build_condition_key(
+    scenario: int,
+    early_rate: float,
+    v2v_rate: float,
+    mode: Optional[str] = None,
+) -> str:
     """条件キー文字列を生成する"""
-    return f"s{scenario}_e{early_rate}_v{v2v_rate}"
+    mode_part = f"_{mode}" if mode else ""
+    return f"s{scenario}{mode_part}_e{early_rate}_v{v2v_rate}"
 
 
 def safe_mean(values: Iterable[float]) -> Optional[float]:
@@ -317,6 +333,7 @@ def parse_out_filename(path: str) -> Optional[LogFileInfo]:
             path=path,
             filename=filename,
             scenario=int(match.group("scenario")),
+            mode=match.group("mode"),
             early_rate=float(match.group("early_rate")),
             v2v_rate=float(match.group("v2v_rate")),
             run_id=int(match.group("run_id")),
@@ -530,16 +547,21 @@ def build_histogram_from_values(values: List[float], bin_edges: List[float]) -> 
     }
 
 
-def get_requested_output_key(early_rate: float, v2v_rate: float) -> Optional[str]:
+def get_requested_output_key(
+    early_rate: float,
+    v2v_rate: float,
+    mode: Optional[str] = None,
+) -> Optional[str]:
     """
     出力 JSON 用のキーを返す。
-    system 側は "0.1", "0.5", "0.9"、
-    nosystem 側は early_rate=0.5, v2v_rate=0.0 を "nosystem" とする。
+
+    system:
+        early_rate をそのまま "0.1", "0.5", "0.9", "1.0" などにする
+    nosystem:
+        "nosystem" にする
     """
-    if is_close_float(v2v_rate, COMPARISON_SYSTEM_V2V_RATE):
-        for target_rate in COMPARISON_SYSTEM_EARLY_RATES:
-            if is_close_float(early_rate, target_rate):
-                return f"{target_rate:.1f}"
+    if mode == "nosystem":
+        return "nosystem"
 
     if (
         is_close_float(early_rate, COMPARISON_NOSYSTEM_EARLY_RATE)
@@ -547,7 +569,11 @@ def get_requested_output_key(early_rate: float, v2v_rate: float) -> Optional[str
     ):
         return "nosystem"
 
+    if mode == "system" or is_close_float(v2v_rate, COMPARISON_SYSTEM_V2V_RATE):
+        return f"{early_rate:.1f}"
+
     return None
+
 
 def build_requested_output_for_scenario(
     scenario: int,
@@ -558,13 +584,17 @@ def build_requested_output_for_scenario(
     0.1 / 0.5 / 0.9 / nosystem ごとに
     all_abandon_time_events を含めて出力する。
     """
-    ordered_keys = ["0.1", "0.5", "0.9", "nosystem"]
+    if scenario == 1:
+        ordered_keys = ["0.1", "0.5", "0.9", "nosystem"]
+    else:
+        ordered_keys = ["1.0"]
 
     selected_results: Dict[str, Dict[str, Any]] = {}
     for _, condition_result in scenario_results.items():
         early_rate = float(condition_result["early_rate"])
         v2v_rate = float(condition_result["v2v_rate"])
-        output_key = get_requested_output_key(early_rate, v2v_rate)
+        mode = condition_result.get("mode")
+        output_key = get_requested_output_key(early_rate, v2v_rate, mode)
         if output_key is not None:
             selected_results[output_key] = condition_result
 
@@ -671,31 +701,55 @@ def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> No
     plt.figure(figsize=(10, 6))
 
     def label_for(key: float) -> str:
-        if is_close_float(key, 0.1):
-            return "system 0.1"
-        if is_close_float(key, 0.5):
-            return "system 0.5"
-        if is_close_float(key, 0.9):
-            return "system 0.9"
+        """
+        CDF グラフの凡例名を返す。
+
+        key=0.0 は nosystem を表す。
+        それ以外は system の early_rate を表す。
+        """
         if is_close_float(key, 0.0):
             return "nosystem 0.5"
-        return f"key={key}"
+        if is_close_float(key, 1.0):
+            return "system 1.0"
+        return f"system {key:.1f}"
 
-    for key in [0.1, 0.5, 0.9, 0.0]:
+    def style_for(key: float) -> Dict[str, str]:
+        """
+        条件ごとの線の色・線種を返す。
+        既存の色設定をなるべく維持する。
+        """
+        if is_close_float(key, 0.0):
+            return {"color": "blue", "linestyle": "--"}
+        if is_close_float(key, 0.1):
+            return {"color": "r", "linestyle": "-"}
+        if is_close_float(key, 0.5):
+            return {"color": "blue", "linestyle": "-"}
+        if is_close_float(key, 0.9):
+            return {"color": "g", "linestyle": "-"}
+        if is_close_float(key, 1.0):
+            return {"color": "black", "linestyle": "-"}
+
+        # 想定外の early_rate が来ても描画できるようにする
+        return {"linestyle": "-"}
+
+    plotted = False
+
+    for key in sorted(data_dict.keys()):
         values = data_dict.get(key, [])
         arr = sorted(float(v) for v in values)
+
         if not arr:
             continue
+
         cdf = [(i + 1) / len(arr) for i in range(len(arr))]
 
-        if is_close_float(key, 0.1):
-            plt.plot(arr, cdf, label=label_for(key), color="r", linestyle="-")
-        elif is_close_float(key, 0.5):
-            plt.plot(arr, cdf, label=label_for(key), color="blue", linestyle="-")
-        elif is_close_float(key, 0.9):
-            plt.plot(arr, cdf, label=label_for(key), color="g", linestyle="-")
-        elif is_close_float(key, 0.0):
-            plt.plot(arr, cdf, label=label_for(key), color="blue", linestyle="--")
+        plt.plot(
+            arr,
+            cdf,
+            label=label_for(key),
+            **style_for(key),
+        )
+        plotted = True
 
     plt.xlim(200, 3000)
     plt.ylim(0.05, 1.0)
@@ -703,7 +757,10 @@ def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> No
     plt.yticks(ticks=[i / 10 for i in range(1, 11)], fontsize=14, fontweight="semibold")
     plt.xlabel("Mean arrival time")
     plt.ylabel("Cumulative distribution")
-    plt.legend(loc="lower right")
+
+    if plotted:
+        plt.legend(loc="lower right")
+
     plt.grid(True)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
@@ -817,6 +874,7 @@ def aggregate_condition(
 
     result: Dict[str, Any] = {
     "scenario": scenario,
+    "mode": files[0].mode,
     "early_rate": early_rate,
     "v2v_rate": v2v_rate,
     "run_status": {
@@ -1026,34 +1084,26 @@ def aggregate_all_conditions(
 def build_comparison_cdf_data_for_scenario(
     scenario_results: Dict[str, Dict[str, Any]]
 ) -> Dict[float, List[float]]:
-    """
-    scenario 単位で、比較 CDF 用のデータを組み立てる。
-    対象:
-      - system 0.1: early_rate=0.1, v2v=1.0
-      - system 0.5: early_rate=0.5, v2v=1.0
-      - system 0.9: early_rate=0.9, v2v=1.0
-      - nosystem 0.5: early_rate=0.5, v2v=0.0
-    """
     comparison_data: Dict[float, List[float]] = {}
 
     for _, condition_result in scenario_results.items():
         early_rate = float(condition_result["early_rate"])
         v2v_rate = float(condition_result["v2v_rate"])
+        mode = condition_result.get("mode")
         arrival_values = list(condition_result["arrival_time"].get("arrival_time_list", []))
 
         if not arrival_values:
             continue
 
-        if (
-            is_close_float(v2v_rate, COMPARISON_SYSTEM_V2V_RATE)
-            and any(is_close_float(early_rate, x) for x in COMPARISON_SYSTEM_EARLY_RATES)
-        ):
-            comparison_data[early_rate] = arrival_values
-        elif (
+        if mode == "nosystem" or (
             is_close_float(early_rate, COMPARISON_NOSYSTEM_EARLY_RATE)
             and is_close_float(v2v_rate, COMPARISON_NOSYSTEM_V2V_RATE)
         ):
             comparison_data[0.0] = arrival_values
+            continue
+
+        if mode == "system" or is_close_float(v2v_rate, COMPARISON_SYSTEM_V2V_RATE):
+            comparison_data[early_rate] = arrival_values
 
     return comparison_data
 

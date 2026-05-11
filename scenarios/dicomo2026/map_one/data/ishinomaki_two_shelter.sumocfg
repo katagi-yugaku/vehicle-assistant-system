@@ -7,7 +7,7 @@
     <input>
         <net-file value="ishinomaki_two_shelter.net.xml"/>
         <route-files value="ishinomaki_two_shelter.rou.xml"/>
-        <additional-files value="ishinomaki_two_shelter.add.xml"/>
+        <!-- <additional-files value="ishinomaki_two_shelter.add.xml"/> -->
     </input>
     <processing>
         <parking.maneuver value="true"/>
