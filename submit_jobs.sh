@@ -105,21 +105,21 @@ fi
 # job 作成前に branch 作成・switch
 # =========================================
 if [[ "${AUTO_GIT_PUSH}" == "1" ]]; then
-  if ! git -C "${SCRIPT_DIR}" remote get-url "${GIT_REMOTE}" >/dev/null 2>&1; then
+  if ! git remote | grep -qx "${GIT_REMOTE}"; then
     echo "ERROR: Git remote '${GIT_REMOTE}' が存在しません"
     exit 1
   fi
 
   echo "[INFO] Git branch を作成して switch します: ${GIT_BRANCH_NAME}"
-  git -C "${SCRIPT_DIR}" checkout -b "${GIT_BRANCH_NAME}"
+  git checkout -b "${GIT_BRANCH_NAME}"
 
   echo "[INFO] submit / aggregate scripts を先に commit 対象として固定します"
-  git -C "${SCRIPT_DIR}" add "${SCRIPT_PATH}" "${AGGREGATE_SCRIPT_PATH}"
+  git add "${SCRIPT_PATH}" "${AGGREGATE_SCRIPT_PATH}"
 
-  if git -C "${SCRIPT_DIR}" diff --cached --quiet; then
+  if git diff --cached --quiet; then
     echo "[INFO] script に commit 対象の変更はありません"
   else
-    git -C "${SCRIPT_DIR}" commit -m "Add aggregation automation scripts"
+    git commit -m "Add aggregation automation scripts"
   fi
 else
   echo "[INFO] AUTO_GIT_PUSH=0 のため Git branch 作成・push はスキップします"
