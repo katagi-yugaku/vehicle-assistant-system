@@ -318,6 +318,7 @@ def control_vehicles():
                         ROUTE_CHANGED_VEHICLE_COUNT += 1
                         if route_changed:
                             agent_by_current_vehID.set_evacuation_route_changed_flg(True)
+                            print(f"Vehicle {current_vehID} changed route after arriving at full shelter at time {current_time}. New shelter: {shelterID}, new route: {to_edge_list[0]}")
                             agent_by_current_vehID.set_agent_action_name("rc")
                             reset_motivation_after_action(
                                 agent=agent_by_current_vehID,
@@ -484,7 +485,8 @@ def control_vehicles():
                         action="rc", 
                         debug=False, 
                         agent_by_vehID_dict=agent_by_vehID_dict,
-                        custome_edge_list=custome_edge_list)
+                        custome_edge_list=custome_edge_list,
+                        pedestrianID_list=pedestrianIDs)
                 if rc_current_value > agent_by_current_vehID.get_route_change_threshold() and not agent_by_current_vehID.get_evacuation_route_changed_flg():
                     # 実行可能性を検証するために、別レーンにいる車両とのこの距離を測定して、判定する
                     # 隣のレーンが埋まっていたら、経路変更は実施不能と判断して、フラグを立てない
@@ -553,7 +555,17 @@ def control_vehicles():
                         continue
 
                 # AGENT: 逆走行為の意思決定
-                ww_current_value = calculate_motivation_for_evacuation_action(agent=agent_by_current_vehID, agent_list=agent_list, vehInfo=vehInfo_by_current_vehID, current_time=current_time, action="ww", debug=False, agent_by_vehID_dict=agent_by_vehID_dict, custome_edge_list=custome_edge_list)
+                ww_current_value = calculate_motivation_for_evacuation_action(
+                    agent=agent_by_current_vehID, 
+                    agent_list=agent_list, 
+                    vehInfo=vehInfo_by_current_vehID, 
+                    current_time=current_time, 
+                    action="ww", 
+                    debug=False, 
+                    agent_by_vehID_dict=agent_by_vehID_dict, 
+                    custome_edge_list=custome_edge_list,
+                    pedestrianID_list=pedestrianIDs)
+                
                 if ww_current_value > agent_by_current_vehID.get_wrong_way_driving_threshold() and not agent_by_current_vehID.get_wrong_way_driving_flg():
                     # 実行可能性を検証するために、別レーンにいる車両とのこの距離を測定して、判定する
                     ww_changed = False
@@ -570,8 +582,8 @@ def control_vehicles():
                             # next_shelter = current_shelter[:-2] + "_1"
                             # agent_by_current_vehID.set_target_shelter(next_shelter)
                             traci.vehicle.setLaneChangeMode(current_vehID, 512)
-                            agent_by_current_vehID.set_wrong_way_driving_flg(True)
-                            agent_by_current_vehID.set_agent_action_name("ww")
+                            # agent_by_current_vehID.set_wrong_way_driving_flg(True)
+                            # agent_by_current_vehID.set_agent_action_name("ww")
                             ww_changed = True
 
                     except Exception as e:
@@ -591,7 +603,16 @@ def control_vehicles():
                 #     if current_vehID == "init_ShelterB_1_250":
                 #         print("逆走行為を行いません current_vehID: {} current_edgeID: {} ww_current_value: {} threshold: {} current_time: {}".format(current_vehID, current_edgeID, ww_current_value, agent_by_current_vehID.get_wrong_way_driving_threshold(), current_time))
                 # AGENT: 車両乗り捨て行為の意思決定
-                va_current_value = calculate_motivation_for_evacuation_action(agent=agent_by_current_vehID, agent_list=agent_list, vehInfo=vehInfo_by_current_vehID, current_time=current_time, action="va", debug=False, agent_by_vehID_dict=agent_by_vehID_dict, custome_edge_list=custome_edge_list)
+                va_current_value = calculate_motivation_for_evacuation_action(
+                    agent=agent_by_current_vehID, 
+                    agent_list=agent_list, 
+                    vehInfo=vehInfo_by_current_vehID, 
+                    current_time=current_time, 
+                    action="va", 
+                    debug=False, 
+                    agent_by_vehID_dict=agent_by_vehID_dict, 
+                    custome_edge_list=custome_edge_list,
+                    pedestrianID_list=pedestrianIDs)
                 if va_current_value > agent_by_current_vehID.get_vehicle_abandoned_threshold() and not agent_by_current_vehID.get_vehicle_abandoned_flg():
                     try:
                         if current_edgeID not in ["-E130", "-E129", "-E128", "-E104", "-E105", "-E106"]:
@@ -785,7 +806,7 @@ if __name__ == "__main__":
                 )
     
     # 避難地の情報をもとに、Shelter一覧を生成
-    shelter_capacity_by_ID:dict = {"ShelterA_1": 100, "ShelterB_1": 300}
+    shelter_capacity_by_ID:dict = {"ShelterA_1": 100, "ShelterB_1": 200}
     edgeID_by_shelterID:dict = {"ShelterA_1": 'E2', "ShelterB_1": "E3"}
     shelter_choice_prob_list = [1.0]
     for shelterID, near_edgeID in edgeID_by_shelterID.items():
@@ -810,8 +831,8 @@ if __name__ == "__main__":
         "E1": [0.0, 1.0],
     }
     vehicle_count_by_start_edge = {
-        "-E1": 200,  # 例: 10台
-        "E1": 200   # 例: 200台
+        "-E1": 150,  # 例: 10台
+        "E1": 150   # 例: 200台
     }
     start_interval = 5.0
     end_interval = 4.0

@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     from evacsim.agents.VehicleInfo import VehicleInfo
 
 from evacsim.sim.routing_distance import distance_each_vehIDs
+
 from evacsim.sim.traci_cache import get_vehicle_position_cached
+
 from evacsim.utils.lookup import (
     find_shelter_by_edgeID_connect_target_shelter,
     find_shelterID_by_edgeID_by_shelterID,
@@ -26,6 +28,14 @@ from evacsim.utils.lookup import (
 )
 from evacsim.sim.neighbors import (
     get_around_vehIDs,
+)
+from evacsim.utilities import get_person_position_cached
+
+from evacsim.maps.edge_utils import (
+    is_pre_edgeID_near_shelter,
+    get_vehicle_start_edges,
+    get_vehicle_end_edges,
+    get_opposite_edgeID_by_edgeID,
 )
 
 def two_stage_sigmoid(value: float):
@@ -273,6 +283,7 @@ def calculate_motivation_for_evacuation_action(
     action: str,
     agent_by_vehID_dict: dict,
     custome_edge_list: list,
+    pedestrianID_list: list,
     debug: bool = False,
 ) -> float:
     """
@@ -305,7 +316,8 @@ def calculate_motivation_for_evacuation_action(
         agent_list=agent_list, 
         candidate_action=action, 
         agent_by_vehID_dict=agent_by_vehID_dict, 
-        custome_edge_list=custome_edge_list,)
+        custome_edge_list=custome_edge_list,
+        pedestrianID_list=pedestrianID_list)
 
     if base_value + majority_motivation_value < 0:
         majority_motivation_value = 0.0
@@ -421,21 +433,23 @@ def calculate_motivation_for_majority_tunning_bias(
     candidate_action: str,
     agent_by_vehID_dict: dict,
     custome_edge_list: list,
+    pedestrianID_list: list,
 ) -> float:
-    same_action_count, total_count = count_same_action_drivers(
+    same_action_count = count_same_action_drivers(
             agent=agent, vehInfo=vehInfo, 
             agent_list=agent_list, 
             candidate_action=candidate_action, 
             agent_by_vehID_dict=agent_by_vehID_dict,
-            custome_edge_list=custome_edge_list)
+            custome_edge_list=custome_edge_list,
+            pedestrianID_list=pedestrianID_list,)
     if vehInfo.get_vehicle_comm_enabled_flag():
-        if total_count == 0:
-            return 0.0
         if same_action_count == 0:
             return -agent.get_majority_value_decrease()
         return same_action_count * agent.get_majority_value_increase()
     else:
+        # print(f"same_action_count {same_action_count}")
         return same_action_count * agent.get_majority_value_increase()
+
 
 def count_same_action_drivers(
     agent: Agent,
@@ -444,6 +458,7 @@ def count_same_action_drivers(
     candidate_action: str,
     agent_by_vehID_dict: dict,
     custome_edge_list: list,
+    pedestrianID_list: list,
 ):
     """
     同調性バイアスの計算
@@ -461,35 +476,72 @@ def count_same_action_drivers(
                     custome_edge_list=custome_edge_list,
                     step_cache=step_cache,
                 )
-    active_vehID_set = set(around_vehIDs)  
-    # agent_listから、周囲の中で、同じ行動をとっている　かつ、周囲の50m以内の車両の数を数える
-    same_action_count = 0
-    total_count = 0
-    if agent.get_vehID() not in active_vehID_set:
-        print(f"Warning:  motivation package Agent's vehID {agent.get_vehID()} is not in active_vehID_set. This agent may have been removed from the simulation.")
-        return 0, 0
-
     target_position = get_vehicle_position_cached(
             agent.get_vehID(),
             step_cache=step_cache,
         )
-    for vehID in around_vehIDs:
-        if vehID == agent.get_vehID():
-            continue
-        other_agent = find_agent_by_vehID(vehID=vehID, agent_list=agent_list, agent_by_vehID_dict=agent_by_vehID_dict)
-        if other_agent == agent or other_agent.get_shelter_changed_flg() or other_agent.get_vehicle_abandoned_flg():
-            continue
-        if other_agent is None:
-            continue
-
-        other_agent_position = get_vehicle_position_cached(
-            other_agent.get_vehID(),
-            step_cache=step_cache,
-        )
-        distance = distance_each_vehIDs(target_position, other_agent_position)
-        if distance <= 50:
-            total_count += 1
-            if other_agent.get_agent_action_name() == candidate_action:
+    same_action_count = 0
+    current_edgeID = traci.vehicle.getRoadID(agent.get_vehID())
+    # 車両乗り捨てをしている人が近くにいるか
+    if candidate_action == "va":
+        for pedestrianID in pedestrianID_list:
+            ped_position = get_person_position_cached(pedestrianID, step_cache=step_cache)
+            if ped_position is None:
+                continue
+            distance = distance_each_vehIDs(target_position, ped_position)
+            if distance <= 50:
+                print(f"va same action found: {pedestrianID} at distance {distance}")
                 same_action_count += 1
+    # 車両乗り捨てをしている人が近くにいるか
+    if candidate_action == "ww":
+        current_lane_ID = traci.vehicle.getLaneID(agent.get_vehID())
+        edge_id, lane_index = current_lane_ID.rsplit("_", 1)
+        ww_lane_ID = f"{edge_id}_2"
 
-    return same_action_count, total_count
+        ww_moviing_vehIDs = traci.lane.getLastStepVehicleIDs(ww_lane_ID)
+        for ww_moving_vehID in ww_moviing_vehIDs:
+            if ww_moving_vehID == agent.get_vehID():
+                continue
+            other_agent = find_agent_by_vehID(vehID=ww_moving_vehID, agent_list=agent_list, agent_by_vehID_dict=agent_by_vehID_dict)
+            if other_agent == agent or other_agent.get_shelter_changed_flg() or other_agent.get_vehicle_abandoned_flg():
+                continue
+            if other_agent is None:
+                continue
+            if other_agent.get_agent_action_name() == "":
+                continue
+
+            other_agent_position = get_vehicle_position_cached(
+                other_agent.get_vehID(),
+                step_cache=step_cache,
+            )
+            distance = distance_each_vehIDs(target_position, other_agent_position)
+            if distance <= 50:
+                print(f"ww same action found: {other_agent.get_vehID()} at distance {distance}")
+                if other_agent.get_agent_action_name() == candidate_action:
+                    print(f"ww same action found: {other_agent.get_vehID()} at distance {distance}")
+                    same_action_count += 1
+    # 車両を変更している人が近くにいるか
+    if candidate_action == "rc":
+        opposite_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID)
+        opposite_moving_vehIDs = traci.edge.getLastStepVehicleIDs(opposite_edgeID)
+
+        for opposite_moving_vehID in opposite_moving_vehIDs:
+            other_agent = find_agent_by_vehID(vehID=opposite_moving_vehID, agent_list=agent_list, agent_by_vehID_dict=agent_by_vehID_dict)
+            if other_agent == agent or other_agent.get_shelter_changed_flg() or other_agent.get_vehicle_abandoned_flg():
+                continue
+            elif other_agent.get_agent_action_name() == "":
+                continue
+            elif other_agent is not None:
+                other_agent_position = get_vehicle_position_cached(
+                    other_agent.get_vehID(),
+                    step_cache=step_cache,
+                )
+                distance = distance_each_vehIDs(target_position, other_agent_position)
+                print(f"rc other_agent: {other_agent.get_vehID()}, distance: {distance}")
+                if distance <= 50:
+                    print(f"rc same action found: {other_agent.get_vehID()} at distance {distance}")
+                    if other_agent.get_agent_action_name() == candidate_action:
+                        print(f"rc same action found: {other_agent.get_vehID()} at distance {distance}")
+                        same_action_count += 1
+    return same_action_count
+
