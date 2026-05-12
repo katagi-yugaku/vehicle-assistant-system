@@ -539,9 +539,9 @@ def count_same_action_drivers(
             other_agent = find_agent_by_vehID(vehID=opposite_moving_vehID, agent_list=agent_list, agent_by_vehID_dict=agent_by_vehID_dict)
             if other_agent == agent or other_agent.get_vehicle_abandoned_flg():
                 continue
-            elif other_agent.get_agent_action_name() == "":
-                print(f"rc other_agent {other_agent.get_vehID()} has no action")
-                continue
+            # elif other_agent.get_agent_action_name() == "":
+            #     print(f"rc other_agent {other_agent.get_vehID()} has no action")
+            #     continue
             elif other_agent is not None:
                 other_agent_position = get_vehicle_position_cached(
                     other_agent.get_vehID(),
