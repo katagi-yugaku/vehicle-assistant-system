@@ -490,7 +490,7 @@ def count_same_action_drivers(
                 continue
             distance = distance_each_vehIDs(target_position, ped_position)
             if distance <= 50:
-                print(f"va same action found: {pedestrianID} at distance {distance}")
+                # print(f"va same action found: {pedestrianID} at distance {distance}")
                 same_action_count += 1
     # 車両乗り捨てをしている人が近くにいるか
     if candidate_action == "ww":
