@@ -804,7 +804,10 @@ if __name__ == "__main__":
                 traceGetters=False,
 
                 )
-    
+    index = traci.edge.getLaneNumber("-E128") 
+    print(f"lane number of -E128_2: {index}")
+    edgeID = traci.lane.getEdgeID("-E128_2")
+    print(f"edgeID {edgeID}")
     # 避難地の情報をもとに、Shelter一覧を生成
     shelter_capacity_by_ID:dict = {"ShelterA_1": 100, "ShelterB_1": 300}
     edgeID_by_shelterID:dict = {"ShelterA_1": 'E2', "ShelterB_1": "E3"}
