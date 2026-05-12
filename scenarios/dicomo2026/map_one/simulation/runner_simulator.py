@@ -831,8 +831,8 @@ if __name__ == "__main__":
         "E1": [0.0, 1.0],
     }
     vehicle_count_by_start_edge = {
-        "-E1": 150,  # 例: 10台
-        "E1": 150   # 例: 200台
+        "-E1": 200,  # 例: 10台
+        "E1": 200   # 例: 200台
     }
     start_interval = 5.0
     end_interval = 4.0
