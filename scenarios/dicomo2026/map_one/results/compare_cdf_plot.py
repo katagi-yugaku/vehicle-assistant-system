@@ -97,7 +97,7 @@ def plot_compare_cdfs(
                 linewidth=2,
             )
 
-    max_time = 1700
+    max_time = 2200
     min_time = 100
     y_min = 0.0
 

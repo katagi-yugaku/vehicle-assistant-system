@@ -318,7 +318,7 @@ def control_vehicles():
                         ROUTE_CHANGED_VEHICLE_COUNT += 1
                         if route_changed:
                             agent_by_current_vehID.set_evacuation_route_changed_flg(True)
-                            print(f"Vehicle {current_vehID} changed route after arriving at full shelter at time {current_time}. New shelter: {shelterID}, new route: {to_edge_list[0]}")
+                            # print(f"Vehicle {current_vehID} changed route after arriving at full shelter at time {current_time}. New shelter: {shelterID}, new route: {to_edge_list[0]}")
                             agent_by_current_vehID.set_agent_action_name("rc")
                             reset_motivation_after_action(
                                 agent=agent_by_current_vehID,
@@ -806,7 +806,7 @@ if __name__ == "__main__":
                 )
     
     # 避難地の情報をもとに、Shelter一覧を生成
-    shelter_capacity_by_ID:dict = {"ShelterA_1": 100, "ShelterB_1": 200}
+    shelter_capacity_by_ID:dict = {"ShelterA_1": 100, "ShelterB_1": 300}
     edgeID_by_shelterID:dict = {"ShelterA_1": 'E2', "ShelterB_1": "E3"}
     shelter_choice_prob_list = [1.0]
     for shelterID, near_edgeID in edgeID_by_shelterID.items():
@@ -831,8 +831,8 @@ if __name__ == "__main__":
         "E1": [0.0, 1.0],
     }
     vehicle_count_by_start_edge = {
-        "-E1": 150,  # 例: 10台
-        "E1": 150   # 例: 200台
+        "-E1": 200,  # 例: 10台
+        "E1": 200   # 例: 200台
     }
     start_interval = 5.0
     end_interval = 4.0

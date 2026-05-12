@@ -78,7 +78,7 @@ def plot_cdfs(
             linestyle=style["linestyle"],
             linewidth=2,
         )
-    max_time = 1700
+    max_time = 2200
     min_time = 100
     ylim_min = 0.0
     plt.xlim(min_time, max_time)

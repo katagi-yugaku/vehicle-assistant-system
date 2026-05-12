@@ -137,9 +137,9 @@ cautious_normalcy_value_about_shelter_full_info_spread = 100.0
 #
 # そのため，従来の 1200 / 1500 より小さくする．
 # ==================================================
-active_majority_increase_value_center = 700.0
+active_majority_increase_value_center = 400.0
 active_majority_increase_value_spread = 150.0
-cautious_majority_increase_value_center = 700.0
+cautious_majority_increase_value_center = 400.0
 cautious_majority_increase_value_spread = 150.0
 
 # ==================================================

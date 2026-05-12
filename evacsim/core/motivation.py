@@ -448,6 +448,8 @@ def calculate_motivation_for_majority_tunning_bias(
         return same_action_count * agent.get_majority_value_increase()
     else:
         # print(f"same_action_count {same_action_count}")
+        if same_action_count > 5:
+            same_action_count = 5
         return same_action_count * agent.get_majority_value_increase()
 
 
@@ -494,10 +496,16 @@ def count_same_action_drivers(
                 same_action_count += 1
     # 車両乗り捨てをしている人が近くにいるか
     if candidate_action == "ww":
+        # print(f"current_edgeID: {current_edgeID} current_lane_ID: {traci.vehicle.getLaneID(agent.get_vehID())}")
         current_lane_ID = traci.vehicle.getLaneID(agent.get_vehID())
         edge_id, lane_index = current_lane_ID.rsplit("_", 1)
-        ww_lane_ID = f"{edge_id}_2"
+        lane_index = int(lane_index)
 
+        if lane_index == 2:
+            target_lane_index = 1
+        else:
+            target_lane_index = lane_index + 1
+        ww_lane_ID = f"{edge_id}_{target_lane_index}"
         ww_moviing_vehIDs = traci.lane.getLastStepVehicleIDs(ww_lane_ID)
         for ww_moving_vehID in ww_moviing_vehIDs:
             if ww_moving_vehID == agent.get_vehID():
@@ -520,11 +528,13 @@ def count_same_action_drivers(
                 if other_agent.get_agent_action_name() == candidate_action:
                     print(f"ww same action found: {other_agent.get_vehID()} at distance {distance}")
                     same_action_count += 1
+
     # 車両を変更している人が近くにいるか
     if candidate_action == "rc":
         opposite_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID)
         opposite_moving_vehIDs = traci.edge.getLastStepVehicleIDs(opposite_edgeID)
-
+        if len(opposite_moving_vehIDs):
+            print(f"rc opposite_edgeID: {opposite_edgeID}, opposite_moving_vehIDs: {opposite_moving_vehIDs}")
         for opposite_moving_vehID in opposite_moving_vehIDs:
             other_agent = find_agent_by_vehID(vehID=opposite_moving_vehID, agent_list=agent_list, agent_by_vehID_dict=agent_by_vehID_dict)
             if other_agent == agent or other_agent.get_shelter_changed_flg() or other_agent.get_vehicle_abandoned_flg():

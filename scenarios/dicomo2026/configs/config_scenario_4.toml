@@ -137,10 +137,10 @@ cautious_normalcy_value_about_shelter_full_info_spread = 100.0
 #
 # そのため，従来の 1200 / 1500 より小さくする．
 # ==================================================
-active_majority_increase_value_center = 1000.0
-active_majority_increase_value_spread = 150.0
-cautious_majority_increase_value_center = 700.0
-cautious_majority_increase_value_spread = 150.0
+active_majority_increase_value_center = 600.0
+active_majority_increase_value_spread = 200.0
+cautious_majority_increase_value_center = 600.0
+cautious_majority_increase_value_spread = 200.0
 
 # ==================================================
 # 周囲車両による同調性バイアス 減少
