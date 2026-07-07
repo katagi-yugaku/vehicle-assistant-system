@@ -268,10 +268,11 @@ def generate_new_veh_based_on_route_time(
     """
     if from_edgeID == "" and new_shelterID == "" and to_edgeID == "":
         return NEW_VEHICLE_COUNT
-
     via_edgeIDs_with_intial_end_edge: list = list(traci.simulation.findRoute(from_edgeID, to_edgeID).edges)
 
     if via_edgeIDs_with_intial_end_edge is None or len(via_edgeIDs_with_intial_end_edge) == 0:
+        print("test4")
+        # print(f"target_vehID: {target_vehID} from_edgeID: {from_edgeID}, to_edgeID: {to_edgeID} viaa_edgeIDs_with_intial_end_edge: {via_edgeIDs_with_intial_end_edge}")
         via_edgeIDs_with_intial_end_edge = list(
             traci.simulation.findRoute(get_opposite_edgeID_by_edgeID(from_edgeID), to_edgeID).edges
         )
@@ -279,7 +280,7 @@ def generate_new_veh_based_on_route_time(
         if via_edgeIDs_with_intial_end_edge is None or len(via_edgeIDs_with_intial_end_edge) == 0:
             print(f"避難経路が存在しません from: {from_edgeID} to: {to_edgeID}")
             return NEW_VEHICLE_COUNT
-
+    print("test5")
     vehID_num = target_vehID.split("_")[3]
     new_veh_ID: str = "{}_{}_{}_{}".format("newveh", new_shelterID, vehID_num, NEW_VEHICLE_COUNT)
     deparet_time: float = traci.simulation.getTime()

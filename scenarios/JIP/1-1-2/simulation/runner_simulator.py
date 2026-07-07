@@ -371,6 +371,7 @@ def control_vehicles():
                     vehInfo_by_vehID_dict=vehInfo_by_vehID_dict,
                     step_cache=step_cache,
                 )
+
         # VEHINFO: 到着していない車両に対して処理を行う
         if not vehInfo_by_current_vehID.get_arrival_flag():
             # V2V: 車両間通信が可能な場合、情報を取得する
@@ -444,7 +445,7 @@ def control_vehicles():
                     # ============================================================
                     # 2. 正常性バイアスによる経路変更
                     # ============================================================
-                    if is_step_10:
+                    if is_step_10 :
                         from_edgeID, shelterID, to_edge_list, congestion_flg = (
                             get_route_time_difference_exceeding_threshold(
                                 current_edgeID=current_edgeID,
@@ -474,8 +475,9 @@ def control_vehicles():
                                     ROUTE_CHANGED_VEHICLE_COUNT += 1
                                     NORMALCY_BIAS_ROUTE_CHANGE_COUNT += 1
                                     route_change_time_by_vehID_dict[current_vehID] = current_time
-                            elif current_edgeID in ["E13", "E16"]: 
-                                print(f"Vehicle {current_vehID} is on edge {current_edgeID} and cannot change route due to normalcy bias.")
+                            elif current_edgeID in ["E13","E14", "E15", "E16", "E12", "E5"]: 
+                                continue
+                                # print(f"Vehicle {current_vehID} is on edge {current_edgeID} and cannot change route due to normalcy bias.")
                             else:
                                 if len(to_edge_list[0]) == 0:
                                         print(f"nor malcy biasto_edge_list[0]: {to_edge_list[0]}")
@@ -532,6 +534,9 @@ def control_vehicles():
                                         ROUTE_CHANGED_VEHICLE_COUNT += 1
                                         MAJORITY_BIAS_ROUTE_CHANGE_COUNT += 1
                                         route_change_time_by_vehID_dict[current_vehID] = current_time
+                                elif current_edgeID in ["E13","E14", "E15", "E16", "E12", "E5"]: 
+                                    continue
+                                    # print(f"Vehicle {current_vehID} is on edge {current_edgeID} and cannot change route due to normalcy bias.")
                                 else:
                                     from_edgeID, shelterID, to_edge_list = (
                                                                             find_uturn_shortest_route_to_current_shelter_group(
@@ -542,7 +547,6 @@ def control_vehicles():
                                                                                 shelter_list=shelter_list,
                                                                             )
                                                                         )
-
                                     if from_edgeID != "" and shelterID != "" and to_edge_list != "":
                                         NEW_VEHICLE_COUNT = generate_new_veh_based_on_route_time(
                                             target_vehID=current_vehID,
@@ -774,7 +778,7 @@ if __name__ == "__main__":
     # 開始エッジごとの目的地確率
     # mapping["E0"] = ["E16", "E13"] の順番に対応
     probabilities_by_start_edge = {
-        "E0": [CHICE_SHORTEST_ROUTE_RATE, 1-CHICE_SHORTEST_ROUTE_RATE],
+        "E0": [1-CHICE_SHORTEST_ROUTE_RATE, CHICE_SHORTEST_ROUTE_RATE],
     }
 
     # 開始エッジごとの生成台数

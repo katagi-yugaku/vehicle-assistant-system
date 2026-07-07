@@ -97,7 +97,6 @@ def calculate_remaining_route_distance(
 
         if current_edgeID.startswith(":"):
             return 0.0
-
         stage = traci.simulation.findRoute(current_edgeID, to_edge)
         route_edges = stage.edges
 
