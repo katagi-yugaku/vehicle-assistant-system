@@ -36,7 +36,7 @@ for (( scenarioID=SCENARIO_FROM; scenarioID<=SCENARIO_TO; scenarioID++ )); do
   for v2v_rate in "${v2v_capable_vehicle_rate_list[@]}"; do
     for run_id in $(seq 1 "${n}"); do
       sbatch \
-        --nodelist="${ALIVE_NODES}" \
+        --partition=ubuntu \
         --job-name="va_s${scenarioID}_e${early_rate}_v${v2v_rate}_r${run_id}" \
         ./slurm_vehicle_assistant.sh \
         "${scenarioID}" \
