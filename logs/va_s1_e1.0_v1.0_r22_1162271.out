@@ -1,0 +1,16 @@
+=== Job Info ===
+host      : chopin
+jobid     : 1162271
+scenario  : 1
+early_rate: 1.0
+v2v_rate  : 1.0
+run_id    : 1.0
+config    : scenarios/dicomo2026/configs/config_scenario_1.toml
+start     : Tue Jul  7 21:48:17 JST 2026
+ Retrying in 1 seconds
+lane number of -E128_2: 3
+edgeID -E128
+ shelter_list: ['ShelterA_1', 'ShelterB_1']
+出現数: {}
+割合:
+Step #0.00

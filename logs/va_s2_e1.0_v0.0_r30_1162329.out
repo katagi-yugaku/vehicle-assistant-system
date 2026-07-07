@@ -1,0 +1,16 @@
+=== Job Info ===
+host      : elgar
+jobid     : 1162329
+scenario  : 2
+early_rate: 1.0
+v2v_rate  : 1.0
+run_id    : 0.0
+config    : scenarios/dicomo2026/configs/config_scenario_2.toml
+start     : 2026年  7月  7日 火曜日 21:48:20 JST
+ Retrying in 1 seconds
+lane number of -E128_2: 3
+edgeID -E128
+ shelter_list: ['ShelterA_1', 'ShelterB_1']
+出現数: {}
+割合:
+Step #0.00

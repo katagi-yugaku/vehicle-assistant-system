@@ -1049,7 +1049,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
     "--scenario-name",
     default=None,
-    help="scenarios/{scenario_name}/map_one/results を出力先として使うためのシナリオ名。例: its105",
+    help="scenarios/{scenario_name}/results を出力先として使うためのシナリオ名。例: its105",
     )
     return parser.parse_args()
 
