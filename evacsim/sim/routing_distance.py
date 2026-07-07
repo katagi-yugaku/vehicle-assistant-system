@@ -171,7 +171,6 @@ def calculate_reroute_distance(
     """
     try:
         total_distance = 0.0
-
         # 1. Uターンコスト
         try:
             edge_position = traci.vehicle.getLanePosition(vehID)
@@ -184,7 +183,7 @@ def calculate_reroute_distance(
         # 2. Uターン後の経路を検索
         stage = traci.simulation.findRoute(from_edgeID, to_edgeID)
         route_edges = stage.edges
-
+        
         if not route_edges:
             from_edgeID = get_opposite_edgeID_by_edgeID(from_edgeID)
             stage = traci.simulation.findRoute(from_edgeID, to_edgeID)

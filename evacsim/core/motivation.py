@@ -19,7 +19,9 @@ if TYPE_CHECKING:
 
 from evacsim.sim.routing_distance import distance_each_vehIDs
 
-from evacsim.sim.traci_cache import get_vehicle_position_cached
+from evacsim.sim.traci_cache import(
+    get_vehicle_position_cached,
+)
 
 from evacsim.utils.lookup import (
     find_shelter_by_edgeID_connect_target_shelter,

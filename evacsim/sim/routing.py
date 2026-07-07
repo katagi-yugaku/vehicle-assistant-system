@@ -521,7 +521,7 @@ def find_alternative_better_choice_fixed(
     agent: Agent, 
     shelter: Shelter,
     shelter_list: list, 
-    custome_edge_list: List[CustomeEdge],
+    custome_edge_list: list,
     debug: bool = False,
     ):
     """
@@ -570,8 +570,6 @@ def find_alternative_better_choice_fixed(
         current_destination_edge,
         shelter=shelter_for_vehInfo
     )
-    ################ ここまでおK ################
-
     try:
         # 念のため初期値を入れておく
         current_speed = FREE_FLOW_SPEED
@@ -606,7 +604,6 @@ def find_alternative_better_choice_fixed(
         f"current_speed={current_speed:.3f}, "
         f"estimated_current_time={estimated_current_route_evacuation_time:.3f}"
     )
-
     # --- 2. 迂回検討のための準備 ---
     approach_edgeIDs_by_start_edgeID = vehInfo.get_approach_edge_dict()
     # print(f"approach_edgeIDs_by_start_edgeID: {approach_edgeIDs_by_start_edgeID}")
@@ -614,7 +611,6 @@ def find_alternative_better_choice_fixed(
         current_edgeID in edge_list
         for edge_list in approach_edgeIDs_by_start_edgeID.values()
     )
-
     approach_edge_flg = False
     base_reroute_start_edgeID = ""
 
@@ -640,7 +636,6 @@ def find_alternative_better_choice_fixed(
         f"approach_edge_flg={approach_edge_flg}, "
         f"base_reroute_start_edgeID={base_reroute_start_edgeID}"
     )
-
     # --- 2.5. V2V情報の取得 ---
     avg_evac_time_data = vehInfo.get_avg_evac_time_by_route_by_recive_time()
 
@@ -675,7 +670,6 @@ def find_alternative_better_choice_fixed(
         dprint("V2V info is empty")
 
     dprint(f"total merged V2V routes={len(routes_dict)}")
-
     # --- 3. 全ての候補避難所について所要時間を計算 ---
     candidate_results_list = []
 
@@ -754,11 +748,13 @@ def find_alternative_better_choice_fixed(
             f"candidate_edgeID={candidate_edgeID}, "
             f"candidate_group={candidate_group}, "
             f"edge_to_search_from={edge_to_search_from}"
-        )
-
+        ) 
+        if current_edgeID in ["E20", "E1"]:
+            edge_to_search_from = current_edgeID
         # ---------------------------------------------------------
         # A. 自由速度での迂回所要時間
         # ---------------------------------------------------------
+        # print(f"8current_edgeID: {current_edgeID}, from_edgeID: {edge_to_search_from}, to_edgeID: {candidate_edgeID}, shelter: {candidate_shelterID}")
         distance_free_flow = calculate_reroute_distance(
             vehID=agent.get_vehID(),
             from_edgeID=edge_to_search_from,
@@ -774,7 +770,6 @@ def find_alternative_better_choice_fixed(
             f"free_flow distance={distance_free_flow:.3f}, "
             f"time_free_flow={time_free_flow:.3f}"
         )
-
         # ---------------------------------------------------------
         # B. V2V情報に基づく所要時間
         # ---------------------------------------------------------
@@ -826,7 +821,6 @@ def find_alternative_better_choice_fixed(
                     continue
 
                 branch_target_edge = route_tuple[target_index]
-
                 distance_to_branch = calculate_reroute_distance(
                     vehID=agent.get_vehID(),
                     from_edgeID=edge_to_search_from,
@@ -902,7 +896,6 @@ def find_alternative_better_choice_fixed(
                 candidate_edgeID
             )
         )
-
     # --- 4. ソートと結果の生成 ---
     candidate_results_list.sort(key=lambda x: x[0])
     to_edge_list = [item[2] for item in candidate_results_list]
@@ -921,8 +914,7 @@ def find_alternative_better_choice_fixed(
 
     time_gain = estimated_current_route_evacuation_time - best_candidate_time
     threshold = agent.get_route_change_threshold()
-    # print(f"estimated_current_route_evacuation_time: {estimated_current_route_evacuation_time:.3f}, best_candidate_time: {best_candidate_time:.3f}, time_gain: {time_gain:.3f}, threshold: {threshold:.3f}")
-
+    # print(f"Check estimated_current_route_evacuation_time: {estimated_current_route_evacuation_time:.3f}, best_candidate_time: {best_candidate_time:.3f}, time_gain: {time_gain:.3f}, threshold: {threshold:.3f}")
     if time_gain > threshold:
         to_edge_decision_list = [best_candidate_edgeID]
         congestion_flg = True
@@ -958,8 +950,8 @@ def find_alternative_better_choice_fixed(
             time_gain,
             congestion_flg
         )
-
     return base_reroute_start_edgeID, shelterID, to_edge_list, time_gain, congestion_flg
+
 
 def _get_shelter_group(shelter_id: str) -> str:
     """
@@ -983,9 +975,23 @@ def is_route_time_difference_exceeding_threshold(current_edgeID, agent_by_target
                                                                                                             custome_edge_list=custome_edge_list,
                                                                                                             debug=False
                                                                                                             )
+    if congestion_flg:
+        print(f"base_reroute_start_edgeID: {base_reroute_start_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}")
+    return base_reroute_start_edgeID, to_edge_list, congestion_flg
+
+def get_route_time_difference_exceeding_threshold(current_edgeID, agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, shelter: Shelter, shelter_list: list[Shelter], custome_edge_list: list):
+    base_reroute_start_edgeID, shelterID, to_edge_list, time_gain, congestion_flg = find_alternative_better_choice_fixed(
+                                                                                                            current_edgeID=current_edgeID,
+                                                                                                            vehInfo=vehInfo_by_target_vehID,
+                                                                                                            agent=agent_by_target_vehID,
+                                                                                                            shelter=shelter,
+                                                                                                            shelter_list=shelter_list,
+                                                                                                            custome_edge_list=custome_edge_list,
+                                                                                                            debug=False
+                                                                                                            )
     # if congestion_flg:
-        # print(f"base_reroute_start_edgeID: {base_reroute_start_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}")
-    return congestion_flg
+    #     print(f"base_reroute_start_edgeID: {base_reroute_start_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}")
+    return base_reroute_start_edgeID, shelterID, to_edge_list, congestion_flg
 
 
 def find_alternative_better_choice(current_edgeID: str, 
@@ -1111,7 +1117,6 @@ def find_alternative_better_choice(current_edgeID: str,
                 else:
                     edge_to_search_from = get_opposite_edgeID_by_edgeID(edgeID=current_edgeID)
         # --- ▲▲▲ ユーザー指定のロジックここまで ▲▲▲ ---
-
         distance_free_flow = calculate_reroute_distance(
             vehID=agent.get_vehID(),
             from_edgeID=edge_to_search_from, # 変更された可能性のあるエッジを使用
@@ -1247,8 +1252,6 @@ def find_alternative_shelter_choice(
     # shelter_list (エージェントが知っている候補リストではない) を全検索
     for candidate_shelter in shelter_list:
         if candidate_shelter.get_near_edgeID() != agent.get_near_edgeID_by_target_shelter():
-            # print(f"canditate_sget_near_edgeIDhelterID: {candidate_shelter.get_near_edgeID()} agent_edgeID: {agent.get_near_edgeID_by_target_shelter()}")
-            # print(f"vehID: {vehID} current_edgeID: {current_edgeID} reroute_start_edgeID: {reroute_start_edgeID}")
             candidate_shelterID = candidate_shelter.get_shelterID()
             ## ここが違う
             candidate_group = _get_shelter_group(candidate_shelterID)
@@ -1318,3 +1321,109 @@ def find_better_route(current_route_edgeIDs, route_info_with_receive_time:dict, 
             better_route = route
 
     return better_route
+
+def find_uturn_shortest_route_to_current_shelter_group(
+    current_edgeID: str,
+    vehID: str,
+    vehInfo: VehicleInfo,
+    agent: Agent,
+    shelter_list: list[Shelter],
+) -> tuple[str, str, list]:
+    """
+    同調バイアス用:
+    現在の避難地グループ、例 ShelterA、は維持する。
+    ただし ShelterA_1 / ShelterA_2 のどちらに向かうかは、
+    U-turn後の開始edgeから最短距離になるものを選ぶ。
+
+    例:
+        現在 target_shelter = ShelterA_1
+        候補:
+            ShelterA_1 -> E16
+            ShelterA_2 -> E13
+
+        -E41, -E42 から E13 の方が近ければ、
+        ShelterA_2, ["E13"] を返す。
+    """
+    FREE_FLOW_SPEED = 11.0
+
+    current_target_shelterID = agent.get_target_shelter()
+    current_group = _get_shelter_group(current_target_shelterID)
+
+    if current_edgeID.startswith(":"):
+        return "", current_target_shelterID, []
+
+    approach_edgeIDs_by_start_edgeID = vehInfo.get_approach_edge_dict()
+
+    is_in_approach_list = any(
+        current_edgeID in edge_list
+        for edge_list in approach_edgeIDs_by_start_edgeID.values()
+    )
+
+    if not is_in_approach_list:
+        reroute_start_edgeID = get_opposite_edgeID_by_edgeID(
+            edgeID=current_edgeID
+        )
+    else:
+        reroute_start_edgeID = current_edgeID
+
+    candidate_results_list = []
+
+    for candidate_shelter in shelter_list:
+        candidate_shelterID = candidate_shelter.get_shelterID()
+        candidate_group = _get_shelter_group(candidate_shelterID)
+
+        # ShelterA_1, ShelterA_2 のように、同じ避難地グループだけ候補にする
+        if candidate_group != current_group:
+            continue
+
+        candidate_edgeID = candidate_shelter.get_near_edgeID()
+
+        try:
+            distance = calculate_reroute_distance(
+                vehID=vehID,
+                from_edgeID=reroute_start_edgeID,
+                to_edgeID=candidate_edgeID,
+                shelter=candidate_shelter,
+                approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID,
+            )
+        except Exception as e:
+            print(
+                f"[majority bias route search error] "
+                f"vehID={vehID}, "
+                f"from_edgeID={reroute_start_edgeID}, "
+                f"to_edgeID={candidate_edgeID}, "
+                f"shelterID={candidate_shelterID}, "
+                f"error={e}"
+            )
+            continue
+
+        candidate_results_list.append(
+            (
+                distance,
+                candidate_shelterID,
+                candidate_edgeID,
+            )
+        )
+
+    if not candidate_results_list:
+        return reroute_start_edgeID, current_target_shelterID, []
+
+    candidate_results_list.sort(key=lambda x: x[0])
+
+    best_distance = candidate_results_list[0][0]
+    best_shelterID = candidate_results_list[0][1]
+    best_edgeID = candidate_results_list[0][2]
+
+    print(
+        f"[majority bias shortest route] "
+        f"vehID={vehID}, "
+        f"current_edgeID={current_edgeID}, "
+        f"reroute_start_edgeID={reroute_start_edgeID}, "
+        f"current_target={current_target_shelterID}, "
+        f"selected_shelter={best_shelterID}, "
+        f"selected_edge={best_edgeID}, "
+        f"distance={best_distance:.2f}, "
+        f"candidates={candidate_results_list}"
+    )
+
+    return reroute_start_edgeID, best_shelterID, [best_edgeID]

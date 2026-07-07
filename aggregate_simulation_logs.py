@@ -115,6 +115,7 @@ DICT_KEYS = [
     "arrival_time_by_vehID_dict",
     "vehicle_abandant_time_by_pedestrianID_dict",
     "walking_distance_by_pedestrianID_dict",
+    "route_change_time_by_vehID_dict",
 ]
 
 # canonical key -> alias 一覧
@@ -181,6 +182,9 @@ ALIAS_MAP = {
     ],
     "walking_distance_by_pedestrianID_dict": [
         "walking_distance_by_pedestrianID_dict",
+    ],
+    "route_change_time_by_vehID_dict": [
+        "route_change_time_by_vehID_dict",
     ],
 }
 
@@ -586,122 +590,23 @@ def build_requested_output_for_scenario(
     scenario_results: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    ユーザー指定形式の output.json を構築する。
-    0.1 / 0.5 / 0.9 / nosystem ごとに
-    all_abandon_time_events を含めて出力する。
+    early_rate = 1.0 固定運用用の output.json を構築する。
+    system:   v2v_rate = 1.0
+    nosystem: v2v_rate = 0.0
     """
-    if scenario == 1:
-        ordered_keys = ["0.1", "0.5", "0.9", "nosystem"]
-    else:
-        ordered_keys = ["1.0"]
+    ordered_keys = ["1.0", "nosystem"]
 
     selected_results: Dict[str, Dict[str, Any]] = {}
+
     for _, condition_result in scenario_results.items():
         early_rate = float(condition_result["early_rate"])
         v2v_rate = float(condition_result["v2v_rate"])
         mode = condition_result.get("mode")
+
         output_key = get_requested_output_key(early_rate, v2v_rate, mode)
+
         if output_key is not None:
             selected_results[output_key] = condition_result
-
-    vehicle_mean_evacuation_time: Dict[str, Dict[str, float]] = {}
-    cdf_source: Dict[str, List[float]] = {}
-    arrival_time_cdf: Dict[str, Dict[str, List[float]]] = {}
-    average_count_metrics: Dict[str, Dict[str, float]] = {}
-
-    all_abandon_time_events: Dict[str, List[float]] = {}
-
-    abandon_time_distribution: Dict[str, Dict[str, Any]] = {}
-    walking_distance_distribution: Dict[str, Dict[str, Any]] = {}
-
-    for output_key in ordered_keys:
-        condition_result = selected_results.get(output_key)
-
-        if condition_result is None:
-            cdf_source[output_key] = []
-            arrival_time_cdf[output_key] = {"x": [], "y": []}
-            average_count_metrics[output_key] = {}
-            vehicle_mean_evacuation_time[output_key] = {}
-            all_abandon_time_events[output_key] = []
-
-            abandon_time_distribution[output_key] = build_histogram_from_values(
-                [],
-                ABANDON_TIME_BIN_EDGES,
-            )
-            walking_distance_distribution[output_key] = build_histogram_from_values(
-                [],
-                WALKING_DISTANCE_BIN_EDGES,
-            )
-            continue
-
-        arrival_values = [
-            float(value)
-            for value in condition_result.get("arrival_time", {}).get("arrival_time_list", [])
-        ]
-        arrival_values = sorted(arrival_values)
-        cdf_source[output_key] = arrival_values
-
-        vehicle_mean_arrival_time_map = (
-            condition_result
-            .get("arrival_time", {})
-            .get("vehicle_mean_arrival_time", {})
-        )
-
-        vehicle_mean_evacuation_time[output_key] = {
-            str(vehicle_id): float(mean_time)
-            for vehicle_id, mean_time in sorted(
-                vehicle_mean_arrival_time_map.items(),
-                key=lambda item: int(item[0]) if str(item[0]).isdigit() else str(item[0]),
-            )
-        }
-
-        x_values, y_values = compute_cdf_points(arrival_values)
-        arrival_time_cdf[output_key] = {
-            "x": x_values,
-            "y": y_values,
-        }
-
-        count_averages = condition_result.get("count_averages", {})
-        average_count_metrics[output_key] = {
-            key: float(count_averages[key])
-            for key in SUMMARY_COUNT_KEYS
-            if count_averages.get(key) is not None
-        }
-
-        abandonment = condition_result.get("abandonment", {})
-
-        # 追加: 全乗り捨てイベント時刻
-        abandon_time_values = [
-            float(value)
-            for value in abandonment.get("all_abandon_time_events", [])
-        ]
-        all_abandon_time_events[output_key] = abandon_time_values
-
-        # 既存の histogram も残したいならこれでOK
-        abandon_time_distribution[output_key] = build_histogram_from_values(
-            abandon_time_values,
-            ABANDON_TIME_BIN_EDGES,
-        )
-
-        walking_distance_map = abandonment.get("vehicle_mean_walking_distance", {})
-        walking_distance_values = [float(value) for value in walking_distance_map.values()]
-        walking_distance_distribution[output_key] = build_histogram_from_values(
-            walking_distance_values,
-            WALKING_DISTANCE_BIN_EDGES,
-        )
-
-    return {
-        "scenario": scenario,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "average_count_metrics": average_count_metrics,
-        "vehicle_mean_evacuation_time": vehicle_mean_evacuation_time,
-        "cdf_source": cdf_source,
-        "arrival_time_cdf": arrival_time_cdf,
-        "all_abandon_time_events": all_abandon_time_events,
-
-        "abandon_time_distribution": abandon_time_distribution,
-        "walking_distance_distribution": walking_distance_distribution,
-    }
 
 def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> None:
     plt.figure(figsize=(10, 6))
@@ -1101,14 +1006,13 @@ def build_comparison_cdf_data_for_scenario(
         if not arrival_values:
             continue
 
-        if mode == "nosystem" or (
-            is_close_float(early_rate, COMPARISON_NOSYSTEM_EARLY_RATE)
-            and is_close_float(v2v_rate, COMPARISON_NOSYSTEM_V2V_RATE)
-        ):
+        # v2v_rate = 0.0 を nosystem として扱う
+        if mode == "nosystem" or is_close_float(v2v_rate, 0.0):
             comparison_data[0.0] = arrival_values
             continue
 
-        if mode == "system" or is_close_float(v2v_rate, COMPARISON_SYSTEM_V2V_RATE):
+        # v2v_rate = 1.0 を system として扱う
+        if mode == "system" or is_close_float(v2v_rate, 1.0):
             comparison_data[early_rate] = arrival_values
 
     return comparison_data

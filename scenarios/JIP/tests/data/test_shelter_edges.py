@@ -1,0 +1,1 @@
+TEST_EDGE_ID_BY_SHELTER_ID = {"ShelterA_1": 'E2', "ShelterB_1": "E3"}

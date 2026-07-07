@@ -8,13 +8,24 @@
 
 set -euo pipefail
 
-# 受け取り：引数1=scenarioID, 引数2=early_rate, 引数3=v2v_rate, 引数4=run_id(任意)
+# 受け取り：
+# 引数1 = scenarioID
+# 引数2 = v2v_rate
+# 引数3 = run_id 任意
 SCENARIO_ID="${1:?scenarioID is required}"
-EARLY_RATE="${2:?early_rate is required}"
-V2V_RATE="${3:?v2v_rate is required}"
-RUN_ID="${4:-0}"
+V2V_RATE="${2:?v2v_rate is required}"
+RUN_ID="${3:-0}"
+
+# early_rate は固定
+EARLY_RATE="1.0"
 
 CONFIG="scenarios/dicomo2026/configs/config_scenario_${SCENARIO_ID}.toml"
+
+# config が存在するか確認
+if [[ ! -f "${CONFIG}" ]]; then
+  echo "ERROR: config file not found: ${CONFIG}" >&2
+  exit 1
+fi
 
 mkdir -p logs
 
@@ -32,12 +43,5 @@ export RUN_ID
 
 python3.10 -W ignore::UserWarning -m scenarios.dicomo2026.map_one.simulation.runner_simulator \
   --nogui "${CONFIG}" "${EARLY_RATE}" "${V2V_RATE}"
-# -W はwarning制御オプション
-# python3.10 -m scenarios.pervehicle.map_one.simulation.runner_simulator \
-#   --nogui \
-#   "${CONFIG}" \
-#   "${EARLY_RATE}" \
-#   "${V2V_RATE}"
-# 修正
 
 echo "end       : $(date)"

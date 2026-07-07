@@ -158,12 +158,12 @@ def generate_simple_init_vehID(
 
     depart_time = depart_time + generate_interval
 
-    # # 新規の避難地を設定
-    # traci.vehicle.setParkingAreaStop(
-    #     vehID=new_veh_ID,
-    #     stopID=shelterID,
-    #     duration=100000,
-    # )
+    # 新規の避難地を設定
+    traci.vehicle.setParkingAreaStop(
+        vehID=new_veh_ID,
+        stopID=shelterID,
+        duration=100000,
+    )
 
     generate_veh_count += 1
     generate_route_count += 1
@@ -348,6 +348,7 @@ def generate_new_veh_based_on_route_time(
     agent.set_vehicle_abandoned_time(copy.deepcopy(agent_by_target_vehID.get_vehicle_abandoned_time()))
     agent.set_target_abandoned_vehID(copy.deepcopy(agent_by_target_vehID.get_target_abandoned_vehID()))
     agent.set_reserved_vehicle_abandonment_edgeID(copy.deepcopy(agent_by_target_vehID.get_reserved_vehicle_abandonment_edgeID()))
+    agent.set_evacuation_route_changed_flg(True)
 
     agent_list[:] = [a for a in agent_list if a.get_vehID() != old_vehID]
     agent_by_vehID_dict.pop(old_vehID, None)

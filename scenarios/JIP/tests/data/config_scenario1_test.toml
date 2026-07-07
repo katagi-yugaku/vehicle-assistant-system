@@ -1,0 +1,71 @@
+# =========================
+# Test scenario config
+# =========================
+
+scenario_id = 1
+num_simulations = 50
+comm_range = 200
+num_vehicles = 400
+vehicle_interval = 5
+
+# init_agent_list() requires ATTR_RATE.
+# ここではテスト用に active / cautious が混在しやすい 0.5 を指定する。
+attr_rate = 0.5
+
+active_route_change_threshold_center = 240.0
+active_route_change_threshold_spread = 60.0
+cautious_route_change_threshold_center = 360.0
+cautious_route_change_threshold_spread = 60.0
+
+normalcy_value_about_route_change_center = 100.0
+normalcy_value_about_route_change_spread = 0.0
+
+active_wrong_way_driving_threshold_center = 1000.0
+active_wrong_way_driving_threshold_spread = 100.0
+cautious_wrong_way_driving_threshold_center = 950.0
+cautious_wrong_way_driving_threshold_spread = 150.0
+
+min_motivation_start = 500
+min_motivation_end = 700
+
+active_normalcy_value_about_tsunami_precursor_info_center = 400.0
+active_normalcy_value_about_tsunami_precursor_info_spread = 80.0
+cautious_normalcy_value_about_tsunami_precursor_info_center = 600.0
+cautious_normalcy_value_about_tsunami_precursor_info_spread = 80.0
+
+active_normalcy_value_about_route_congestion_info_center = 100.0
+active_normalcy_value_about_route_congestion_info_spread = 0.0
+cautious_normalcy_value_about_route_congestion_info_center = 100.0
+cautious_normalcy_value_about_route_congestion_info_spread = 0.0
+
+active_normalcy_value_about_shelter_full_info_center = 100.0
+active_normalcy_value_about_shelter_full_info_spread = 0.0
+cautious_normalcy_value_about_shelter_full_info_center = 100.0
+cautious_normalcy_value_about_shelter_full_info_spread = 0.0
+
+active_majority_increase_value_center = 200.0
+active_majority_increase_value_spread = 50.0
+cautious_majority_increase_value_center = 200.0
+cautious_majority_increase_value_spread = 50.0
+
+active_majority_decrease_value_center = 100.0
+active_majority_decrease_value_spread = 0.0
+cautious_majority_decrease_value_center = 100.0
+cautious_majority_decrease_value_spread = 0.0
+
+active_shelter_occupancy_rate_threshold_start = 0.65
+active_shelter_occupancy_rate_threshold_end = 0.8
+cautious_shelter_occupancy_rate_threshold_start = 0.8
+cautious_shelter_occupancy_rate_threshold_end = 0.95
+
+shelter_capacity_threshold = 1.0
+tsunami_sign_start_time = 600
+tsunami_sign_end_time = 800
+driver_visibility_distance = 50
+alpha = 0.10
+following_rate = 0.2
+
+shelter_A_capacity = 150
+vehicles_to_shelter_A = 150
+shelter_B_capacity = 150
+vehicles_to_shelter_B = 150
