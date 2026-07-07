@@ -1,11 +1,11 @@
-scenario_id = 2
+scenario_id = 29
 num_simulations = 50
 comm_range = 200
 num_vehicles = 400
 vehicle_interval = 5
 choice_shortest_route_rate = 0.9
-p_follow = 0.1
-active_route_change_threshold_center = 250.0
+p_follow = 0.3
+active_route_change_threshold_center = 400.0
 active_route_change_threshold_spread = 100.0
 cautious_route_change_threshold_center = 5200.0
 cautious_route_change_threshold_spread = 840.0

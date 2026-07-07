@@ -30,16 +30,16 @@ SCENARIO_ID_START = 1
 # パラメータスイープ設定
 # ==================================================
 
-# parameter_grid = {
-#     "p_follow": [0.0, 0.25, 0.5, 0.75],
-#     "active_route_change_threshold_center": [150.0, 300.0, 450.0],
-#     "active_route_change_threshold_spread": [50.0, 100.0],
-# }
+parameter_grid = {
+    "p_follow": [0.10, 0.15, 0.20, 0.25, 0.30],
+    "active_route_change_threshold_center": [200.0, 250.0, 300.0, 350.0, 400.0, 450.0],
+    # "active_route_change_threshold_spread": [50.0, 100.0],
+}
 
 # 5条件の例
-parameter_grid = {
-    "choice_shortest_route_rate": [0.1, 0.3, 0.5, 0.7, 0.9],
-}
+# parameter_grid = {
+#     "choice_shortest_route_rate": [0.1, 0.3, 0.5, 0.7, 0.9],
+# }
 
 
 # ==================================================
