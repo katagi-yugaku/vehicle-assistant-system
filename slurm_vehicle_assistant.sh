@@ -19,7 +19,8 @@ RUN_ID="${3:-0}"
 # early_rate は固定
 EARLY_RATE="1.0"
 
-CONFIG="scenarios/dicomo2026/configs/config_scenario_${SCENARIO_ID}.toml"
+# JIP 用 config
+CONFIG="scenarios/JIP/configs/config_scenario_${SCENARIO_ID}.toml"
 
 # config が存在するか確認
 if [[ ! -f "${CONFIG}" ]]; then
@@ -41,7 +42,7 @@ echo "start     : $(date)"
 
 export RUN_ID
 
-python3.10 -W ignore::UserWarning -m scenarios.dicomo2026.map_one.simulation.runner_simulator \
+python3 -W ignore::UserWarning -m scenarios.JIP.1-1-2.simulation.runner_simulator \
   --nogui "${CONFIG}" "${EARLY_RATE}" "${V2V_RATE}"
 
 echo "end       : $(date)"

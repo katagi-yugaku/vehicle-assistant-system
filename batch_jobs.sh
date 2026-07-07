@@ -36,7 +36,6 @@ for (( scenarioID=SCENARIO_FROM; scenarioID<=SCENARIO_TO; scenarioID++ )); do
         --job-name="va_s${scenarioID}_e${early_rate}_v${v2v_rate}_r${run_id}" \
         ./slurm_vehicle_assistant.sh \
         "${scenarioID}" \
-        "${early_rate}" \
         "${v2v_rate}" \
         "${run_id}"
     done
