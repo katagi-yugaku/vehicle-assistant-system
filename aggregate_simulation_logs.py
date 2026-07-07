@@ -2,24 +2,25 @@
 # -*- coding: utf-8 -*-
 
 """
-slurm の .out ログを条件別に集計し、平均値と CDF を出力するスクリプト。
+Aggregate Slurm .out logs for vehicle-assistant-system simulations.
 
-主な機能:
-- .out ファイルのみを対象に集計（.err は無視）
-- ファイル名から scenario / early_rate / v2v_rate / run_id / jobid を自動抽出
-- 条件 (scenario, early_rate, v2v_rate) ごとに集計
-- ped_init_..._末尾番号 を init_... に正規化
-- 今回の Simlation Result Summary に含まれる scalar 系キーの平均値を算出
-- arrival_time_by_vehID_dict の vehicle ごとの平均到着時刻を算出
-- 条件ごとに CDF グラフ (PNG) を出力
-- vehicle_abandant_time / walking_distance の平均を算出
-- 欠損 run / パース失敗 run を記録
-- 結果を JSON に保存
+Features:
+- Reads only .out files and ignores .err files.
+- Parses filenames of the form:
+    va_s{scenario}_e{early_rate}_v{v2v_rate}_r{run_id}_{jobid}.out
+- Groups logs by scenario / early_rate / v2v_rate.
+- If multiple logs exist for the same condition and run_id, uses the largest jobid.
+- Parses scalar metrics and dictionary metrics from "Simlation Result Summary".
+- Aggregates run_id = 1..N, records missing and failed runs.
+- Normalizes derived vehicle IDs such as init_..., newveh_..., and ped_... to the original ID.
+- Does not drop duplicated normalized IDs; values are accumulated as lists and averaged later.
+- Handles rate_vehicle_abandonment values with a trailing percent sign, such as 0.00%.
+- Writes output.json and a comparison CDF PDF for each scenario.
 
-実行例:
-    python aggregate_simulation_logs.py ./logs
-    python aggregate_simulation_logs.py ./logs --output-dir ./aggregated
+Examples:
     python aggregate_simulation_logs.py ./logs --expected-max-run-id 50
+    python aggregate_simulation_logs.py ./logs --scenario-name JIP/1-1-2 --expected-max-run-id 50
+    python aggregate_simulation_logs.py ./logs --output-dir ./aggregated --expected-max-run-id 50
 """
 
 from __future__ import annotations
@@ -33,75 +34,24 @@ import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
 from typing import Any, DefaultDict, Dict, Iterable, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 
 OUTPUT_JSON_FILE = "output.json"
-
-COMPARISON_SYSTEM_EARLY_RATES = [0.1, 0.5, 0.9]
-COMPARISON_SYSTEM_V2V_RATE = 1.0
-COMPARISON_NOSYSTEM_EARLY_RATE = 0.5
-COMPARISON_NOSYSTEM_V2V_RATE = 0.0
-
-# output.json の average_count_metrics に出すキー。
-# runner_simulator.py 側の以下の print 出力名に合わせる。
-SUMMARY_COUNT_KEYS = [
-    "avg_congestion_duration",
-    "pedestrian_count",
-    "route_changed_vehicle_count",
-    "wrong_way_driving_count",
-    "rate_vehicle_abandonment",  # 追加: 乗り捨て率
-    "vehicle_abandonment_count",
-    "normalcy_bias_route_change_count",
-    "majority_bias_route_change_count",
-    "lane_changed_vehicle_count",
-    "info_obtained_lanechange_count",
-    "elapsed_time_lanechange_count",
-    "majority_bias_lanechange_count",
-]
-
-
-WALKING_DISTANCE_BIN_WIDTH = 50
-WALKING_DISTANCE_BIN_EDGES = [
-    200, 250, 300, 350, 400, 450, 500, 550,
-    600, 650, 700, 750, 800, 850, 900, 950, 1000,
-]
-
-ABANDON_TIME_BIN_EDGES = [
-    800, 900, 1000, 1100, 1200, 1300, 1400, 1500,
-    1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300,
-]
-
-def is_close_float(a: float, b: float, tol: float = 1e-9) -> bool:
-    return abs(a - b) < tol
-
-def build_scenario_output_dir(base_output_dir: str, scenario: int) -> str:
-    return os.path.join(base_output_dir, f"scenario{scenario}")
-
-def build_output_dir_from_scenario_name(scenario_name: str) -> str:
-    repo_root = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(repo_root, "scenarios", scenario_name, "map_one", "results")
-
-# =========================================
-# 拡張しやすい定数定義
-# =========================================
-
-
-# 想定 run_id の上限。必要に応じて CLI 引数で上書き可能。
 DEFAULT_EXPECTED_MAX_RUN_ID = 50
+SUMMARY_MARKER = "===== Simlation Result Summary ====="
+JSON_CHUNK_SIZE = 100
+JSON_INDENT_SIZE = 2
 
-# 集計対象の scalar 系キー。
-# 今回のログ末尾の "===== Simlation Result Summary =====" で出力している
-# print(...) のキー名を canonical 名として扱う。
+# Scalar keys printed by runner_simulator.py.
 COUNT_KEYS = [
     "avg_congestion_duration",
     "pedestrian_count",
     "route_changed_vehicle_count",
+    "rate_vehicle_abandonment",
     "wrong_way_driving_count",
     "vehicle_abandonment_count",
-    "rate_vehicle_abandonment",  # 追加: 乗り捨て率
     "normalcy_bias_route_change_count",
     "majority_bias_route_change_count",
     "lane_changed_vehicle_count",
@@ -110,7 +60,7 @@ COUNT_KEYS = [
     "majority_bias_lanechange_count",
 ]
 
-# 集計対象の dict 系キー
+# Dict keys printed by runner_simulator.py.
 DICT_KEYS = [
     "arrival_time_by_vehID_dict",
     "vehicle_abandant_time_by_pedestrianID_dict",
@@ -118,77 +68,49 @@ DICT_KEYS = [
     "route_change_time_by_vehID_dict",
 ]
 
-# canonical key -> alias 一覧
-# 先頭が canonical 名で、後続が別名
-ALIAS_MAP = {
-    # scalar 系
+# Canonical key -> acceptable aliases.
+ALIAS_MAP: Dict[str, List[str]] = {
     "avg_congestion_duration": [
         "avg_congestion_duration",
         "average_congestion_duration",
     ],
-    "pedestrian_count": [
-        "pedestrian_count",
-    ],
-    "route_changed_vehicle_count": [
-        "route_changed_vehicle_count",
-    ],
+    "pedestrian_count": ["pedestrian_count"],
+    "route_changed_vehicle_count": ["route_changed_vehicle_count"],
+    "rate_vehicle_abandonment": ["rate_vehicle_abandonment"],
     "wrong_way_driving_count": [
         "wrong_way_driving_count",
         "wrong_way_success_count",
     ],
-    "rate_vehicle_abandonment": [
-        "rate_vehicle_abandonment",
-    ],
-    
     "vehicle_abandonment_count": [
         "vehicle_abandonment_count",
         "vehicle_abandonment_success_count",
     ],
-    "normalcy_bias_route_change_count": [
-        "normalcy_bias_route_change_count",
-    ],
-    "majority_bias_route_change_count": [
-        "majority_bias_route_change_count",
-    ],
-    "lane_changed_vehicle_count": [
-        "lane_changed_vehicle_count",
-    ],
+    "normalcy_bias_route_change_count": ["normalcy_bias_route_change_count"],
+    "majority_bias_route_change_count": ["majority_bias_route_change_count"],
+    "lane_changed_vehicle_count": ["lane_changed_vehicle_count"],
     "info_obtained_lanechange_count": [
         "info_obtained_lanechange_count",
-        # 旧ログ名との互換用
         "obtain_info_lane_change_count",
         "info_obtained_lane_change_count",
         "obtain_info_lanechange_count",
     ],
     "elapsed_time_lanechange_count": [
         "elapsed_time_lanechange_count",
-        # 旧ログ名との互換用
         "elapsed_time_lane_change_count",
     ],
     "majority_bias_lanechange_count": [
         "majority_bias_lanechange_count",
-        # 旧ログ名との互換用
         "positive_majority_bias_count",
     ],
-
-    # dict 系
-    "arrival_time_by_vehID_dict": [
-        "arrival_time_by_vehID_dict",
-    ],
+    "arrival_time_by_vehID_dict": ["arrival_time_by_vehID_dict"],
     "vehicle_abandant_time_by_pedestrianID_dict": [
         "vehicle_abandant_time_by_pedestrianID_dict",
-        # typo 修正後の名前にも対応
         "vehicle_abandon_time_by_pedestrianID_dict",
     ],
-    "walking_distance_by_pedestrianID_dict": [
-        "walking_distance_by_pedestrianID_dict",
-    ],
-    "route_change_time_by_vehID_dict": [
-        "route_change_time_by_vehID_dict",
-    ],
+    "walking_distance_by_pedestrianID_dict": ["walking_distance_by_pedestrianID_dict"],
+    "route_change_time_by_vehID_dict": ["route_change_time_by_vehID_dict"],
 }
 
-# .out ファイル名規則
 OUT_FILENAME_RE = re.compile(
     r"^va_s(?P<scenario>\d+)"
     r"(?:_(?P<mode>system|nosystem))?"
@@ -198,275 +120,335 @@ OUT_FILENAME_RE = re.compile(
     r"_(?P<jobid>\d+)\.out$"
 )
 
-
-# =========================================
-# データ構造
-# =========================================
-
-@dataclass(frozen=True)
-class LogFileInfo:
-    """ファイル名から抽出したメタ情報"""
-    path: str
-    filename: str
-    scenario: int
-    mode: Optional[str]
-    early_rate: float
-    v2v_rate: float
-    run_id: int
-    jobid: int
-
-    @property
-    def condition_key(self) -> str:
-        return build_condition_key(
-            self.scenario,
-            self.early_rate,
-            self.v2v_rate,
-            self.mode,
-        )
-
-# =========================================
-# 汎用ユーティリティ
-# =========================================
-
-def warn(message: str) -> None:
-    """warning を標準出力に出す"""
-    print(f"[WARNING] {message}", file=sys.stdout)
-
-
-def info(message: str) -> None:
-    """通常情報を標準出力に出す"""
-    print(f"[INFO] {message}", file=sys.stdout)
-
-
-def build_condition_key(
-    scenario: int,
-    early_rate: float,
-    v2v_rate: float,
-    mode: Optional[str] = None,
-) -> str:
-    """条件キー文字列を生成する"""
-    mode_part = f"_{mode}" if mode else ""
-    return f"s{scenario}{mode_part}_e{early_rate}_v{v2v_rate}"
-
-
-def safe_mean(values: Iterable[float]) -> Optional[float]:
-    """空配列なら None、そうでなければ平均を返す"""
-    values = list(values)
-    if not values:
-        return None
-    return sum(values) / len(values)
-
-
-def sort_numeric_strings_as_numbers(keys: Iterable[str]) -> List[str]:
-    """ID 等のキーを文字列として安定ソートする"""
-    return sorted(keys)
-
-
-def ensure_output_dir(path: str) -> None:
-    """出力ディレクトリを作成する"""
-    os.makedirs(path, exist_ok=True)
-
-
 ORIGINAL_VEH_ID_RE = re.compile(
     r"^(?:ped_)?(?:init|newveh)_Shelter[A-Za-z]+_\d+_(\d+)(?:_\d+)*$"
 )
 
+
+@dataclass(frozen=True)
+class LogFileInfo:
+    path: str
+    filename: str
+    scenario: int
+    early_rate: float
+    early_rate_text: str
+    v2v_rate: float
+    v2v_rate_text: str
+    run_id: int
+    jobid: int
+    mode: Optional[str] = None
+
+    @property
+    def condition_key(self) -> str:
+        # The requested key format does not include mode.
+        return build_condition_key(
+            scenario=self.scenario,
+            early_rate_text=self.early_rate_text,
+            v2v_rate_text=self.v2v_rate_text,
+        )
+
+
+def warn(message: str) -> None:
+    print(f"[WARNING] {message}", file=sys.stdout)
+
+
+def info(message: str) -> None:
+    print(f"[INFO] {message}", file=sys.stdout)
+
+
+def is_close_float(a: float, b: float, tol: float = 1e-9) -> bool:
+    return abs(a - b) < tol
+
+
+def safe_mean(values: Iterable[float]) -> Optional[float]:
+    values_list = [float(v) for v in values]
+    if not values_list:
+        return None
+    return sum(values_list) / len(values_list)
+
+
+def build_condition_key(
+    scenario: int,
+    early_rate_text: str,
+    v2v_rate_text: str,
+) -> str:
+    return f"s{scenario}_e{early_rate_text}_v{v2v_rate_text}"
+
+
+def sort_numeric_strings_as_numbers(keys: Iterable[str]) -> List[str]:
+    def sort_key(value: str) -> Tuple[int, Any]:
+        try:
+            return (0, int(value))
+        except ValueError:
+            try:
+                return (1, float(value))
+            except ValueError:
+                return (2, value)
+
+    return sorted(keys, key=sort_key)
+
+
+def ensure_output_dir(path: str) -> None:
+    os.makedirs(path, exist_ok=True)
+
+
+def find_repo_root(start_path: Optional[str] = None) -> str:
+    """
+    Find the repository root by walking upward until a .git directory is found.
+
+    The current working directory is tried first because the script may not be
+    placed directly under the repository root. If that fails, the directory of
+    this script is also tried.
+    """
+    candidates: List[str] = []
+    if start_path is not None:
+        candidates.append(os.path.abspath(start_path))
+    candidates.append(os.path.abspath(os.getcwd()))
+    candidates.append(os.path.dirname(os.path.abspath(__file__)))
+
+    checked: set[str] = set()
+    for candidate in candidates:
+        current = candidate
+        while True:
+            if current in checked:
+                break
+            checked.add(current)
+
+            if os.path.isdir(os.path.join(current, ".git")):
+                return current
+
+            parent = os.path.dirname(current)
+            if parent == current:
+                break
+            current = parent
+
+    raise FileNotFoundError("リポジトリルート .git が見つかりませんでした")
+
+
+def build_output_dir_from_scenario_name(scenario_name: str) -> str:
+    normalized_name = scenario_name.strip().strip("/")
+    if normalized_name.startswith("scenarios/"):
+        normalized_name = normalized_name[len("scenarios/") :]
+
+    repo_root = find_repo_root()
+    return os.path.join(repo_root, "scenarios", normalized_name, "results")
+
+
+def resolve_output_dir(args: argparse.Namespace) -> str:
+    """
+    Priority:
+      1. --output-dir
+      2. --scenario-name -> scenarios/{scenario_name}/results
+      3. log_dir
+    """
+    if args.output_dir is not None:
+        return os.path.abspath(args.output_dir)
+    if args.scenario_name is not None:
+        return build_output_dir_from_scenario_name(args.scenario_name)
+    return os.path.abspath(args.log_dir)
+
+
+def build_scenario_output_dir(base_output_dir: str, scenario: int) -> str:
+    return os.path.join(base_output_dir, f"scenario{scenario}")
+
+
 def normalize_vehicle_id(raw_id: str) -> str:
     """
-    車両ID・歩行者IDから元の車両番号を取り出す。
+    Normalize vehicle/pedestrian IDs to the original vehicle ID.
 
-    examples:
+    Examples:
         init_ShelterA_1_267 -> 267
         newveh_ShelterA_1_267_138 -> 267
         ped_init_ShelterA_1_197_44 -> 197
         newveh_ShelterA_1_197_45 -> 197
         ped_newveh_ShelterA_1_98_91_47 -> 98
     """
-    raw_id = raw_id.strip()
+    text = str(raw_id).strip()
 
-    match = ORIGINAL_VEH_ID_RE.match(raw_id)
-    if match is None:
-        raise ValueError(f"Unexpected vehicle/pedestrian ID format: {raw_id}")
+    match = ORIGINAL_VEH_ID_RE.match(text)
+    if match is not None:
+        return match.group(1)
 
-    return match.group(1)
+    # If the simulator already emits a plain numeric ID, accept it.
+    if re.fullmatch(r"\d+", text):
+        return text
 
-def normalize_id_value_dict(raw_dict: Dict[Any, Any]) -> Dict[str, float]:
-    normalized: Dict[str, float] = {}
+    # Fallback: use the raw ID rather than aborting the whole log.
+    # This keeps parsing robust when a new ID format appears.
+    return text
 
-    for key, value in raw_dict.items():
-        normalized_key = normalize_vehicle_id(str(key))
 
+def normalize_id_value_dict_to_lists(raw_dict: Dict[Any, Any]) -> Dict[str, List[float]]:
+    """
+    Normalize keys and accumulate values as lists.
+
+    This intentionally does not warn when the same normalized ID appears more
+    than once in the same run, because init/newveh/ped derived IDs can coexist.
+    """
+    normalized: DefaultDict[str, List[float]] = defaultdict(list)
+
+    for raw_key, raw_value in raw_dict.items():
+        normalized_key = normalize_vehicle_id(str(raw_key))
         try:
-            normalized_value = float(value)
+            normalized_value = float(raw_value)
         except (TypeError, ValueError):
             continue
+        normalized[normalized_key].append(normalized_value)
 
-        if normalized_key in normalized:
-            warn(
-                f"同一 run 内で元車両IDが重複しました: "
-                f"original_id={normalized_key}, "
-                f"old={normalized[normalized_key]}, new={normalized_value}, raw_id={key}"
-            )
+    return dict(normalized)
 
-        normalized[normalized_key] = normalized_value
-
-    return normalized
-
-
-# =========================================
-# ファイル探索・ファイル名解析
-# =========================================
 
 def list_out_files(log_dir: str) -> List[str]:
-    """ログディレクトリ内の .out ファイル一覧を取得する"""
     if not os.path.isdir(log_dir):
         raise FileNotFoundError(f"ログディレクトリが存在しません: {log_dir}")
 
-    out_files: List[str] = []
-    for entry in os.listdir(log_dir):
-        if entry.endswith(".out"):
-            out_files.append(os.path.join(log_dir, entry))
-    out_files.sort()
-    return out_files
+    paths = [
+        os.path.join(log_dir, entry)
+        for entry in os.listdir(log_dir)
+        if entry.endswith(".out")
+    ]
+    return sorted(paths)
 
 
 def parse_out_filename(path: str) -> Optional[LogFileInfo]:
-    """ファイル名から条件情報を抽出する"""
     filename = os.path.basename(path)
     match = OUT_FILENAME_RE.match(filename)
-    if not match:
+    if match is None:
         warn(f"ファイル名規則に一致しないためスキップします: {filename}")
         return None
 
     try:
+        early_rate_text = match.group("early_rate")
+        v2v_rate_text = match.group("v2v_rate")
         return LogFileInfo(
             path=path,
             filename=filename,
             scenario=int(match.group("scenario")),
-            mode=match.group("mode"),
-            early_rate=float(match.group("early_rate")),
-            v2v_rate=float(match.group("v2v_rate")),
+            early_rate=float(early_rate_text),
+            early_rate_text=early_rate_text,
+            v2v_rate=float(v2v_rate_text),
+            v2v_rate_text=v2v_rate_text,
             run_id=int(match.group("run_id")),
             jobid=int(match.group("jobid")),
+            mode=match.group("mode"),
         )
     except ValueError as exc:
         warn(f"ファイル名の数値変換に失敗したためスキップします: {filename} ({exc})")
         return None
 
 
-def deduplicate_by_condition_and_run(files: List[LogFileInfo]) -> Dict[str, List[LogFileInfo]]:
-    """
-    同一 (condition, run_id) に複数ファイルがある場合は jobid が最大のものを採用する。
-    """
+def deduplicate_by_condition_and_run(
+    files: List[LogFileInfo],
+) -> Dict[str, List[LogFileInfo]]:
     selected: Dict[Tuple[str, int], LogFileInfo] = {}
 
     for file_info in files:
         key = (file_info.condition_key, file_info.run_id)
-        if key not in selected:
+        existing = selected.get(key)
+        if existing is None or file_info.jobid > existing.jobid:
+            if existing is not None:
+                warn(
+                    "同一条件・同一 run_id の重複を検出しました。"
+                    f" jobid={existing.jobid} より jobid={file_info.jobid} を優先します: "
+                    f"{file_info.condition_key}, run_id={file_info.run_id}"
+                )
             selected[key] = file_info
-            continue
-
-        existing = selected[key]
-        if file_info.jobid > existing.jobid:
-            warn(
-                f"同一条件・同一 run_id の重複を検出しました。"
-                f" jobid={existing.jobid} より jobid={file_info.jobid} を優先します: "
-                f"{file_info.condition_key}, run_id={file_info.run_id}"
-            )
-            selected[key] = file_info
-        else:
-            warn(
-                f"同一条件・同一 run_id の重複を検出しました。"
-                f" jobid={existing.jobid} を維持し、jobid={file_info.jobid} は無視します: "
-                f"{file_info.condition_key}, run_id={file_info.run_id}"
-            )
 
     grouped: DefaultDict[str, List[LogFileInfo]] = defaultdict(list)
     for file_info in selected.values():
         grouped[file_info.condition_key].append(file_info)
 
-    for condition_key in grouped:
-        grouped[condition_key].sort(key=lambda x: x.run_id)
+    return {
+        condition_key: sorted(condition_files, key=lambda item: item.run_id)
+        for condition_key, condition_files in grouped.items()
+    }
 
-    return dict(grouped)
-
-
-# =========================================
-# ログ本文解析
-# =========================================
 
 def read_text_file(path: str) -> Optional[str]:
-    """テキストファイルを安全に読み込む"""
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return f.read()
+        with open(path, "r", encoding="utf-8", errors="replace") as file:
+            return file.read()
     except OSError as exc:
         warn(f"ファイル読み込みに失敗しました: {path} ({exc})")
         return None
 
 
-def build_alias_lookup(alias_map: Dict[str, List[str]]) -> Dict[str, str]:
-    """
-    alias -> canonical の逆引きマップを生成する。
-    使わないが、拡張時に便利なので残している。
-    """
-    lookup: Dict[str, str] = {}
-    for canonical, aliases in alias_map.items():
-        for alias in aliases:
-            lookup[alias] = canonical
-    return lookup
+def get_summary_text(text: str) -> str:
+    marker_index = text.rfind(SUMMARY_MARKER)
+    if marker_index == -1:
+        return text
+    return text[marker_index:]
+
+
+def parse_scalar_value(raw_value: str) -> Optional[float]:
+    value = raw_value.strip()
+    if value.endswith("%"):
+        value = value[:-1].strip()
+    value = value.replace(",", "")
+
+    try:
+        parsed = float(value)
+    except ValueError:
+        return None
+
+    if math.isnan(parsed):
+        return None
+    return parsed
 
 
 def extract_scalar_by_aliases(text: str, aliases: List[str]) -> Optional[float]:
-    """
-    alias 群のいずれかについて、
-    例: key_name:123
-    のような 1 行値を抽出して float に変換する。
-    """
     for alias in aliases:
         pattern = re.compile(rf"^\s*{re.escape(alias)}\s*:\s*(.+?)\s*$", re.MULTILINE)
         match = pattern.search(text)
-        if not match:
+        if match is None:
             continue
 
-        raw_value = match.group(1).strip()
-        try:
-            return float(raw_value)
-        except ValueError:
-            warn(f"数値パースに失敗しました: key={alias}, value={raw_value}")
-            return None
+        raw_value = match.group(1)
+        value = parse_scalar_value(raw_value)
+        if value is None:
+            warn(f"数値パースに失敗しました: key={alias}, value={raw_value.strip()}")
+        return value
+
     return None
 
 
 def find_braced_literal_after_key(text: str, key_name: str) -> Optional[str]:
-    """
-    key_name:{...} の {...} 部分を、波括弧の対応を見ながら抽出する。
-    複数行 dict にも対応する。
-    """
     key_pattern = re.compile(rf"{re.escape(key_name)}\s*:\s*\{{", re.MULTILINE)
     match = key_pattern.search(text)
-    if not match:
+    if match is None:
         return None
 
     brace_start = match.end() - 1
     depth = 0
+    in_string: Optional[str] = None
+    escaped = False
 
-    for idx in range(brace_start, len(text)):
-        ch = text[idx]
-        if ch == "{":
+    for index in range(brace_start, len(text)):
+        char = text[index]
+
+        if in_string is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == in_string:
+                in_string = None
+            continue
+
+        if char in {"'", '"'}:
+            in_string = char
+            continue
+        if char == "{":
             depth += 1
-        elif ch == "}":
+        elif char == "}":
             depth -= 1
             if depth == 0:
-                return text[brace_start:idx + 1]
+                return text[brace_start : index + 1]
 
     return None
 
 
 def extract_dict_by_aliases(text: str, aliases: List[str]) -> Optional[Dict[Any, Any]]:
-    """
-    alias 群のいずれかについて dict 文字列を抽出し、ast.literal_eval で dict 化する。
-    """
     for alias in aliases:
         literal_text = find_braced_literal_after_key(text, alias)
         if literal_text is None:
@@ -487,74 +469,172 @@ def extract_dict_by_aliases(text: str, aliases: List[str]) -> Optional[Dict[Any,
     return None
 
 
-def parse_log_content(text: str) -> Tuple[Dict[str, Optional[float]], Dict[str, Dict[str, float]], List[str]]:
-    """
-    ログ本文から集計対象を抽出する。
+def parse_log_content(
+    text: str,
+) -> Tuple[Dict[str, Optional[float]], Dict[str, Dict[str, List[float]]]]:
+    summary_text = get_summary_text(text)
 
-    戻り値:
-        count_values: canonical scalar key -> float or None
-        dict_values : canonical dict key -> normalized dict
-        messages    : warning 相当の補足メッセージ
-    """
     count_values: Dict[str, Optional[float]] = {}
-    dict_values: Dict[str, Dict[str, float]] = {}
-    messages: List[str] = []
+    dict_values: Dict[str, Dict[str, List[float]]] = {}
 
-    # scalar 系
     for canonical_key in COUNT_KEYS:
         aliases = ALIAS_MAP.get(canonical_key, [canonical_key])
-        value = extract_scalar_by_aliases(text, aliases)
-        count_values[canonical_key] = value
-        if value is None:
-            messages.append(f"scalar key が見つかりませんでした: {canonical_key}")
+        count_values[canonical_key] = extract_scalar_by_aliases(summary_text, aliases)
 
-    # dict 系
     for canonical_key in DICT_KEYS:
         aliases = ALIAS_MAP.get(canonical_key, [canonical_key])
-        raw_dict = extract_dict_by_aliases(text, aliases)
+        raw_dict = extract_dict_by_aliases(summary_text, aliases)
         if raw_dict is None:
             dict_values[canonical_key] = {}
-            messages.append(f"dict key が見つかりませんでした: {canonical_key}")
         else:
-            dict_values[canonical_key] = normalize_id_value_dict(raw_dict)
+            dict_values[canonical_key] = normalize_id_value_dict_to_lists(raw_dict)
 
-    return count_values, dict_values, messages
+    return count_values, dict_values
 
 
-def build_histogram_from_values(values: List[float], bin_edges: List[float]) -> Dict[str, Any]:
-    """
-    指定した bin_edges に従って度数分布を作る。
-    区間は [left, right) とし、最後の bin のみ right を含む。
-    bin 範囲外の値は無視する。
-    """
-    if len(bin_edges) < 2:
-        raise ValueError("bin_edges には 2 つ以上の境界が必要です")
+def extend_accumulator(
+    accumulator: DefaultDict[str, List[float]],
+    values_by_id: Dict[str, List[float]],
+) -> None:
+    for vehicle_id, values in values_by_id.items():
+        accumulator[vehicle_id].extend(values)
 
-    counts = [0] * (len(bin_edges) - 1)
 
-    for value in values:
-        for index in range(len(bin_edges) - 1):
-            left = bin_edges[index]
-            right = bin_edges[index + 1]
-            is_last_bin = index == len(bin_edges) - 2
-            if (left <= value < right) or (is_last_bin and left <= value <= right):
-                counts[index] += 1
-                break
+def flatten_values(values_by_id: Dict[str, List[float]]) -> List[float]:
+    return [value for values in values_by_id.values() for value in values]
 
-    counted_total = sum(counts)
-    if counted_total > 0:
-        ratios = [round(count / counted_total, 4) for count in counts]
-    else:
-        ratios = [0.0 for _ in counts]
 
-    bin_width = bin_edges[1] - bin_edges[0]
+def mean_by_id(accumulator: DefaultDict[str, List[float]]) -> Dict[str, float]:
+    result: Dict[str, float] = {}
+    for vehicle_id, values in accumulator.items():
+        mean_value = safe_mean(values)
+        if mean_value is not None:
+            result[vehicle_id] = mean_value
+    return result
 
-    return {
-        "bin_width": bin_width,
-        "bin_edges": list(bin_edges),
-        "counts": counts,
-        "ratios": ratios,
+
+def aggregate_condition(
+    condition_key: str,
+    files: List[LogFileInfo],
+    expected_max_run_id: int,
+) -> Dict[str, Any]:
+    if not files:
+        raise ValueError(f"files が空です: {condition_key}")
+
+    first_file = files[0]
+    expected_run_ids = list(range(1, expected_max_run_id + 1))
+    found_run_ids = sorted(file_info.run_id for file_info in files)
+    missing_run_ids = sorted(set(expected_run_ids) - set(found_run_ids))
+
+    parsed_run_ids: List[int] = []
+    failed_run_ids: List[int] = []
+
+    count_accumulator: DefaultDict[str, List[float]] = defaultdict(list)
+    arrival_time_accumulator: DefaultDict[str, List[float]] = defaultdict(list)
+    abandon_time_by_vehicle: DefaultDict[str, List[float]] = defaultdict(list)
+    walking_distance_by_vehicle: DefaultDict[str, List[float]] = defaultdict(list)
+    route_change_time_by_vehicle: DefaultDict[str, List[float]] = defaultdict(list)
+
+    abandon_time_all_events: List[float] = []
+    walking_distance_all_events: List[float] = []
+
+    for file_info in files:
+        text = read_text_file(file_info.path)
+        if text is None:
+            failed_run_ids.append(file_info.run_id)
+            continue
+
+        count_values, dict_values = parse_log_content(text)
+
+        has_any_count = any(value is not None for value in count_values.values())
+        has_any_dict = any(bool(values) for values in dict_values.values())
+        if not has_any_count and not has_any_dict:
+            failed_run_ids.append(file_info.run_id)
+            warn(f"必要なキーを抽出できなかったため失敗扱いにします: {file_info.filename}")
+            continue
+
+        parsed_run_ids.append(file_info.run_id)
+
+        for key, value in count_values.items():
+            if value is not None:
+                count_accumulator[key].append(value)
+
+        arrival_dict = dict_values.get("arrival_time_by_vehID_dict", {})
+        extend_accumulator(arrival_time_accumulator, arrival_dict)
+
+        abandon_dict = dict_values.get("vehicle_abandant_time_by_pedestrianID_dict", {})
+        extend_accumulator(abandon_time_by_vehicle, abandon_dict)
+        abandon_time_all_events.extend(flatten_values(abandon_dict))
+
+        walking_dict = dict_values.get("walking_distance_by_pedestrianID_dict", {})
+        extend_accumulator(walking_distance_by_vehicle, walking_dict)
+        walking_distance_all_events.extend(flatten_values(walking_dict))
+
+        route_change_dict = dict_values.get("route_change_time_by_vehID_dict", {})
+        extend_accumulator(route_change_time_by_vehicle, route_change_dict)
+
+    parsed_run_ids = sorted(set(parsed_run_ids))
+    failed_run_ids = sorted(set(failed_run_ids))
+
+    count_averages: Dict[str, Optional[float]] = {
+        key: safe_mean(count_accumulator.get(key, []))
+        for key in COUNT_KEYS
     }
+
+    vehicle_mean_arrival_time = mean_by_id(arrival_time_accumulator)
+    vehicle_mean_abandon_time = mean_by_id(abandon_time_by_vehicle)
+    vehicle_mean_walking_distance = mean_by_id(walking_distance_by_vehicle)
+    vehicle_mean_route_change_time = mean_by_id(route_change_time_by_vehicle)
+
+    sorted_arrival_time_list = sorted(float(value) for value in vehicle_mean_arrival_time.values())
+
+    result: Dict[str, Any] = {
+        "scenario": first_file.scenario,
+        "mode": first_file.mode,
+        "early_rate": first_file.early_rate,
+        "v2v_rate": first_file.v2v_rate,
+        "condition_key": condition_key,
+        "run_status": {
+            "expected_run_ids": expected_run_ids,
+            "found_run_ids": found_run_ids,
+            "missing_run_ids": missing_run_ids,
+            "parsed_run_ids": parsed_run_ids,
+            "failed_run_ids": failed_run_ids,
+        },
+        "count_averages": count_averages,
+        "arrival_time": {
+            "arrival_time_list": sorted_arrival_time_list,
+            "vehicle_mean_arrival_time": {
+                vehicle_id: vehicle_mean_arrival_time[vehicle_id]
+                for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_arrival_time.keys())
+            },
+        },
+        "abandonment": {
+            "mean_abandon_time": safe_mean(abandon_time_all_events),
+            "mean_walking_distance": safe_mean(walking_distance_all_events),
+            "all_abandon_time_events": sorted(float(value) for value in abandon_time_all_events),
+            "vehicle_mean_abandon_time": {
+                vehicle_id: vehicle_mean_abandon_time[vehicle_id]
+                for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_abandon_time.keys())
+            },
+            "vehicle_mean_walking_distance": {
+                vehicle_id: vehicle_mean_walking_distance[vehicle_id]
+                for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_walking_distance.keys())
+            },
+        },
+    }
+
+    # Parsed for future use. It is not required by the current output spec, but
+    # keeping it here makes it visible without changing the parser later.
+    if vehicle_mean_route_change_time:
+        result["route_change_time"] = {
+            "vehicle_mean_route_change_time": {
+                vehicle_id: vehicle_mean_route_change_time[vehicle_id]
+                for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_route_change_time.keys())
+            }
+        }
+
+    return result
 
 
 def get_requested_output_key(
@@ -562,26 +642,10 @@ def get_requested_output_key(
     v2v_rate: float,
     mode: Optional[str] = None,
 ) -> Optional[str]:
-    """
-    出力 JSON 用のキーを返す。
-
-    system:
-        early_rate をそのまま "0.1", "0.5", "0.9", "1.0" などにする
-    nosystem:
-        "nosystem" にする
-    """
-    if mode == "nosystem":
+    if mode == "nosystem" or is_close_float(v2v_rate, 0.0):
         return "nosystem"
-
-    if (
-        is_close_float(early_rate, COMPARISON_NOSYSTEM_EARLY_RATE)
-        and is_close_float(v2v_rate, COMPARISON_NOSYSTEM_V2V_RATE)
-    ):
-        return "nosystem"
-
-    if mode == "system" or is_close_float(v2v_rate, COMPARISON_SYSTEM_V2V_RATE):
+    if mode == "system" or is_close_float(v2v_rate, 1.0):
         return f"{early_rate:.1f}"
-
     return None
 
 
@@ -590,341 +654,246 @@ def build_requested_output_for_scenario(
     scenario_results: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
-    early_rate = 1.0 固定運用用の output.json を構築する。
-    system:   v2v_rate = 1.0
-    nosystem: v2v_rate = 0.0
+    Build the requested top-level JSON structure for a scenario.
+
+    Main order is stable: "1.0" first and "nosystem" second.
+    Additional system early_rate keys, if present, are appended in numeric order.
     """
-    ordered_keys = ["1.0", "nosystem"]
+    del scenario  # The scenario value is already stored in each condition result.
 
     selected_results: Dict[str, Dict[str, Any]] = {}
 
-    for _, condition_result in scenario_results.items():
-        early_rate = float(condition_result["early_rate"])
-        v2v_rate = float(condition_result["v2v_rate"])
-        mode = condition_result.get("mode")
-
-        output_key = get_requested_output_key(early_rate, v2v_rate, mode)
-
+    for condition_result in scenario_results.values():
+        output_key = get_requested_output_key(
+            early_rate=float(condition_result["early_rate"]),
+            v2v_rate=float(condition_result["v2v_rate"]),
+            mode=condition_result.get("mode"),
+        )
         if output_key is not None:
             selected_results[output_key] = condition_result
 
-def plot_cdfs_to_path(data_dict: Dict[float, List[float]], save_path: str) -> None:
-    plt.figure(figsize=(10, 6))
+    ordered_keys = ["1.0", "nosystem"]
+    additional_keys = [
+        key for key in selected_results.keys()
+        if key not in ordered_keys
+    ]
 
-    def label_for(key: float) -> str:
-        """
-        CDF グラフの凡例名を返す。
+    def additional_sort_key(key: str) -> Tuple[int, Any]:
+        try:
+            return (0, float(key))
+        except ValueError:
+            return (1, key)
 
-        key=0.0 は nosystem を表す。
-        それ以外は system の early_rate を表す。
-        """
-        if is_close_float(key, 0.0):
-            return "nosystem 0.5"
-        if is_close_float(key, 1.0):
-            return "system 1.0"
-        return f"system {key:.1f}"
+    ordered_keys.extend(sorted(additional_keys, key=additional_sort_key))
 
-    def style_for(key: float) -> Dict[str, str]:
-        """
-        条件ごとの線の色・線種を返す。
-        既存の色設定をなるべく維持する。
-        """
-        if is_close_float(key, 0.0):
-            return {"color": "blue", "linestyle": "--"}
-        if is_close_float(key, 0.1):
-            return {"color": "r", "linestyle": "-"}
-        if is_close_float(key, 0.5):
-            return {"color": "blue", "linestyle": "-"}
-        if is_close_float(key, 0.9):
-            return {"color": "g", "linestyle": "-"}
-        if is_close_float(key, 1.0):
-            return {"color": "black", "linestyle": "-"}
+    return {
+        key: selected_results[key]
+        for key in ordered_keys
+        if key in selected_results
+    }
 
-        # 想定外の early_rate が来ても描画できるようにする
-        return {"linestyle": "-"}
 
-    plotted = False
+def build_comparison_cdf_data_for_scenario(
+    scenario_results: Dict[str, Dict[str, Any]],
+) -> Dict[str, List[float]]:
+    comparison_data: Dict[str, List[float]] = {}
 
-    for key in sorted(data_dict.keys()):
-        values = data_dict.get(key, [])
-        arr = sorted(float(v) for v in values)
-
-        if not arr:
-            continue
-
-        cdf = [(i + 1) / len(arr) for i in range(len(arr))]
-
-        plt.plot(
-            arr,
-            cdf,
-            label=label_for(key),
-            **style_for(key),
+    for condition_result in scenario_results.values():
+        output_key = get_requested_output_key(
+            early_rate=float(condition_result["early_rate"]),
+            v2v_rate=float(condition_result["v2v_rate"]),
+            mode=condition_result.get("mode"),
         )
-        plotted = True
-
-    plt.xlim(200, 3000)
-    plt.ylim(0.05, 1.0)
-    plt.xticks(ticks=list(range(200, 3000, 100)), fontsize=14, fontweight="semibold")
-    plt.yticks(ticks=[i / 10 for i in range(1, 11)], fontsize=14, fontweight="semibold")
-    plt.xlabel("Mean arrival time")
-    plt.ylabel("Cumulative distribution")
-
-    if plotted:
-        plt.legend(loc="lower right")
-
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    plt.close()
-
-# =========================================
-# 条件別集計
-# =========================================
-
-def aggregate_condition(
-    condition_key: str,
-    files: List[LogFileInfo],
-    output_dir: str,
-    expected_max_run_id: int,
-) -> Dict[str, Any]:
-    """
-    1 条件分の集計を実施する。
-    """
-    if not files:
-        raise ValueError(f"files が空です: {condition_key}")
-
-    scenario = files[0].scenario
-    early_rate = files[0].early_rate
-    v2v_rate = files[0].v2v_rate
-
-    expected_run_ids = list(range(1, expected_max_run_id + 1))
-    found_run_ids = sorted({f.run_id for f in files})
-    missing_run_ids = sorted(set(expected_run_ids) - set(found_run_ids))
-
-    parsed_run_ids: List[int] = []
-    failed_run_ids: List[int] = []
-
-    count_accumulator: DefaultDict[str, List[float]] = defaultdict(list)
-    arrival_time_accumulator: DefaultDict[str, List[float]] = defaultdict(list)
-
-    abandon_time_all_events: List[float] = []
-    walking_distance_all_events: List[float] = []
-    abandon_time_by_vehicle: DefaultDict[str, List[float]] = defaultdict(list)
-    walking_distance_by_vehicle: DefaultDict[str, List[float]] = defaultdict(list)
-
-    for file_info in files:
-        text = read_text_file(file_info.path)
-        if text is None:
-            failed_run_ids.append(file_info.run_id)
+        if output_key is None:
             continue
 
-        count_values, dict_values, messages = parse_log_content(text)
+        arrival_values = list(condition_result["arrival_time"].get("arrival_time_list", []))
+        if arrival_values:
+            comparison_data[output_key] = [float(value) for value in arrival_values]
 
-        has_any_count = any(value is not None for value in count_values.values())
-        has_any_dict = any(bool(value_dict) for value_dict in dict_values.values())
-        if not (has_any_count or has_any_dict):
-            failed_run_ids.append(file_info.run_id)
-            warn(
-                f"必要なキーを抽出できなかったため失敗扱いにします: "
-                f"{file_info.filename}"
-            )
-            for message in messages:
-                warn(f"{file_info.filename}: {message}")
-            continue
+    ordered = build_requested_output_for_scenario(0, {
+        key: value for key, value in scenario_results.items()
+    })
+    ordered_keys = list(ordered.keys())
 
-        parsed_run_ids.append(file_info.run_id)
+    # Keep the same order as the JSON where possible.
+    return {
+        key: comparison_data[key]
+        for key in ordered_keys
+        if key in comparison_data
+    }
 
-        for message in messages:
-            warn(f"{file_info.filename}: {message}")
-
-        for key, value in count_values.items():
-            if value is not None and not math.isnan(value):
-                count_accumulator[key].append(value)
-
-        arrival_dict = dict_values.get("arrival_time_by_vehID_dict", {})
-        for vehicle_id, arrival_time in arrival_dict.items():
-            arrival_time_accumulator[vehicle_id].append(arrival_time)
-
-        abandon_dict = dict_values.get("vehicle_abandant_time_by_pedestrianID_dict", {})
-        for vehicle_id, abandon_time in abandon_dict.items():
-            abandon_time_all_events.append(abandon_time)
-            abandon_time_by_vehicle[vehicle_id].append(abandon_time)
-
-        walking_dict = dict_values.get("walking_distance_by_pedestrianID_dict", {})
-        for vehicle_id, walking_distance in walking_dict.items():
-            walking_distance_all_events.append(walking_distance)
-            walking_distance_by_vehicle[vehicle_id].append(walking_distance)
-
-    parsed_run_ids = sorted(set(parsed_run_ids))
-    failed_run_ids = sorted(set(failed_run_ids))
-
-    count_averages: Dict[str, Optional[float]] = {}
-    for key in COUNT_KEYS:
-        count_averages[key] = safe_mean(count_accumulator.get(key, []))
-
-    vehicle_mean_arrival_time: Dict[str, float] = {}
-    for vehicle_id, values in arrival_time_accumulator.items():
-        mean_value = safe_mean(values)
-        if mean_value is not None:
-            vehicle_mean_arrival_time[vehicle_id] = mean_value
-
-    vehicle_mean_abandon_time: Dict[str, float] = {}
-    for vehicle_id, values in abandon_time_by_vehicle.items():
-        mean_value = safe_mean(values)
-        if mean_value is not None:
-            vehicle_mean_abandon_time[vehicle_id] = mean_value
-
-    vehicle_mean_walking_distance: Dict[str, float] = {}
-    for vehicle_id, values in walking_distance_by_vehicle.items():
-        mean_value = safe_mean(values)
-        if mean_value is not None:
-            vehicle_mean_walking_distance[vehicle_id] = mean_value
-
-    # CDF の元データとして使いやすいように list でも保持
-    arrival_time_list = sorted(vehicle_mean_arrival_time.values())
-
-    result: Dict[str, Any] = {
-    "scenario": scenario,
-    "mode": files[0].mode,
-    "early_rate": early_rate,
-    "v2v_rate": v2v_rate,
-    "run_status": {
-        "expected_run_ids": expected_run_ids,
-        "found_run_ids": found_run_ids,
-        "missing_run_ids": missing_run_ids,
-        "parsed_run_ids": parsed_run_ids,
-        "failed_run_ids": failed_run_ids,
-    },
-    "count_averages": count_averages,
-    "arrival_time": {
-        "arrival_time_list": arrival_time_list,
-        "vehicle_mean_arrival_time": {
-            vehicle_id: vehicle_mean_arrival_time[vehicle_id]
-            for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_arrival_time.keys())
-        },
-    },
-    "abandonment": {
-        "mean_abandon_time": safe_mean(abandon_time_all_events),
-        "mean_walking_distance": safe_mean(walking_distance_all_events),
-
-        "all_abandon_time_events": sorted(float(v) for v in abandon_time_all_events),
-
-        "vehicle_mean_abandon_time": {
-            vehicle_id: vehicle_mean_abandon_time[vehicle_id]
-            for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_abandon_time.keys())
-        },
-        "vehicle_mean_walking_distance": {
-            vehicle_id: vehicle_mean_walking_distance[vehicle_id]
-            for vehicle_id in sort_numeric_strings_as_numbers(vehicle_mean_walking_distance.keys())
-        },
-    },
-    }   
-
-    return result
-
-# =========================================
-# CDF 出力
-# =========================================
 
 def compute_cdf_points(values: List[float]) -> Tuple[List[float], List[float]]:
-    """
-    CDF 用の x, y を作る。
-    y = i / n (1 始まり)
-    """
     if not values:
         return [], []
 
-    sorted_values = sorted(values)
+    sorted_values = sorted(float(value) for value in values)
     n = len(sorted_values)
-    x = sorted_values
-    y = [(i + 1) / n for i in range(n)]
-    return x, y
+    cdf = [(index + 1) / n for index in range(n)]
+    return sorted_values, cdf
 
 
-def create_cdf_plot(condition_key: str, values: List[float], output_dir: str) -> Optional[str]:
-    """
-    条件ごとに CDF グラフを PDF 出力する。
-    値が空なら None を返す。
-    """
-    x, y = compute_cdf_points(values)
-    if not x:
-        warn(f"CDF を作成する値が存在しません: {condition_key}")
+def label_for_output_key(output_key: str) -> str:
+    if output_key == "nosystem":
+        return "nosystem: e1.0, v0.0"
+    return f"system: e{output_key}, v1.0"
+
+
+def plot_comparison_cdf_to_path(
+    comparison_data: Dict[str, List[float]],
+    save_path: str,
+) -> Optional[str]:
+    if not comparison_data:
         return None
 
-    filename = f"cdf_{condition_key}.pdf"
-    output_path = os.path.join(output_dir, filename)
-
+    plotted = False
     plt.figure(figsize=(8, 6))
-    plt.plot(x, y, marker="o", linestyle="-")
-    plt.xlabel("Mean arrival time")
+
+    for output_key, values in comparison_data.items():
+        x_values, y_values = compute_cdf_points(values)
+        if not x_values:
+            continue
+        plt.plot(x_values, y_values, label=label_for_output_key(output_key))
+        plotted = True
+
+    if not plotted:
+        plt.close()
+        return None
+
+    plt.xlabel("Mean arrival time [sec.]")
     plt.ylabel("Cumulative distribution")
-    plt.title(f"CDF of Mean Arrival Time ({condition_key})")
     plt.grid(True)
+    plt.legend(loc="lower right")
     plt.tight_layout()
-    plt.savefig(output_path, dpi=150)
+    plt.savefig(save_path, format="pdf")
     plt.close()
+    return save_path
 
-    return filename
+
+def json_indent(indent: int) -> str:
+    return " " * indent
 
 
-# =========================================
-# JSON 出力
-# =========================================
+def is_json_scalar(value: Any) -> bool:
+    return value is None or isinstance(value, (str, int, float, bool))
+
+
+def dumps_json_scalar(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, allow_nan=False)
+
+
+def format_json_key(key: Any) -> str:
+    # json.dump() coerces non-string dict keys to strings.
+    # Do the same here so that the output remains valid JSON.
+    return json.dumps(str(key), ensure_ascii=False, allow_nan=False)
+
+
+def format_json_value(value: Any, indent: int = 0, chunk_size: int = JSON_CHUNK_SIZE) -> str:
+    if isinstance(value, dict):
+        return format_json_dict_compact(value, indent=indent, chunk_size=chunk_size)
+
+    if isinstance(value, list):
+        return format_json_list_compact(value, indent=indent, chunk_size=chunk_size)
+
+    if isinstance(value, tuple):
+        return format_json_list_compact(list(value), indent=indent, chunk_size=chunk_size)
+
+    return dumps_json_scalar(value)
+
+
+def format_json_list_compact(
+    values: List[Any],
+    indent: int = 0,
+    chunk_size: int = JSON_CHUNK_SIZE,
+) -> str:
+    if not values:
+        return "[]"
+
+    if all(is_json_scalar(value) for value in values):
+        dumped_values = [dumps_json_scalar(value) for value in values]
+
+        if len(dumped_values) <= chunk_size:
+            return "[" + ", ".join(dumped_values) + "]"
+
+        child_indent = indent + JSON_INDENT_SIZE
+        lines = ["["]
+        for start in range(0, len(dumped_values), chunk_size):
+            chunk = dumped_values[start : start + chunk_size]
+            is_last_chunk = start + chunk_size >= len(dumped_values)
+            comma = "" if is_last_chunk else ","
+            lines.append(f"{json_indent(child_indent)}{', '.join(chunk)}{comma}")
+        lines.append(f"{json_indent(indent)}]")
+        return "\n".join(lines)
+
+    child_indent = indent + JSON_INDENT_SIZE
+    lines = ["["]
+    for index, value in enumerate(values):
+        comma = "" if index == len(values) - 1 else ","
+        formatted_value = format_json_value(
+            value,
+            indent=child_indent,
+            chunk_size=chunk_size,
+        )
+        lines.append(f"{json_indent(child_indent)}{formatted_value}{comma}")
+    lines.append(f"{json_indent(indent)}]")
+    return "\n".join(lines)
+
+
+def format_json_dict_compact(
+    values: Dict[str, Any],
+    indent: int = 0,
+    chunk_size: int = JSON_CHUNK_SIZE,
+) -> str:
+    if not values:
+        return "{}"
+
+    items = list(values.items())
+    child_indent = indent + JSON_INDENT_SIZE
+
+    if all(is_json_scalar(value) for _, value in items):
+        dumped_entries = [
+            f"{format_json_key(key)}: {dumps_json_scalar(value)}"
+            for key, value in items
+        ]
+
+        if len(dumped_entries) <= chunk_size:
+            return "{ " + ", ".join(dumped_entries) + " }"
+
+        lines = ["{"]
+        for start in range(0, len(dumped_entries), chunk_size):
+            chunk = dumped_entries[start : start + chunk_size]
+            is_last_chunk = start + chunk_size >= len(dumped_entries)
+            comma = "" if is_last_chunk else ","
+            lines.append(f"{json_indent(child_indent)}{', '.join(chunk)}{comma}")
+        lines.append(f"{json_indent(indent)}}}")
+        return "\n".join(lines)
+
+    lines = ["{"]
+    for index, (key, value) in enumerate(items):
+        comma = "" if index == len(items) - 1 else ","
+        formatted_value = format_json_value(
+            value,
+            indent=child_indent,
+            chunk_size=chunk_size,
+        )
+        lines.append(
+            f"{json_indent(child_indent)}{format_json_key(key)}: {formatted_value}{comma}"
+        )
+    lines.append(f"{json_indent(indent)}}}")
+    return "\n".join(lines)
+
 
 def write_json(data: Dict[str, Any], output_path: str) -> None:
-    """
-    結果 JSON を保存する。
+    formatted_json = format_json_value(
+        data,
+        indent=0,
+        chunk_size=JSON_CHUNK_SIZE,
+    )
+    with open(output_path, "w", encoding="utf-8") as file:
+        file.write(formatted_json)
+        file.write("\n")
 
-    top-level は改行する。
-    top-level の値が dict の場合，その直下の key ごとに改行する。
-    その下の dict は 1 行で出力する。
-    """
-    with open(output_path, "w", encoding="utf-8") as f:
-        f.write("{\n")
-
-        top_items = list(data.items())
-
-        for top_index, (top_key, top_value) in enumerate(top_items):
-            is_last_top = top_index == len(top_items) - 1
-            top_comma = "" if is_last_top else ","
-
-            if not isinstance(top_value, dict):
-                dumped_value = json.dumps(
-                    top_value,
-                    ensure_ascii=False,
-                    separators=(", ", ": "),
-                    sort_keys=False,
-                )
-                f.write(f'  "{top_key}": {dumped_value}{top_comma}\n')
-                continue
-
-            f.write(f'  "{top_key}": {{\n')
-
-            child_items = list(top_value.items())
-
-            for child_index, (child_key, child_value) in enumerate(child_items):
-                is_last_child = child_index == len(child_items) - 1
-                child_comma = "" if is_last_child else ","
-
-                dumped_child_value = json.dumps(
-                    child_value,
-                    ensure_ascii=False,
-                    separators=(", ", ": "),
-                    sort_keys=False,
-                )
-
-                f.write(
-                    f'    "{child_key}": {dumped_child_value}{child_comma}\n'
-                )
-
-            f.write(f"  }}{top_comma}\n")
-
-        f.write("}\n")
-        
-
-# =========================================
-# 全体処理
-# =========================================
 
 def aggregate_all_conditions(
     log_dir: str,
@@ -932,108 +901,86 @@ def aggregate_all_conditions(
     expected_max_run_id: int,
     json_filename: str,
 ) -> Dict[str, Any]:
-    """全条件を集計し、scenario ごとに JSON と比較 CDF を出力する"""
     ensure_output_dir(output_dir)
 
     out_paths = list_out_files(log_dir)
     info(f".out ファイル数: {len(out_paths)}")
 
-    parsed_files: List[LogFileInfo] = []
-    for path in out_paths:
-        file_info = parse_out_filename(path)
-        if file_info is not None:
-            parsed_files.append(file_info)
-
+    parsed_files = [
+        file_info
+        for path in out_paths
+        if (file_info := parse_out_filename(path)) is not None
+    ]
     info(f"ファイル名の解析に成功した .out ファイル数: {len(parsed_files)}")
 
     grouped = deduplicate_by_condition_and_run(parsed_files)
     info(f"検出された条件数: {len(grouped)}")
 
-    all_results_by_scenario: Dict[int, Dict[str, Any]] = defaultdict(dict)
-
+    all_results_by_scenario: DefaultDict[int, Dict[str, Dict[str, Any]]] = defaultdict(dict)
     for condition_key in sorted(grouped.keys()):
         info(f"集計中: {condition_key}")
         condition_result = aggregate_condition(
             condition_key=condition_key,
             files=grouped[condition_key],
-            output_dir=output_dir,
             expected_max_run_id=expected_max_run_id,
         )
         scenario = int(condition_result["scenario"])
         all_results_by_scenario[scenario][condition_key] = condition_result
 
     final_output: Dict[str, Any] = {}
+    scenario_count = len(all_results_by_scenario)
 
     for scenario, scenario_results in sorted(all_results_by_scenario.items()):
         scenario_output_dir = build_scenario_output_dir(output_dir, scenario)
         ensure_output_dir(scenario_output_dir)
 
-        comparison_plot_filename = f"cdf_compare_s{scenario}.pdf"
-        comparison_plot_path = os.path.join(
-            scenario_output_dir,
-            comparison_plot_filename,
-        )
-
-        comparison_data = build_comparison_cdf_data_for_scenario(scenario_results)
-        if comparison_data:
-            plot_cdfs_to_path(comparison_data, comparison_plot_path)
-        else:
-            warn(f"比較 CDF 用データが不足しているためスキップします: scenario={scenario}")
-            comparison_plot_filename = None
-
         scenario_json_data = build_requested_output_for_scenario(scenario, scenario_results)
-
         json_output_path = os.path.join(scenario_output_dir, json_filename)
         write_json(scenario_json_data, json_output_path)
         info(f"JSON を出力しました: {json_output_path}")
+
+        comparison_data = build_comparison_cdf_data_for_scenario(scenario_results)
+        cdf_output_path = os.path.join(scenario_output_dir, f"cdf_compare_s{scenario}.pdf")
+        if plot_comparison_cdf_to_path(comparison_data, cdf_output_path) is not None:
+            info(f"CDF を出力しました: {cdf_output_path}")
+        else:
+            warn(f"比較 CDF 用データが不足しているためスキップします: scenario={scenario}")
+
+        # If the log set contains only one scenario, also mirror outputs directly
+        # under output_dir so that scenarios/{scenario_name}/results/output.json
+        # is available for the common single-scenario workflow.
+        if scenario_count == 1:
+            mirror_json_path = os.path.join(output_dir, json_filename)
+            write_json(scenario_json_data, mirror_json_path)
+            info(f"JSON を出力しました: {mirror_json_path}")
+
+            mirror_cdf_path = os.path.join(output_dir, f"cdf_compare_s{scenario}.pdf")
+            if comparison_data:
+                plot_comparison_cdf_to_path(comparison_data, mirror_cdf_path)
+                info(f"CDF を出力しました: {mirror_cdf_path}")
 
         final_output[f"scenario{scenario}"] = scenario_json_data
 
     return final_output
 
 
-def build_comparison_cdf_data_for_scenario(
-    scenario_results: Dict[str, Dict[str, Any]]
-) -> Dict[float, List[float]]:
-    comparison_data: Dict[float, List[float]] = {}
-
-    for _, condition_result in scenario_results.items():
-        early_rate = float(condition_result["early_rate"])
-        v2v_rate = float(condition_result["v2v_rate"])
-        mode = condition_result.get("mode")
-        arrival_values = list(condition_result["arrival_time"].get("arrival_time_list", []))
-
-        if not arrival_values:
-            continue
-
-        # v2v_rate = 0.0 を nosystem として扱う
-        if mode == "nosystem" or is_close_float(v2v_rate, 0.0):
-            comparison_data[0.0] = arrival_values
-            continue
-
-        # v2v_rate = 1.0 を system として扱う
-        if mode == "system" or is_close_float(v2v_rate, 1.0):
-            comparison_data[early_rate] = arrival_values
-
-    return comparison_data
-
-# =========================================
-# CLI
-# =========================================
-
 def parse_args() -> argparse.Namespace:
-    """コマンドライン引数を解析する"""
     parser = argparse.ArgumentParser(
-        description="slurm の .out シミュレーションログを条件別に集計し、平均値と CDF を出力する"
+        description="Slurm の .out シミュレーションログを条件別に集計し、output.json と CDF を出力する"
     )
     parser.add_argument(
         "log_dir",
-        help="ログディレクトリのパス (.out / .err が混在していてよい)",
+        help="ログディレクトリのパス。.out のみを集計し、.err は無視する。",
     )
     parser.add_argument(
         "--output-dir",
         default=None,
-        help="出力先ディレクトリ。未指定時は log_dir 配下に出力する",
+        help="出力先ディレクトリ。指定された場合は --scenario-name より優先する。",
+    )
+    parser.add_argument(
+        "--scenario-name",
+        default=None,
+        help="scenarios/{scenario_name}/results を出力先にする。例: JIP/1-1-2",
     )
     parser.add_argument(
         "--expected-max-run-id",
@@ -1046,27 +993,15 @@ def parse_args() -> argparse.Namespace:
         default=OUTPUT_JSON_FILE,
         help=f"出力 JSON ファイル名。既定値: {OUTPUT_JSON_FILE}",
     )
-    parser.add_argument(
-    "--scenario-name",
-    default=None,
-    help="scenarios/{scenario_name}/results を出力先として使うためのシナリオ名。例: its105",
-    )
     return parser.parse_args()
 
-def main() -> int:
-    """エントリポイント"""
-    args = parse_args()
 
+def main() -> int:
+    args = parse_args()
     log_dir = os.path.abspath(args.log_dir)
 
-    if args.scenario_name:
-        output_dir = build_output_dir_from_scenario_name(args.scenario_name)
-    elif args.output_dir is not None:
-        output_dir = os.path.abspath(args.output_dir)
-    else:
-        output_dir = log_dir
-
     try:
+        output_dir = resolve_output_dir(args)
         aggregate_all_conditions(
             log_dir=log_dir,
             output_dir=output_dir,
@@ -1078,6 +1013,7 @@ def main() -> int:
         return 1
 
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(main())
