@@ -180,6 +180,7 @@ def calculate_reroute_distance(
             return float("inf")
 
         # 2. Uターン後の経路を検索
+        # print(f" {vehID} from_edgeID: {from_edgeID} to_edgeID: {to_edgeID} shelter: {shelter.get_near_edgeID()}")
         stage = traci.simulation.findRoute(from_edgeID, to_edgeID)
         route_edges = stage.edges
         

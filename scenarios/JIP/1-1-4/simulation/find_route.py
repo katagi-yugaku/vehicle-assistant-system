@@ -93,8 +93,8 @@ def get_options():
 # this is the main entry point of this script
 if __name__ == "__main__":
     # python3 -m scenarios.dicomo2026.map_one.simulation.find_route --nogui
+    # python3 -m scenarios.JIP.1-1-2.simulation.find_route --nogui
     options = get_options()
-    file_path = "data/two_route_one_evac.rou.xml"
     if options.nogui:
         sumoBinary = checkBinary('sumo')
     else:
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     # for shelterID, near_edgeID in shelter_edge_by_IDs.items():
     #     shelter_list:list = utilities.init_shelter(shelterID=shelterID, shelter_capacity_by_ID=shelter_capacity_by_ID, near_edgeID=near_edgeID, shelter_list=shelter_list)
     # 現在のedge情報をもとに、CustomEdge一覧を生成
-    traci.start([sumoBinary, "-c", "/Users/kashiisamutakeshi/vehicle-assistant-system/scenarios/dicomo2026/map_one/data/ishinomaki_two_shelter.sumocfg",
+    traci.start([sumoBinary, "-c", "/Users/kashiisamutakeshi/vehicle-assistant-system/scenarios/JIP/1-1-4/data/ishinomaki_one_four_one.sumocfg",
                              "--tripinfo-output", "tripinfo.xml"], traceFile="traci_log.txt", traceGetters=False)
     # 開始エッジ, 終了エッジ一覧を作成
     custome_edge_list:list = utilities.init_custome_edge()
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     print(f"connected_edges_list: {connected_edges_list}")
     # 取得した総当たり情報をjson形式で保存する
     utilities.export_connected_edges_to_json(connected_edges_list=connected_edges_list,
-                                                file_path="/Users/kashiisamutakeshi/vehicle-assistant-system/scenarios/dicomo2026/map_one/data/all_edgeIDs.json")
+                                                file_path="/Users/kashiisamutakeshi/vehicle-assistant-system/scenarios/JIP/1-1-4/data/all_edgeIDs.json")
     
     print(f'length of connected_edges_list: {len(connected_edges_list)}')
     # ここまで空
@@ -132,7 +132,7 @@ if __name__ == "__main__":
     print(f'nearest_end_edgeID_by_start_edgeID_dict: {nearest_end_edgeID_by_start_edgeID_dict}')
     # 取得した開始地点と終了地点の情報をjson形式で保存する
     utilities.export_start_end_edgeIDs_to_json(start_end_edgeIDs=nearest_end_edgeID_by_start_edgeID_dict,
-                                                file_path="/Users/kashiisamutakeshi/vehicle-assistant-system/scenarios/dicomo2026/map_one/data/start_end_edgeIDs_ishinomaki_two_shelter.json")
+                                                file_path="/Users/kashiisamutakeshi/vehicle-assistant-system/scenarios/JIP/1-1-4/data/start_end_edgeIDs_ishinomaki_two_shelter.json")
     print(f'find route complete')
 
 
