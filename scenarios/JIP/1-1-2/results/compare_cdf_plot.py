@@ -323,15 +323,23 @@ def main() -> None:
         json_path = scenario_dir / "output.json"
 
         values = load_arrival_time_list(
-            json_path=json_path,
+        json_path=json_path,
             condition_key=condition_key,
         )
 
         scenario_to_values[scenario_id] = values
 
+        # arrival_time_list の最後の値を避難完了時刻として表示
+        evacuation_completion_time = float(values[-1])
+
         print(
             f"[INFO] {scenario_id}: loaded {len(values)} arrival times "
             f"from condition_key='{condition_key}'"
+        )
+
+        print(
+            f"[RESULT] {scenario_id}: "
+            f"evacuation_completion_time = {evacuation_completion_time:.2f} s"
         )
 
     scenario_part = "_vs_".join(scenario_ids)
