@@ -14,6 +14,13 @@ from __future__ import annotations
 import copy
 
 from evacsim.sim.sumo_env import ensure_sumo_tools_on_path
+import math
+import random
+from decimal import Decimal, ROUND_FLOOR
+from collections import Counter
+
+import numpy as np
+import random
 
 ensure_sumo_tools_on_path()
 
@@ -166,6 +173,116 @@ def generate_simple_init_vehID(
     )
 
     generate_veh_count += 1
+    generate_route_count += 1
+
+    return generate_veh_count, generate_route_count, vehID_list, depart_time
+
+
+
+def generate_simple_init_vehID_based_one_routefile(
+    from_edgeID: str,
+    to_edgeID: str,
+    shelterID: str,
+    generate_interval: float,
+    generate_route_count: int,
+    generate_veh_count: int,
+    depart_time: float,
+    routeID: str | None = None,
+    route_index: int | None = None,
+):
+    """
+    初期車両を1台生成する。
+
+    routeID が指定された場合:
+        既存の SUMO route ID を使って車両を生成する。
+        例: E0_E16_0, E0_E13_1
+
+    routeID が指定されない場合:
+        従来通り findRoute() で経路を作成し、initroute_* を追加する。
+    """
+    vehID_list = []
+
+    # ------------------------------------------------------------
+    # 車両IDを生成
+    #
+    # 既存の init_{shelterID}_{veh_count} 形式を大きく壊さず、
+    # 末尾に routeID を付けて、どの route に基づく車両か分かるようにする。
+    # ------------------------------------------------------------
+    if routeID is None:
+        new_veh_ID: str = "{}_{}_{}".format(
+            "init",
+            shelterID,
+            generate_veh_count,
+        )
+    else:
+        new_veh_ID: str = "{}_{}_{}_{}".format(
+            "init",
+            shelterID,
+            routeID,
+            generate_veh_count,
+        )
+
+    vehID_list.append(new_veh_ID)
+
+    # ------------------------------------------------------------
+    # routeID が指定されている場合は、既存 route をそのまま使う
+    # ------------------------------------------------------------
+    if routeID is not None:
+        available_routeIDs = set(traci.route.getIDList())
+
+        if routeID not in available_routeIDs:
+            raise ValueError(
+                f"Specified routeID does not exist in SUMO: {routeID}. "
+                f"available_routeIDs={sorted(available_routeIDs)}"
+            )
+
+        new_route_ID = routeID
+
+    # ------------------------------------------------------------
+    # routeID が指定されていない場合は、従来通り findRoute() で作る
+    # ------------------------------------------------------------
+    else:
+        via_edgeIDs_with_intial_end_edge: list = list(
+            traci.simulation.findRoute(
+                from_edgeID,
+                to_edgeID,
+            ).edges
+        )
+
+        new_route_ID: str = "{}_{}_{}".format(
+            "initroute",
+            shelterID,
+            generate_route_count,
+        )
+
+        traci.route.add(
+            routeID=new_route_ID,
+            edges=via_edgeIDs_with_intial_end_edge,
+        )
+
+    # ------------------------------------------------------------
+    # 車両を生成
+    # ------------------------------------------------------------
+    traci.vehicle.add(
+        vehID=new_veh_ID,
+        routeID=new_route_ID,
+        depart=depart_time,
+    )
+
+    depart_time = depart_time + generate_interval
+
+    # ------------------------------------------------------------
+    # 避難地で停止
+    # ------------------------------------------------------------
+    traci.vehicle.setParkingAreaStop(
+        vehID=new_veh_ID,
+        stopID=shelterID,
+        duration=100000,
+    )
+
+    generate_veh_count += 1
+
+    # ROUTE_NUM の既存管理を壊さないため、従来通り増やす
     generate_route_count += 1
 
     return generate_veh_count, generate_route_count, vehID_list, depart_time
@@ -620,3 +737,162 @@ def generate_new_veh(
     NEW_VEHICLE_COUNT += 1
 
     return NEW_VEHICLE_COUNT
+
+
+def parse_route_id(routeID: str) -> tuple[str, str, int]:
+    """
+    routeID format:
+        fromEdge_toEdge_routeIndex
+
+    example:
+        E0_E16_0
+        E0_E13_1
+    """
+    parts = routeID.split("_")
+
+    if len(parts) != 3:
+        raise ValueError(
+            f"Invalid routeID format: {routeID}. "
+            "Expected format is fromEdge_toEdge_routeIndex, e.g., E0_E16_0"
+        )
+
+    from_edgeID, to_edgeID, route_index_str = parts
+
+    if not from_edgeID or not to_edgeID:
+        raise ValueError(f"Invalid routeID format: {routeID}")
+
+    try:
+        route_index = int(route_index_str)
+    except ValueError:
+        raise ValueError(
+            f"Invalid route index in routeID={routeID}. "
+            f"route_index must be int, got {route_index_str}"
+        )
+
+    if route_index < 0:
+        raise ValueError(
+            f"Invalid route index in routeID={routeID}. "
+            f"route_index must be non-negative."
+        )
+
+    return from_edgeID, to_edgeID, route_index
+
+
+def validate_route_choice_rates(
+    route_choice_rate_by_routeID: dict[str, float],
+    available_routeIDs: list[str],
+) -> None:
+    if not route_choice_rate_by_routeID:
+        raise ValueError("route_choice_rate_by_routeID is empty.")
+
+    for routeID, rate in route_choice_rate_by_routeID.items():
+        parse_route_id(routeID)
+
+        if rate < 0:
+            raise ValueError(
+                f"Invalid route choice rate for routeID={routeID}: {rate}. "
+                "Rate must be non-negative."
+            )
+
+    rate_sum = sum(route_choice_rate_by_routeID.values())
+
+    if not math.isclose(rate_sum, 1.0, rel_tol=0.0, abs_tol=1e-9):
+        raise ValueError(
+            f"sum(route_choice_rate_by_routeID.values()) must be 1.0, "
+            f"but got {rate_sum}. "
+            f"route_choice_rate_by_routeID={route_choice_rate_by_routeID}"
+        )
+
+    available_routeID_set = set(available_routeIDs)
+    missing_routeIDs = [
+        routeID
+        for routeID in route_choice_rate_by_routeID.keys()
+        if routeID not in available_routeID_set
+    ]
+
+    if missing_routeIDs:
+        raise ValueError(
+            "Some route IDs in route_choice_rate_by_routeID are not found in SUMO routes. "
+            f"missing_routeIDs={missing_routeIDs}, "
+            f"available_routeIDs={available_routeIDs}"
+        )
+
+
+def allocate_vehicle_counts_by_route(
+    total_vehicle_count: int,
+    route_choice_rate_by_routeID: dict[str, float],
+) -> dict[str, int]:
+    """
+    確率から route ID ごとの生成台数を決定する。
+
+    方針:
+    1. total * rate の床関数で一旦割り当て
+    2. 残り台数を小数部分が大きい route から順に +1
+    3. 合計が必ず total_vehicle_count になるようにする
+    """
+    if total_vehicle_count < 0:
+        raise ValueError(f"total_vehicle_count must be >= 0, got {total_vehicle_count}")
+
+    raw_count_by_routeID: dict[str, Decimal] = {}
+    floor_count_by_routeID: dict[str, int] = {}
+    fractional_part_by_routeID: dict[str, Decimal] = {}
+
+    total_decimal = Decimal(str(total_vehicle_count))
+
+    for routeID, rate in route_choice_rate_by_routeID.items():
+        raw_count = total_decimal * Decimal(str(rate))
+        floor_count = int(raw_count.to_integral_value(rounding=ROUND_FLOOR))
+
+        raw_count_by_routeID[routeID] = raw_count
+        floor_count_by_routeID[routeID] = floor_count
+        fractional_part_by_routeID[routeID] = raw_count - Decimal(floor_count)
+
+    assigned_count = sum(floor_count_by_routeID.values())
+    remaining_count = total_vehicle_count - assigned_count
+
+    if remaining_count < 0:
+        raise ValueError(
+            f"Vehicle allocation failed. assigned_count={assigned_count}, "
+            f"total_vehicle_count={total_vehicle_count}"
+        )
+
+    # 小数部分が大きい順に余りを配分する。
+    # 小数部分が同じ場合は routeID の昇順にして再現性を保つ。
+    routeIDs_sorted_by_fraction = sorted(
+        route_choice_rate_by_routeID.keys(),
+        key=lambda routeID: (-fractional_part_by_routeID[routeID], routeID)
+    )
+
+    route_vehicle_count_by_routeID = dict(floor_count_by_routeID)
+
+    for routeID in routeIDs_sorted_by_fraction[:remaining_count]:
+        route_vehicle_count_by_routeID[routeID] += 1
+
+    final_total = sum(route_vehicle_count_by_routeID.values())
+
+    if final_total != total_vehicle_count:
+        raise ValueError(
+            f"Vehicle allocation total mismatch. "
+            f"final_total={final_total}, total_vehicle_count={total_vehicle_count}, "
+            f"route_vehicle_count_by_routeID={route_vehicle_count_by_routeID}"
+        )
+
+    return route_vehicle_count_by_routeID
+
+
+def build_assigned_routeID_list(
+    route_vehicle_count_by_routeID: dict[str, int],
+    seed: int | None = None,
+) -> list[str]:
+    assigned_routeID_list: list[str] = []
+
+    for routeID, count in route_vehicle_count_by_routeID.items():
+        if count < 0:
+            raise ValueError(f"Vehicle count must be non-negative: {routeID}={count}")
+
+        assigned_routeID_list.extend([routeID] * count)
+
+    rng = random.Random(seed)
+    rng.shuffle(assigned_routeID_list)
+
+    return assigned_routeID_list

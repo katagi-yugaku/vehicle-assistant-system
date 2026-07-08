@@ -7,7 +7,7 @@
 
     <input>
         <net-file value="ishinomaki_one_four_one.net.xml"/>
-        <route-files value="ishinoamki_four_route_one.rou.xml"/>
+        <route-files value="ishinomaki_one_four_one.rou.xml"/>
+        <additional-files value="ishinomaki_one_two_one.add.xml,road_background_color.xml"/>
     </input>
-
 </configuration>
