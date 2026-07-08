@@ -12,7 +12,7 @@ n=50
 early_rate=1.0
 
 # v2v_rate のみ sweep
-v2v_capable_vehicle_rate_list=(0.0 1.0)
+v2v_capable_vehicle_rate_list=(1.0)
 
 # mount が正常なノードだけ使う
 ALIVE_NODES="paganini,elgar,chopin"
