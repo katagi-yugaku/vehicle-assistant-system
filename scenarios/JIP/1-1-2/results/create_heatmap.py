@@ -26,6 +26,13 @@ class HeatmapTable:
     values: list[list[float]]
 
 
+@dataclass
+class AnnotationTable:
+    row_values: list[float]
+    col_values: list[float]
+    annotations: list[list[str]]
+
+
 def load_toml(path: Path) -> dict[str, Any]:
     with path.open("rb") as f:
         return tomllib.load(f)
@@ -33,8 +40,10 @@ def load_toml(path: Path) -> dict[str, Any]:
 
 def extract_scenario_number_from_dir(path: Path) -> int:
     match = re.fullmatch(r"scenario(\d+)", path.name)
-    if not match:
-        raise ValueError(f"Invalid scenario directory name: {path.name}")
+    # if not match:
+    #     raise ValueError(f"Invalid scenario directory name:"scenario(\d+)", path.name)
+    # if not match:
+    #     raise ValueError(f"Invalid scenario directory name: {path.name}")
     return int(match.group(1))
 
 
@@ -51,10 +60,18 @@ def warn_and_skip(message: str) -> None:
     warnings.warn(message, RuntimeWarning)
 
 
-def collect_records(results_dir: Path, config_dir: Path) -> list[dict[str, Any]]:
+def collect_records(
+    results_dir: Path,
+    config_dir: Path,
+    scenario_start: int,
+    scenario_end: int,
+) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
 
-    scenario_dirs = [results_dir / f"scenario{i}" for i in range(1, 31)]
+    scenario_dirs = [
+        results_dir / f"scenario{i}"
+        for i in range(scenario_start, scenario_end + 1)
+    ]
 
     for scenario_dir in scenario_dirs:
         if not scenario_dir.exists():
@@ -66,7 +83,7 @@ def collect_records(results_dir: Path, config_dir: Path) -> list[dict[str, Any]]
             continue
 
         try:
-            extract_scenario_number_from_dir(scenario_dir)
+            scenario_dir_number = extract_scenario_number_from_dir(scenario_dir)
         except ValueError as e:
             warn_and_skip(f"Skip {scenario_dir.name}: {e}")
             continue
@@ -97,6 +114,13 @@ def collect_records(results_dir: Path, config_dir: Path) -> list[dict[str, Any]]
         except Exception as e:
             warn_and_skip(f"Skip {scenario_dir.name}: invalid scenario id: {e}")
             continue
+
+        if scenario_id != scenario_dir_number:
+            warn_and_skip(
+                f"{scenario_dir.name}: directory scenario number "
+                f"({scenario_dir_number}) and output.json scenario id "
+                f"({scenario_id}) are different. Use output.json scenario id."
+            )
 
         config_path = find_config_path(config_dir, scenario_id)
 
@@ -135,15 +159,23 @@ def collect_records(results_dir: Path, config_dir: Path) -> list[dict[str, Any]]
             continue
 
         try:
+            count_averages = condition_data["count_averages"]
+
             route_changed_vehicle_count = float(
-                condition_data["count_averages"]["route_changed_vehicle_count"]
+                count_averages["route_changed_vehicle_count"]
+            )
+            normalcy_bias_route_change_count = float(
+                count_averages["normalcy_bias_route_change_count"]
+            )
+            majority_bias_route_change_count = float(
+                count_averages["majority_bias_route_change_count"]
             )
         except KeyError as e:
             warn_and_skip(f"Skip {scenario_dir.name}: missing count_averages key: {e}")
             continue
         except Exception as e:
             warn_and_skip(
-                f"Skip {scenario_dir.name}: invalid route_changed_vehicle_count: {e}"
+                f"Skip {scenario_dir.name}: invalid route change count value: {e}"
             )
             continue
 
@@ -155,6 +187,8 @@ def collect_records(results_dir: Path, config_dir: Path) -> list[dict[str, Any]]
                 "active_route_change_threshold_center": threshold,
                 "evacuation_completion_time": evacuation_completion_time,
                 "route_changed_vehicle_count": route_changed_vehicle_count,
+                "normalcy_bias_route_change_count": normalcy_bias_route_change_count,
+                "majority_bias_route_change_count": majority_bias_route_change_count,
             }
         )
 
@@ -196,10 +230,64 @@ def build_table(
     )
 
 
-def build_pivot_tables(records: list[dict[str, Any]]) -> tuple[HeatmapTable, HeatmapTable]:
+def build_route_change_annotation_table(
+    records: list[dict[str, Any]],
+) -> AnnotationTable:
+    row_values = sorted(
+        {
+            float(record["active_route_change_threshold_center"])
+            for record in records
+        }
+    )
+    col_values = sorted({float(record["p_follow"]) for record in records})
+
+    annotation_map: dict[tuple[float, float], str] = {}
+
+    for record in records:
+        row = float(record["active_route_change_threshold_center"])
+        col = float(record["p_follow"])
+
+        total = float(record["route_changed_vehicle_count"])
+        normalcy = float(record["normalcy_bias_route_change_count"])
+        majority = float(record["majority_bias_route_change_count"])
+
+        if total > 0.0:
+            normalcy_ratio = normalcy / total * 100.0
+            majority_ratio = majority / total * 100.0
+        else:
+            normalcy_ratio = 0.0
+            majority_ratio = 0.0
+
+        annotation = (
+            f"{total:.1f}\n"
+            f"N{normalcy_ratio:.0f} C{majority_ratio:.0f}"
+        )
+
+        annotation_map[(row, col)] = annotation
+
+    annotations: list[list[str]] = []
+
+    for row in row_values:
+        row_list: list[str] = []
+        for col in col_values:
+            row_list.append(annotation_map.get((row, col), ""))
+        annotations.append(row_list)
+
+    return AnnotationTable(
+        row_values=row_values,
+        col_values=col_values,
+        annotations=annotations,
+    )
+
+
+def build_pivot_tables(
+    records: list[dict[str, Any]],
+) -> tuple[HeatmapTable, HeatmapTable, AnnotationTable]:
     completion_table = build_table(records, "evacuation_completion_time")
     route_changed_table = build_table(records, "route_changed_vehicle_count")
-    return completion_table, route_changed_table
+    route_changed_annotation_table = build_route_change_annotation_table(records)
+
+    return completion_table, route_changed_table, route_changed_annotation_table
 
 
 def save_table_csv(table: HeatmapTable, output_path: Path) -> None:
@@ -220,11 +308,33 @@ def save_table_csv(table: HeatmapTable, output_path: Path) -> None:
             writer.writerow(row)
 
 
+def save_annotation_csv(
+    annotation_table: AnnotationTable,
+    output_path: Path,
+) -> None:
+    with output_path.open("w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+
+        header = ["active_route_change_threshold_center"]
+        header.extend([f"{col:.2f}" for col in annotation_table.col_values])
+        writer.writerow(header)
+
+        for row_value, row_data in zip(
+            annotation_table.row_values,
+            annotation_table.annotations,
+        ):
+            row = [f"{row_value:.1f}"]
+            row.extend(row_data)
+            writer.writerow(row)
+
+
 def save_heatmap(
     table: HeatmapTable,
     output_path: Path,
     title: str,
     colorbar_label: str,
+    annotation_table: AnnotationTable | None = None,
+    annotation_fontsize: int = 9,
 ) -> None:
     if not table.row_values or not table.col_values:
         warn_and_skip(f"Skip saving {output_path.name}: table is empty")
@@ -255,13 +365,18 @@ def save_heatmap(
             if math.isnan(value):
                 continue
 
+            if annotation_table is not None:
+                text = annotation_table.annotations[i][j]
+            else:
+                text = f"{value:.2f}"
+
             ax.text(
                 j,
                 i,
-                f"{value:.2f}",
+                text,
                 ha="center",
                 va="center",
-                fontsize=9,
+                fontsize=annotation_fontsize,
             )
 
     fig.tight_layout()
@@ -296,11 +411,48 @@ def parse_args() -> argparse.Namespace:
         help="Path to scenarios/JIP/configs",
     )
 
+    parser.add_argument(
+        "--scenario-start",
+        type=int,
+        default=1,
+        help="First scenario number to load. Default: 1",
+    )
+
+    parser.add_argument(
+        "--scenario-end",
+        type=int,
+        default=64,
+        help="Last scenario number to load. Default: 64",
+    )
+
     return parser.parse_args()
+
+
+def validate_scenario_range(scenario_start: int, scenario_end: int) -> None:
+    if scenario_start <= 0:
+        raise ValueError(
+            f"scenario_start must be positive: scenario_start={scenario_start}"
+        )
+
+    if scenario_end <= 0:
+        raise ValueError(
+            f"scenario_end must be positive: scenario_end={scenario_end}"
+        )
+
+    if scenario_start > scenario_end:
+        raise ValueError(
+            "scenario_start must be less than or equal to scenario_end: "
+            f"scenario_start={scenario_start}, scenario_end={scenario_end}"
+        )
 
 
 def main() -> None:
     args = parse_args()
+
+    validate_scenario_range(
+        scenario_start=args.scenario_start,
+        scenario_end=args.scenario_end,
+    )
 
     results_dir = (
         args.results_dir.resolve()
@@ -320,27 +472,46 @@ def main() -> None:
     if not config_dir.exists():
         raise FileNotFoundError(f"config_dir not found: {config_dir}")
 
-    records = collect_records(results_dir, config_dir)
+    records = collect_records(
+        results_dir=results_dir,
+        config_dir=config_dir,
+        scenario_start=args.scenario_start,
+        scenario_end=args.scenario_end,
+    )
 
     loaded_count = len(records)
-    skipped_count = 30 - loaded_count
+    expected_count = args.scenario_end - args.scenario_start + 1
+    skipped_count = expected_count - loaded_count
 
-    completion_table, route_changed_table = build_pivot_tables(records)
+    (
+        completion_table,
+        route_changed_table,
+        route_changed_annotation_table,
+    ) = build_pivot_tables(records)
 
     completion_pdf_path = results_dir / "heatmap_evacuation_completion_time.pdf"
     route_changed_pdf_path = results_dir / "heatmap_route_changed_vehicle_count.pdf"
 
     completion_csv_path = results_dir / "heatmap_evacuation_completion_time.csv"
     route_changed_csv_path = results_dir / "heatmap_route_changed_vehicle_count.csv"
+    route_changed_annotation_csv_path = (
+        results_dir / "heatmap_route_changed_vehicle_count_annotation.csv"
+    )
 
     save_table_csv(completion_table, completion_csv_path)
     save_table_csv(route_changed_table, route_changed_csv_path)
+    save_annotation_csv(
+        route_changed_annotation_table,
+        route_changed_annotation_csv_path,
+    )
 
     save_heatmap(
         completion_table,
         completion_pdf_path,
         title="Evacuation Completion Time",
         colorbar_label="Completion Time [s]",
+        annotation_table=None,
+        annotation_fontsize=9,
     )
 
     save_heatmap(
@@ -348,8 +519,12 @@ def main() -> None:
         route_changed_pdf_path,
         title="Route Changed Vehicle Count",
         colorbar_label="Route Changed Vehicle Count",
+        annotation_table=route_changed_annotation_table,
+        annotation_fontsize=8,
     )
 
+    print(f"Scenario range: scenario{args.scenario_start} - scenario{args.scenario_end}")
+    print(f"Expected scenarios: {expected_count}")
     print(f"Loaded scenarios: {loaded_count}")
     print(f"Skipped scenarios: {skipped_count}")
 
@@ -361,7 +536,8 @@ def main() -> None:
         print(f"Saved: {completion_csv_path.name}")
     if route_changed_csv_path.exists():
         print(f"Saved: {route_changed_csv_path.name}")
-
+    if route_changed_annotation_csv_path.exists():
+        print(f"Saved: {route_changed_annotation_csv_path.name}")
 
 if __name__ == "__main__":
     main()
