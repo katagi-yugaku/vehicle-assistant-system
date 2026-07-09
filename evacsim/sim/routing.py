@@ -21,7 +21,7 @@ from evacsim.sim.sumo_env import ensure_sumo_tools_on_path
 ensure_sumo_tools_on_path()
 
 import traci
-
+import math
 from evacsim.maps.edge_utils import (
     get_opposite_edgeID_by_edgeID,
     is_has_middle_edge,
@@ -43,6 +43,22 @@ if TYPE_CHECKING:
     from evacsim.agents.CustomeEdge import CustomeEdge
 
 FREE_FLOW_SPEED = 11.0
+
+V2V_PREFIX_INITIAL_COMMON_PREFIX = ("E0", "E1", "E20")
+
+V2V_ROUTE_FAMILY_MARKERS = {
+    # E0_E16_0 / E0_E13_0 系
+    "short_side": {
+        "E43", "E25", "E26", "E7", "E42", "E41",
+    },
+
+    # E0_E13_1 / E0_E16_1 系
+    "detour_side": {
+        "E22", "E21", "E23", "E29", "E8", "E30",
+        "E31", "E9", "E17", "E32", "E18",
+    },
+}
+
 
 
 def get_new_shelterID_and_near_edgeID_by_vehID(
@@ -2120,8 +2136,6 @@ def find_uturn_shortest_route_to_current_shelter_group(
 
 
 
-
-
 @dataclass(frozen=True)
 class CurrentRouteEstimate:
     target_shelter_id: str
@@ -2282,6 +2296,8 @@ def _merge_v2v_routes(
     receive_time は計算に使わず，内側の route 情報だけを統合する。
     """
     avg_evac_time_data = vehInfo.get_avg_evac_time_by_route_by_recive_time()
+    if len(avg_evac_time_data) > 3:
+        print(f"vehInfo.get_avg_evac_time_by_route_by_recive_time() = {avg_evac_time_data}")
     routes_dict = {}
 
     if not avg_evac_time_data:
@@ -2519,8 +2535,28 @@ def _get_v2v_branch_target_edge(
     return route_tuple[target_index]
 
 
+# def _is_unusable_distance(distance: float) -> bool:
+#     """
+#     距離・時間として使えない値を判定する。
+
+#     prefix 補正では 0m の区間は別途許容する場合があるため、
+#     この関数は「正の有限値が必要な場所」で使う。
+#     """
+#     return (not math.isfinite(distance)) or distance <= 0.0
 def _is_unusable_distance(distance: float) -> bool:
     return distance == float("inf") or distance <= 0.0
+
+
+
+
+def _is_unusable_nonnegative_value(value: float) -> bool:
+    """
+    0 を許容しつつ、NaN / inf / 負値を除外する。
+
+    current_edgeID がすでに divergence edge の場合、
+    分岐点までの距離・時間は 0 になるため、この判定を使う。
+    """
+    return (not math.isfinite(value)) or value < 0.0
 
 
 def _calculate_route_distance_from_edges(
@@ -2618,9 +2654,18 @@ def _extract_edges_from_current_to_divergence(
     dprint: Callable[[str], None],
 ) -> Optional[tuple]:
     """
-    current_route_tuple 上で，現在 edge から分岐 edge までの edge 群を返す。
-    分岐 edge が現在 edge より前にある場合，または current_edgeID が
-    current_route_tuple に存在しない場合は None を返す。
+    current_route_tuple 上で、現在 edge から分岐 edge までの edge 群を返す。
+
+    注意:
+        current_edgeID がすでに divergence edge の場合は、
+        分岐 edge までの時間を二重計上しないため空 tuple を返す。
+
+    例:
+        current_edgeID = "E42", divergence = "E41"
+            -> ("E42", "E41")
+
+        current_edgeID = "E41", divergence = "E41"
+            -> ()
     """
     try:
         current_edge_index = current_route_tuple.index(current_edgeID)
@@ -2640,6 +2685,9 @@ def _extract_edges_from_current_to_divergence(
             f"divergence_edge_index={divergence_edge_index}"
         )
         return None
+
+    if current_edge_index == divergence_edge_index:
+        return tuple()
 
     return tuple(current_route_tuple[current_edge_index:divergence_edge_index + 1])
 
@@ -2678,7 +2726,11 @@ def _estimate_time_after_divergence_from_v2v(
     dprint: Callable[[str], None],
 ) -> float:
     """
-    代替 route 全体の avg_time を，距離比により分岐 edge 以降の時間へ補正する。
+    代替 route 全体の avg_time を、距離比により分岐 edge 後の時間へ補正する。
+
+    重要:
+        divergence edge は現在地から分岐点までの時間側で扱うため、
+        ここでは alternative_route_tuple[divergence_edge_index + 1:] を使う。
     """
     if alternative_avg_time is None:
         return float("inf")
@@ -2694,7 +2746,7 @@ def _estimate_time_after_divergence_from_v2v(
         return float("inf")
 
     alternative_edges_after_divergence = tuple(
-        alternative_route_tuple[divergence_edge_index:]
+        alternative_route_tuple[divergence_edge_index + 1:]
     )
     alternative_distance_after_divergence = _calculate_route_distance_from_edges(
         alternative_edges_after_divergence,
@@ -2721,60 +2773,84 @@ def _estimate_forward_reroute_time_from_v2v_prefix(
     dprint: Callable[[str], None],
 ) -> tuple[float, Optional[dict]]:
     """
-    現在 route と代替 route の共通 prefix を使い，
-    順方向分岐による経路変更後の推定所要時間を計算する。
+    現在 route と代替 route の共通 prefix を使い、
+    現在位置から候補経路へ順方向に分岐した場合の推定所要時間を計算する。
 
-    return:
-        forward_reroute_estimated_time, debug_info
+    重要:
+        - 現在 edge が共通 prefix 上にある場合だけ評価する。
+        - current_edgeID が分岐 edge と同じ場合、分岐 edge までの距離は 0 とする。
+        - 分岐後の代替 route 時間推定では、分岐 edge を含めない。
+        - SUMO setRoute 用 route は current_edgeID から始める。
     """
-    if not current_route.route_tuple or not alternative_route_tuple:
+
+    def invalid(reason: str) -> tuple[float, None]:
+        dprint(f"skip V2V prefix candidate: {reason}")
         return float("inf"), None
+
+    if not current_route.route_tuple:
+        return invalid("current_route.route_tuple is empty")
+
+    if not alternative_route_tuple:
+        return invalid("alternative_route_tuple is empty")
 
     if alternative_route_tuple[-1] != candidate_edgeID:
-        return float("inf"), None
+        return invalid(
+            "alternative route destination is not candidate edge: "
+            f"route_last_edge={alternative_route_tuple[-1]}, "
+            f"candidate_edgeID={candidate_edgeID}"
+        )
 
     if alternative_route_tuple[-1] == current_route.destination_edge_id:
-        dprint(
-            "skip V2V prefix candidate because destination edge is current "
-            f"destination: candidate_edgeID={candidate_edgeID}, "
+        return invalid(
+            "alternative route destination is current destination: "
+            f"candidate_edgeID={candidate_edgeID}, "
             f"current_destination_edge={current_route.destination_edge_id}"
         )
-        return float("inf"), None
 
     if alternative_route_tuple == current_route.route_tuple:
-        dprint(
-            "skip V2V prefix candidate because it is exactly current route: "
+        return invalid(
+            "alternative route is exactly current route: "
             f"alternative_route_tuple={alternative_route_tuple}"
         )
-        return float("inf"), None
 
     if alternative_route_tuple[0] != current_route.route_tuple[0]:
-        dprint(
-            "skip V2V prefix candidate because start edge differs: "
+        return invalid(
+            "start edge differs: "
             f"current_start_edge={current_route.route_tuple[0]}, "
             f"alternative_start_edge={alternative_route_tuple[0]}, "
             f"alternative_route_tuple={alternative_route_tuple}"
         )
-        return float("inf"), None
 
     alternative_avg_time = route_info.get("avg_time")
     if alternative_avg_time is None:
-        dprint(
-            "skip V2V prefix candidate because avg_time is missing: "
+        return invalid(
+            "avg_time is missing: "
             f"alternative_route_tuple={alternative_route_tuple}"
         )
-        return float("inf"), None
+
+    if (not isinstance(alternative_avg_time, (int, float))) or _is_unusable_distance(float(alternative_avg_time)):
+        return invalid(
+            "avg_time is not positive finite value: "
+            f"alternative_avg_time={alternative_avg_time}"
+        )
 
     common_prefix_length = _longest_common_prefix_length(
         current_route.route_tuple,
         alternative_route_tuple,
     )
     if common_prefix_length <= 0:
-        dprint(
-            "skip V2V prefix candidate because common prefix is empty: "
+        return invalid(
+            "common prefix is empty: "
             f"alternative_route_tuple={alternative_route_tuple}"
         )
-        return float("inf"), None
+
+    common_prefix = tuple(alternative_route_tuple[:common_prefix_length])
+    if current_edgeID not in common_prefix:
+        return invalid(
+            "current edge is not on common prefix: "
+            f"current_edgeID={current_edgeID}, "
+            f"common_prefix={common_prefix}"
+        )
 
     divergence_edge_index = common_prefix_length - 1
     divergence_edge_id = alternative_route_tuple[divergence_edge_index]
@@ -2782,22 +2858,19 @@ def _estimate_forward_reroute_time_from_v2v_prefix(
     try:
         current_edge_index = current_route.route_tuple.index(current_edgeID)
     except ValueError:
-        dprint(
-            "skip V2V prefix candidate because current edge is not in "
-            f"current route: current_edgeID={current_edgeID}, "
+        return invalid(
+            "current edge is not in current route: "
+            f"current_edgeID={current_edgeID}, "
             f"current_route_tuple={current_route.route_tuple}"
         )
-        return float("inf"), None
 
-    if divergence_edge_index < current_edge_index:
-        dprint(
-            "skip V2V prefix candidate because divergence edge is behind "
-            "current edge: "
+    if current_edge_index > divergence_edge_index:
+        return invalid(
+            "divergence edge is behind current edge: "
             f"current_edge_index={current_edge_index}, "
             f"divergence_edge_index={divergence_edge_index}, "
             f"divergence_edge_id={divergence_edge_id}"
         )
-        return float("inf"), None
 
     edges_from_current_to_divergence = _extract_edges_from_current_to_divergence(
         current_route_tuple=current_route.route_tuple,
@@ -2808,19 +2881,20 @@ def _estimate_forward_reroute_time_from_v2v_prefix(
     if edges_from_current_to_divergence is None:
         return float("inf"), None
 
-    distance_from_current_to_divergence = _calculate_route_distance_from_edges(
-        tuple(edges_from_current_to_divergence),
-        dprint=dprint,
-    )
-    if _is_unusable_distance(distance_from_current_to_divergence):
-        dprint(
-            "skip V2V prefix candidate because distance from current to "
-            "divergence is unusable: "
-            f"edges_from_current_to_divergence={edges_from_current_to_divergence}, "
-            f"distance_from_current_to_divergence="
-            f"{distance_from_current_to_divergence}"
+    if edges_from_current_to_divergence:
+        distance_from_current_to_divergence = _calculate_route_distance_from_edges(
+            tuple(edges_from_current_to_divergence),
+            dprint=dprint,
         )
-        return float("inf"), None
+        if _is_unusable_distance(distance_from_current_to_divergence):
+            return invalid(
+                "distance from current to divergence is unusable: "
+                f"edges_from_current_to_divergence={edges_from_current_to_divergence}, "
+                f"distance_from_current_to_divergence="
+                f"{distance_from_current_to_divergence}"
+            )
+    else:
+        distance_from_current_to_divergence = 0.0
 
     current_speed = _get_current_speed(
         current_edgeID=current_edgeID,
@@ -2828,76 +2902,116 @@ def _estimate_forward_reroute_time_from_v2v_prefix(
         agent=agent,
         dprint=dprint,
     )
+    if _is_unusable_distance(current_speed):
+        return invalid(f"current speed is unusable: current_speed={current_speed}")
+
     time_from_current_to_divergence = (
         distance_from_current_to_divergence / current_speed
     )
+    if _is_unusable_nonnegative_value(time_from_current_to_divergence):
+        return invalid(
+            "time from current to divergence is unusable: "
+            f"time_from_current_to_divergence="
+            f"{time_from_current_to_divergence}"
+        )
 
     alternative_total_distance = _calculate_route_distance_from_edges(
         tuple(alternative_route_tuple),
         dprint=dprint,
     )
     if _is_unusable_distance(alternative_total_distance):
-        dprint(
-            "skip V2V prefix candidate because alternative total distance "
-            f"is unusable: alternative_total_distance={alternative_total_distance}, "
+        return invalid(
+            "alternative total distance is unusable: "
+            f"alternative_total_distance={alternative_total_distance}, "
             f"alternative_route_tuple={alternative_route_tuple}"
         )
-        return float("inf"), None
 
+    # 時間推定用: divergence edge は含めない。
     alternative_edges_after_divergence = tuple(
-        alternative_route_tuple[divergence_edge_index:]
+        alternative_route_tuple[divergence_edge_index + 1:]
     )
     alternative_distance_after_divergence = _calculate_route_distance_from_edges(
         alternative_edges_after_divergence,
         dprint=dprint,
     )
     if _is_unusable_distance(alternative_distance_after_divergence):
-        dprint(
-            "skip V2V prefix candidate because alternative distance after "
-            "divergence is unusable: "
+        return invalid(
+            "alternative distance after divergence is unusable: "
             f"alternative_edges_after_divergence="
             f"{alternative_edges_after_divergence}, "
             f"alternative_distance_after_divergence="
             f"{alternative_distance_after_divergence}"
         )
-        return float("inf"), None
 
-    estimated_time_after_divergence = (
-        alternative_avg_time
-        * alternative_distance_after_divergence
-        / alternative_total_distance
+    estimated_time_after_divergence_raw = (
+    alternative_avg_time
+    * alternative_distance_after_divergence
+    / alternative_total_distance
     )
+
+    estimated_time_after_divergence, free_flow_time_after_divergence, was_clamped_by_free_flow = (
+        _apply_free_flow_lower_bound_to_v2v_time(
+            estimated_time_raw=estimated_time_after_divergence_raw,
+            distance=alternative_distance_after_divergence,
+            dprint=dprint,
+            context=(
+                f"candidate_edgeID={candidate_edgeID}, "
+                f"divergence_edge_id={divergence_edge_id}"
+            ),
+        )
+    )
+
+    if estimated_time_after_divergence == float("inf"):
+        dprint(
+            "skip V2V prefix candidate because estimated time after divergence "
+            "became invalid after free-flow lower-bound correction: "
+            f"estimated_time_after_divergence_raw="
+            f"{estimated_time_after_divergence_raw}, "
+            f"alternative_distance_after_divergence="
+            f"{alternative_distance_after_divergence}"
+        )
+        return float("inf"), None
 
     forward_reroute_estimated_time = (
         time_from_current_to_divergence
         + estimated_time_after_divergence
     )
 
+    # SUMO setRoute 用: current_edgeID から始める。
+    route_edges_for_sumo = tuple(alternative_route_tuple[current_edge_index:])
+
     debug_info = {
         "source": "v2v_prefix_adjusted",
         "from_edgeID": current_edgeID,
         "candidate_edgeID": candidate_edgeID,
+        "current_edgeID": current_edgeID,
+        "current_route_tuple": current_route.route_tuple,
         "alternative_route_tuple": alternative_route_tuple,
-        "alternative_avg_time": alternative_avg_time,
+        "current_route_estimated_time": current_route.estimated_time,
+        "alternative_avg_time": float(alternative_avg_time),
         "vehicles": route_info.get("vehicles"),
+        "common_prefix": common_prefix,
         "common_prefix_length": common_prefix_length,
         "divergence_edge_index": divergence_edge_index,
         "divergence_edge_id": divergence_edge_id,
         "current_edge_index": current_edge_index,
         "edges_from_current_to_divergence": edges_from_current_to_divergence,
         "distance_from_current_to_divergence": distance_from_current_to_divergence,
+        "current_speed": current_speed,
         "time_from_current_to_divergence": time_from_current_to_divergence,
         "alternative_edges_after_divergence": alternative_edges_after_divergence,
         "alternative_total_distance": alternative_total_distance,
         "alternative_distance_after_divergence": alternative_distance_after_divergence,
         "estimated_time_after_divergence": estimated_time_after_divergence,
         "forward_reroute_estimated_time": forward_reroute_estimated_time,
+        "v2v_prefix_adjusted_time": forward_reroute_estimated_time,
+        "route_edges_for_sumo": route_edges_for_sumo,
     }
 
     dprint(
         "V2V prefix candidate evaluated: "
         f"candidate_edgeID={candidate_edgeID}, "
-        f"alternative_avg_time={alternative_avg_time:.3f}, "
+        f"alternative_avg_time={float(alternative_avg_time):.3f}, "
         f"common_prefix_length={common_prefix_length}, "
         f"divergence_edge_index={divergence_edge_index}, "
         f"divergence_edge_id={divergence_edge_id}, "
@@ -2905,6 +3019,7 @@ def _estimate_forward_reroute_time_from_v2v_prefix(
         f"edges_from_current_to_divergence={edges_from_current_to_divergence}, "
         f"distance_from_current_to_divergence="
         f"{distance_from_current_to_divergence:.3f}, "
+        f"current_speed={current_speed:.3f}, "
         f"time_from_current_to_divergence="
         f"{time_from_current_to_divergence:.3f}, "
         f"alternative_edges_after_divergence="
@@ -2915,7 +3030,8 @@ def _estimate_forward_reroute_time_from_v2v_prefix(
         f"estimated_time_after_divergence="
         f"{estimated_time_after_divergence:.3f}, "
         f"forward_reroute_estimated_time="
-        f"{forward_reroute_estimated_time:.3f}"
+        f"{forward_reroute_estimated_time:.3f}, "
+        f"route_edges_for_sumo={route_edges_for_sumo}"
     )
 
     return forward_reroute_estimated_time, debug_info
@@ -2933,14 +3049,40 @@ def _estimate_best_v2v_prefix_adjusted_time(
 ) -> tuple[float, Optional[dict]]:
     """
     routes_dict 内の V2V route を走査し，
-    現在 route と共通 prefix を持つ代替 route の中から，
-    最も短い forward_reroute_estimated_time を返す。
+    現在 route と同じ経路系統に属し，かつ共通 prefix を持つ
+    代替 route の中から，最も短い prefix 補正済み推定時間を返す。
+
+    重要:
+        - E0 E1 E20 のような初期共通区間だけ一致する route は除外する。
+        - short_side 系と detour_side 系を混同しない。
+        - 例:
+            E0_E16_0 -> E0_E13_0 は評価対象
+            E0_E16_0 -> E0_E13_1 は除外
+            E0_E16_1 -> E0_E13_1 は評価対象
+            E0_E16_1 -> E0_E13_0 は除外
     """
     best_v2v_prefix_adjusted_time = float("inf")
     best_v2v_prefix_adjusted_debug_info = None
 
     if not routes_dict:
         return best_v2v_prefix_adjusted_time, best_v2v_prefix_adjusted_debug_info
+
+    if not current_route.route_tuple:
+        dprint(
+            "skip V2V prefix search because current_route.route_tuple is empty"
+        )
+        return best_v2v_prefix_adjusted_time, best_v2v_prefix_adjusted_debug_info
+
+    current_route_family = _classify_v2v_route_family(current_route.route_tuple)
+
+    dprint(
+        "V2V prefix search start: "
+        f"current_edgeID={current_edgeID}, "
+        f"candidate_shelterID={candidate_shelterID}, "
+        f"candidate_edgeID={candidate_edgeID}, "
+        f"current_route_family={current_route_family}, "
+        f"current_route={current_route.route_tuple}"
+    )
 
     for route_tuple, route_info in routes_dict.items():
         alternative_route_tuple = tuple(route_tuple)
@@ -2970,15 +3112,17 @@ def _estimate_best_v2v_prefix_adjusted_time(
             continue
 
         alternative_avg_time = route_info.get("avg_time")
-        if alternative_avg_time is None:
+        if (
+            alternative_avg_time is None
+            or alternative_avg_time <= 0
+            or alternative_avg_time == float("inf")
+        ):
             dprint(
                 f"candidate={candidate_shelterID}: "
-                "skip V2V prefix route because avg_time is missing: "
-                f"{alternative_route_tuple}"
+                "skip V2V prefix route because avg_time is invalid: "
+                f"avg_time={alternative_avg_time}, "
+                f"route={alternative_route_tuple}"
             )
-            continue
-
-        if not current_route.route_tuple:
             continue
 
         if alternative_route_tuple[0] != current_route.route_tuple[0]:
@@ -2989,6 +3133,22 @@ def _estimate_best_v2v_prefix_adjusted_time(
                 f"alternative_start_edge={alternative_route_tuple[0]}, "
                 f"route={alternative_route_tuple}"
             )
+            continue
+
+        if _should_skip_v2v_prefix_by_initial_common_prefix(
+            current_route_tuple=current_route.route_tuple,
+            alternative_route_tuple=alternative_route_tuple,
+            candidate_shelterID=candidate_shelterID,
+            dprint=dprint,
+        ):
+            continue
+
+        if _should_skip_v2v_prefix_by_route_family(
+            current_route_tuple=current_route.route_tuple,
+            alternative_route_tuple=alternative_route_tuple,
+            candidate_shelterID=candidate_shelterID,
+            dprint=dprint,
+        ):
             continue
 
         forward_reroute_estimated_time, debug_info = (
@@ -3010,6 +3170,53 @@ def _estimate_best_v2v_prefix_adjusted_time(
 
     return best_v2v_prefix_adjusted_time, best_v2v_prefix_adjusted_debug_info
 
+def _apply_free_flow_lower_bound_to_v2v_time(
+    estimated_time_raw: float,
+    distance: float,
+    dprint: Callable[[str], None],
+    context: str = "",
+) -> tuple[float, float, bool]:
+    """
+    V2V による推定時間が自由流時間より短くならないように下限補正する。
+
+    return:
+        adjusted_time:
+            自由流時間を下限として補正した推定時間
+
+        free_flow_time:
+            distance / FREE_FLOW_SPEED で求めた自由流時間
+
+        was_clamped:
+            補正が発生した場合 True
+    """
+    if FREE_FLOW_SPEED <= 0:
+        dprint(
+            "free-flow lower bound failed because FREE_FLOW_SPEED is invalid: "
+            f"FREE_FLOW_SPEED={FREE_FLOW_SPEED}, context={context}"
+        )
+        return float("inf"), float("inf"), False
+
+    if distance <= 0 or distance == float("inf"):
+        dprint(
+            "free-flow lower bound failed because distance is invalid: "
+            f"distance={distance}, context={context}"
+        )
+        return float("inf"), float("inf"), False
+
+    free_flow_time = distance / FREE_FLOW_SPEED
+
+    if estimated_time_raw < free_flow_time:
+        dprint(
+            "V2V estimated time was clamped by free-flow lower bound: "
+            f"context={context}, "
+            f"estimated_time_raw={estimated_time_raw:.3f}, "
+            f"free_flow_time={free_flow_time:.3f}, "
+            f"distance={distance:.3f}, "
+            f"FREE_FLOW_SPEED={FREE_FLOW_SPEED:.3f}"
+        )
+        return free_flow_time, free_flow_time, True
+
+    return estimated_time_raw, free_flow_time, False
 
 def _estimate_u_turn_reroute_time(
     current_edgeID: str,
@@ -3070,13 +3277,7 @@ def _estimate_u_turn_reroute_time(
         )
         return float("inf"), None
 
-    current_speed = _get_current_speed(
-        current_edgeID=current_edgeID,
-        vehInfo=vehInfo,
-        agent=agent,
-        dprint=dprint,
-    )
-    u_turn_estimated_time = u_turn_route_distance / current_speed
+    u_turn_estimated_time = u_turn_route_distance / FREE_FLOW_SPEED
 
     debug_info = {
         "source": "u_turn",
@@ -3214,6 +3415,8 @@ def _evaluate_candidate_from_start_edge(
     approach_edgeIDs_by_start_edgeID: dict,
     dprint: Callable[[str], None],
 ) -> CandidateEvaluation:
+    
+    # Uターンではなく、経路を変更する
     distance_free_flow, time_free_flow = _estimate_free_flow_time(
         agent=agent,
         from_edgeID=from_edgeID,
@@ -3284,6 +3487,7 @@ def _evaluate_candidate_from_start_edge(
             f"u_turn_debug_info={u_turn_debug_info}"
         )
 
+    # print(f"time_free_flow: {time_free_flow}, time_v2v_prefix_adjusted: {time_v2v_prefix_adjusted}, time_u_turn: {time_u_turn}")
     best_time = min(
         time_free_flow,
         time_v2v_prefix_adjusted,
@@ -3417,7 +3621,7 @@ def _evaluate_candidate(
             "no start edge options. skip candidate."
         )
         return None
-
+    # print(f"evaluations for candidate_shelterID={candidate_shelterID}, candidate_edgeID={candidate_edgeID}: {evaluations}")
     best_evaluation = min(evaluations, key=lambda item: item.best_time)
 
     dprint(
@@ -3492,8 +3696,17 @@ def _apply_approach_edge_route_if_needed(
     from_edgeID: str,
     to_edgeID: str,
     dprint: Callable[[str], None],
+    route_edges_for_sumo: tuple = tuple(),
 ) -> None:
     dprint("approach edge: apply best route directly with traci.vehicle.setRoute")
+
+    if route_edges_for_sumo:
+        dprint(
+            "apply route_edges_for_sumo from best candidate debug info: "
+            f"route_edges_for_sumo={route_edges_for_sumo}"
+        )
+        traci.vehicle.setRoute(agent.get_vehID(), list(route_edges_for_sumo))
+        return
 
     route = traci.simulation.findRoute(from_edgeID, to_edgeID)
     if route.edges:
@@ -3539,11 +3752,18 @@ def _build_final_decision(
                 congestion_flg,
             )
 
+        route_edges_for_sumo = tuple()
+        if best_candidate.best_debug_info:
+            route_edges_for_sumo = tuple(
+                best_candidate.best_debug_info.get("route_edges_for_sumo", tuple())
+            )
+
         _apply_approach_edge_route_if_needed(
             agent=agent,
             from_edgeID=best_candidate.from_edge_id,
             to_edgeID=best_candidate.edge_id,
             dprint=dprint,
+            route_edges_for_sumo=route_edges_for_sumo,
         )
         return (
             best_candidate.from_edge_id,
@@ -3554,6 +3774,8 @@ def _build_final_decision(
         )
 
     to_edge_list = [item.edge_id for item in candidate_results]
+    print(f"Check base_reroute_start_edgeID={base_reroute_start_edgeID}, shelterID={shelterID}, to_edge_list={to_edge_list}, time_gain={time_gain:.3f}, congestion_flg={congestion_flg}")
+
     return base_reroute_start_edgeID, shelterID, to_edge_list, time_gain, congestion_flg
 
 
@@ -3587,6 +3809,7 @@ def find_alternative_better_choice_fixed_divide(
         dprint(f"skip: current_edgeID is internal junction edge: {current_edgeID}")
         return "", shelterID_to_return, to_edge_list_to_return, 0.0, congestion_flg
 
+    # 現在のルートでかかる時間
     current_route = _estimate_current_route_time(
         current_edgeID=current_edgeID,
         vehInfo=vehInfo,
@@ -3594,6 +3817,7 @@ def find_alternative_better_choice_fixed_divide(
         shelter=shelter,
         dprint=dprint,
     )
+
 
     reroute_start_context = _build_reroute_start_context(
         current_edgeID=current_edgeID,
@@ -3615,9 +3839,9 @@ def find_alternative_better_choice_fixed_divide(
         )
 
     routes_dict = _merge_v2v_routes(vehInfo=vehInfo, dprint=dprint)
-    if len(routes_dict) > 2:
-        print(f"current_route={current_route}")
-        print(f"routes_dict={routes_dict}")
+    # if len(routes_dict) > 3:
+    #     print(f"current_route={current_route}")
+    #     print(f"routes_dict={routes_dict}")
 
     candidate_results = _evaluate_all_candidates(
         current_edgeID=current_edgeID,
@@ -3629,6 +3853,7 @@ def find_alternative_better_choice_fixed_divide(
         routes_dict=routes_dict,
         dprint=dprint,
     )
+    print(f"candidate_results={candidate_results}")
 
     return _build_final_decision(
         agent=agent,
@@ -3638,3 +3863,123 @@ def find_alternative_better_choice_fixed_divide(
         approach_edge_flg=reroute_start_context.approach_edge_flg,
         dprint=dprint,
     )
+
+
+def _route_starts_with_prefix(
+    route_tuple: tuple,
+    prefix: tuple[str, ...],
+) -> bool:
+    if len(route_tuple) < len(prefix):
+        return False
+
+    return tuple(route_tuple[:len(prefix)]) == prefix
+
+
+def _classify_v2v_route_family(route_tuple: tuple) -> str:
+    """
+    V2V prefix 補正に使うため，route を経路系統に分類する。
+
+    例:
+        E0_E16_0 / E0_E13_0 -> short_side
+        E0_E13_1 / E0_E16_1 -> detour_side
+
+    どの系統にも分類できない場合は空文字を返す。
+    """
+    route_edges = set(route_tuple)
+
+    for family_name, marker_edges in V2V_ROUTE_FAMILY_MARKERS.items():
+        if route_edges & marker_edges:
+            return family_name
+
+    return ""
+
+
+def _should_skip_v2v_prefix_by_route_family(
+    current_route_tuple: tuple,
+    alternative_route_tuple: tuple,
+    candidate_shelterID: str,
+    dprint: Callable[[str], None],
+) -> bool:
+    """
+    初期共通区間だけ一致している route を V2V prefix 補正から除外する。
+
+    目的:
+        E0_E16_0 から E0_E13_1 のように，
+        E0 E1 E20 までは一致するが，その後の経路系統が異なる route を
+        prefix 補正候補にしない。
+    """
+    current_family = _classify_v2v_route_family(current_route_tuple)
+    alternative_family = _classify_v2v_route_family(alternative_route_tuple)
+
+    if not current_family or not alternative_family:
+        dprint(
+            f"candidate={candidate_shelterID}: "
+            "skip V2V prefix route because route family is unknown: "
+            f"current_family={current_family}, "
+            f"alternative_family={alternative_family}, "
+            f"current_route={current_route_tuple}, "
+            f"alternative_route={alternative_route_tuple}"
+        )
+        return True
+
+    if current_family != alternative_family:
+        dprint(
+            f"candidate={candidate_shelterID}: "
+            "skip V2V prefix route because route family differs: "
+            f"current_family={current_family}, "
+            f"alternative_family={alternative_family}, "
+            f"current_route={current_route_tuple}, "
+            f"alternative_route={alternative_route_tuple}"
+        )
+        return True
+
+    return False
+
+
+def _should_skip_v2v_prefix_by_initial_common_prefix(
+    current_route_tuple: tuple,
+    alternative_route_tuple: tuple,
+    candidate_shelterID: str,
+    dprint: Callable[[str], None],
+) -> bool:
+    """
+    common prefix が初期共通区間だけの場合は除外する。
+
+    例:
+        current  = E0_E16_0
+        alt      = E0_E13_1
+
+        common prefix = E0 E1 E20
+
+    この場合，実質的には「現在走っている経路上での前方分岐」ではなく，
+    初期分岐の別系統 route なので V2V prefix 補正には使わない。
+    """
+    common_prefix_length = _longest_common_prefix_length(
+        current_route_tuple,
+        alternative_route_tuple,
+    )
+
+    ignored_prefix_length = len(V2V_PREFIX_INITIAL_COMMON_PREFIX)
+
+    if (
+        _route_starts_with_prefix(
+            current_route_tuple,
+            V2V_PREFIX_INITIAL_COMMON_PREFIX,
+        )
+        and _route_starts_with_prefix(
+            alternative_route_tuple,
+            V2V_PREFIX_INITIAL_COMMON_PREFIX,
+        )
+        and common_prefix_length <= ignored_prefix_length
+    ):
+        dprint(
+            f"candidate={candidate_shelterID}: "
+            "skip V2V prefix route because common prefix is only initial trunk: "
+            f"common_prefix_length={common_prefix_length}, "
+            f"initial_common_prefix={V2V_PREFIX_INITIAL_COMMON_PREFIX}, "
+            f"current_route={current_route_tuple}, "
+            f"alternative_route={alternative_route_tuple}"
+        )
+        return True
+
+    return False

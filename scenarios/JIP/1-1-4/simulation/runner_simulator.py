@@ -433,16 +433,18 @@ def control_vehicles():
                     # ============================================================
                     if is_step_10 :
                         # ここでに題がある
-                        from_edgeID, shelterID, to_edge_list, congestion_flg = (
-                            get_route_time_difference_exceeding_threshold(
-                                current_edgeID=current_edgeID,
-                                agent_by_target_vehID=agent_by_current_vehID,
-                                shelter=shelter_for_current_vehID,
-                                vehInfo_by_target_vehID=vehInfo_by_current_vehID,
-                                shelter_list=shelter_list,
-                                custome_edge_list=custome_edge_list,
+                        congestion_flg = False
+                        if not current_edgeID in ["E13","E14", "E15", "E16", "E12", "E5"]: 
+                            from_edgeID, shelterID, to_edge_list, congestion_flg = (
+                                get_route_time_difference_exceeding_threshold(
+                                    current_edgeID=current_edgeID,
+                                    agent_by_target_vehID=agent_by_current_vehID,
+                                    shelter=shelter_for_current_vehID,
+                                    vehInfo_by_target_vehID=vehInfo_by_current_vehID,
+                                    shelter_list=shelter_list,
+                                    custome_edge_list=custome_edge_list,
+                                )
                             )
-                        )
                         agent_by_current_vehID.set_route_congestion_info_obtained_time(current_time)
                         agent_by_current_vehID.set_route_congestion_info_obtained_flg(congestion_flg)
                         if congestion_flg:
@@ -527,7 +529,6 @@ def control_vehicles():
                                     continue
                                     # print(f"Vehicle {current_vehID} is on edge {current_edgeID} and cannot change route due to normalcy bias.")
                                 else:
-                                    print("check10")
                                     from_edgeID, shelterID, to_edge_list = (
                                                                             find_uturn_shortest_route_to_current_shelter_group(
                                                                                 current_edgeID=current_edgeID,
@@ -537,7 +538,6 @@ def control_vehicles():
                                                                                 shelter_list=shelter_list,
                                                                             )
                                                                         )
-                                    print("check11")
                                     if from_edgeID != "" and shelterID != "" and to_edge_list != "":
                                         NEW_VEHICLE_COUNT = generate_new_veh_based_on_route_time(
                                             target_vehID=current_vehID,
