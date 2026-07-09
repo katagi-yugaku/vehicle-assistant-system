@@ -42,7 +42,7 @@ echo "start     : $(date)"
 
 export RUN_ID
 
-python3 -W ignore::UserWarning -m scenarios.JIP.1-1-2.simulation.runner_simulator \
+python3 -W ignore::UserWarning -m scenarios.JIP.1-1-4.simulation.runner_simulator \
   --nogui "${CONFIG}" "${EARLY_RATE}" "${V2V_RATE}"
 
 echo "end       : $(date)"
