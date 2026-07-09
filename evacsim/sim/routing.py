@@ -1488,7 +1488,7 @@ def is_route_time_difference_exceeding_threshold(current_edgeID, agent_by_target
     return base_reroute_start_edgeID, to_edge_list, congestion_flg
 
 def get_route_time_difference_exceeding_threshold(current_edgeID, agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, shelter: Shelter, shelter_list: list[Shelter], custome_edge_list: list):
-    base_reroute_start_edgeID, shelterID, to_edge_list, time_gain, congestion_flg = find_alternative_better_choice_fixed_divide(
+    from_edgeID, shelterID, to_edge_list, time_gain, congestion_flg, route_edges_for_sumo= find_alternative_better_choice_fixed_divide(
                                                                                                             current_edgeID=current_edgeID,
                                                                                                             vehInfo=vehInfo_by_target_vehID,
                                                                                                             agent=agent_by_target_vehID,
@@ -1497,9 +1497,9 @@ def get_route_time_difference_exceeding_threshold(current_edgeID, agent_by_targe
                                                                                                             custome_edge_list=custome_edge_list,
                                                                                                             debug=False
                                                                                                             )
-    if congestion_flg:
-        print(f"base_reroute_start_edgeID: {base_reroute_start_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}")
-    return base_reroute_start_edgeID, shelterID, to_edge_list, congestion_flg
+    # if congestion_flg:
+    #     print(f"base_reroute_start_edgeID: {base_reroute_start_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}")
+    return from_edgeID, shelterID, to_edge_list, time_gain, congestion_flg, route_edges_for_sumo
 
 
 def find_alternative_better_choice(current_edgeID: str, 
@@ -3713,6 +3713,70 @@ def _apply_approach_edge_route_if_needed(
         traci.vehicle.setRoute(agent.get_vehID(), route.edges)
 
 
+# def _build_final_decision(
+#     agent: "Agent",
+#     estimated_current_route_time: float,
+#     candidate_results: list[CandidateEvaluation],
+#     base_reroute_start_edgeID: str,
+#     approach_edge_flg: bool,
+#     dprint: Callable[[str], None],
+# ) -> tuple:
+#     shelterID = ""
+#     congestion_flg = False
+
+#     if not candidate_results:
+#         dprint("no candidate results. keep current route.")
+#         return base_reroute_start_edgeID, shelterID, [], 0.0, congestion_flg
+
+#     best_candidate = candidate_results[0]
+#     time_gain = estimated_current_route_time - best_candidate.best_time
+#     threshold = agent.get_route_change_threshold()
+
+#     dprint(
+#         f"final decision: estimated_current_time={estimated_current_route_time:.3f}, "
+#         f"best_candidate_time={best_candidate.best_time:.3f}, "
+#         f"time_gain={time_gain:.3f}, "
+#         f"threshold={threshold:.3f}, "
+#         f"best_candidate={best_candidate}"
+#     )
+
+#     if time_gain > threshold:
+#         congestion_flg = True
+
+#         if not approach_edge_flg:
+#             return (
+#                 best_candidate.from_edge_id,
+#                 best_candidate.shelter_id,
+#                 [best_candidate.edge_id],
+#                 time_gain,
+#                 congestion_flg,
+#             )
+
+#         route_edges_for_sumo = tuple()
+#         if best_candidate.best_debug_info:
+#             route_edges_for_sumo = tuple(
+#                 best_candidate.best_debug_info.get("route_edges_for_sumo", tuple())
+#             )
+
+#         _apply_approach_edge_route_if_needed(
+#             agent=agent,
+#             from_edgeID=best_candidate.from_edge_id,
+#             to_edgeID=best_candidate.edge_id,
+#             dprint=dprint,
+#             route_edges_for_sumo=route_edges_for_sumo,
+#         )
+#         return (
+#             best_candidate.from_edge_id,
+#             best_candidate.shelter_id,
+#             [],
+#             time_gain,
+#             congestion_flg,
+#         )
+
+#     to_edge_list = [item.edge_id for item in candidate_results]
+#     print(f"Check base_reroute_start_edgeID={base_reroute_start_edgeID}, shelterID={shelterID}, to_edge_list={to_edge_list}, time_gain={time_gain:.3f}, congestion_flg={congestion_flg}")
+
+#     return base_reroute_start_edgeID, shelterID, to_edge_list, time_gain, congestion_flg
 def _build_final_decision(
     agent: "Agent",
     estimated_current_route_time: float,
@@ -3720,64 +3784,88 @@ def _build_final_decision(
     base_reroute_start_edgeID: str,
     approach_edge_flg: bool,
     dprint: Callable[[str], None],
-) -> tuple:
+) -> tuple[str, str, list[str], float, bool, tuple[str, ...]]:
+    """
+    Returns:
+        from_edgeID
+        shelterID
+        to_edge_list
+        time_gain
+        congestion_flg
+        route_edges_for_sumo
+
+    route_edges_for_sumo は、現在edgeから目的地edgeまでの
+    SUMOに直接渡せる残り経路を表す。
+    """
     shelterID = ""
     congestion_flg = False
+    route_edges_for_sumo: tuple[str, ...] = tuple()
 
     if not candidate_results:
         dprint("no candidate results. keep current route.")
-        return base_reroute_start_edgeID, shelterID, [], 0.0, congestion_flg
+        return (
+            base_reroute_start_edgeID,
+            shelterID,
+            [],
+            0.0,
+            congestion_flg,
+            route_edges_for_sumo,
+        )
 
     best_candidate = candidate_results[0]
     time_gain = estimated_current_route_time - best_candidate.best_time
     threshold = agent.get_route_change_threshold()
+
+    if best_candidate.best_debug_info:
+        route_edges_for_sumo = tuple(
+            best_candidate.best_debug_info.get("route_edges_for_sumo", tuple())
+        )
 
     dprint(
         f"final decision: estimated_current_time={estimated_current_route_time:.3f}, "
         f"best_candidate_time={best_candidate.best_time:.3f}, "
         f"time_gain={time_gain:.3f}, "
         f"threshold={threshold:.3f}, "
+        f"best_candidate_from={best_candidate.from_edge_id}, "
+        f"best_candidate_to={best_candidate.edge_id}, "
+        f"route_edges_for_sumo={route_edges_for_sumo}, "
         f"best_candidate={best_candidate}"
     )
 
     if time_gain > threshold:
         congestion_flg = True
 
-        if not approach_edge_flg:
-            return (
-                best_candidate.from_edge_id,
-                best_candidate.shelter_id,
-                [best_candidate.edge_id],
-                time_gain,
-                congestion_flg,
-            )
-
-        route_edges_for_sumo = tuple()
-        if best_candidate.best_debug_info:
-            route_edges_for_sumo = tuple(
-                best_candidate.best_debug_info.get("route_edges_for_sumo", tuple())
-            )
-
-        _apply_approach_edge_route_if_needed(
-            agent=agent,
-            from_edgeID=best_candidate.from_edge_id,
-            to_edgeID=best_candidate.edge_id,
-            dprint=dprint,
-            route_edges_for_sumo=route_edges_for_sumo,
-        )
         return (
             best_candidate.from_edge_id,
             best_candidate.shelter_id,
-            [],
+            [best_candidate.edge_id],
             time_gain,
             congestion_flg,
+            route_edges_for_sumo,
         )
 
     to_edge_list = [item.edge_id for item in candidate_results]
-    print(f"Check base_reroute_start_edgeID={base_reroute_start_edgeID}, shelterID={shelterID}, to_edge_list={to_edge_list}, time_gain={time_gain:.3f}, congestion_flg={congestion_flg}")
 
-    return base_reroute_start_edgeID, shelterID, to_edge_list, time_gain, congestion_flg
+    dprint(
+        f"route change rejected by threshold: "
+        f"base_reroute_start_edgeID={base_reroute_start_edgeID}, "
+        f"candidate_from_edgeID={best_candidate.from_edge_id}, "
+        f"shelterID={best_candidate.shelter_id}, "
+        f"to_edge_list={to_edge_list}, "
+        f"time_gain={time_gain:.3f}, "
+        f"threshold={threshold:.3f}, "
+        f"congestion_flg={congestion_flg}, "
+        f"route_edges_for_sumo={route_edges_for_sumo}"
+    )
 
+    return (
+        base_reroute_start_edgeID,
+        shelterID,
+        to_edge_list,
+        time_gain,
+        congestion_flg,
+        route_edges_for_sumo,
+    )
 
 def find_alternative_better_choice_fixed_divide(
     current_edgeID: str,
@@ -3853,7 +3941,7 @@ def find_alternative_better_choice_fixed_divide(
         routes_dict=routes_dict,
         dprint=dprint,
     )
-    print(f"candidate_results={candidate_results}")
+    # print(f"candidate_results={candidate_results}")
 
     return _build_final_decision(
         agent=agent,
