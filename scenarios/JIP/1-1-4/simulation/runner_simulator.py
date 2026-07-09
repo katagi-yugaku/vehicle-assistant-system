@@ -583,20 +583,20 @@ def control_vehicles():
                                 continue
 
                             if not to_edge_list:
-                                print(
-                                    f"normalcy bias: empty to_edge_list. "
-                                    f"vehID={current_vehID}, current_edgeID={current_edgeID}, "
-                                    f"from_edgeID={from_edgeID}, shelterID={shelterID}, "
-                                    f"time_gain={time_gain:.3f}, time={current_time}"
-                                )
+                                # print(
+                                #     f"normalcy bias: empty to_edge_list. "
+                                #     f"vehID={current_vehID}, current_edgeID={current_edgeID}, "
+                                #     f"from_edgeID={from_edgeID}, shelterID={shelterID}, "
+                                #     f"time_gain={time_gain:.3f}, time={current_time}"
+                                # )
                                 continue
 
-                            print(
-                                f"{current_vehID} is {current_edgeID} changed to {to_edge_list[0]} "
-                                f"due to normalcy bias at time {current_time}. "
-                                f"from_edgeID={from_edgeID}, time_gain={time_gain:.3f}, "
-                                f"route_edges_for_sumo={route_edges_for_sumo}"
-                            )
+                            # print(
+                            #     f"{current_vehID} is {current_edgeID} changed to {to_edge_list[0]} "
+                            #     f"due to normalcy bias at time {current_time}. "
+                            #     f"from_edgeID={from_edgeID}, time_gain={time_gain:.3f}, "
+                            #     f"route_edges_for_sumo={route_edges_for_sumo}"
+                            # )
 
                             if from_edgeID == current_edgeID:
                                 route_changed = _apply_route_edges_for_sumo(
