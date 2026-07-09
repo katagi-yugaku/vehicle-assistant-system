@@ -165,17 +165,17 @@ def plot_compare_arrival_time_cdfs(
 
     plt.figure(figsize=(10, 6))
 
-    scenario_color_map = {
-        "scenario21": "r",
-        "scenario43": "blue",
-        "scenario57": "g",
-        "scenario2": "r",
-        "scenario3": "blue",
-        "scenario4": "g",
-        "scenario5": "orange",
-        "scenario27": "r",
-        "scenario29": "blue",
-    }
+    # scenario_color_map = {
+    #     "scenario21": "r",
+    #     "scenario43": "blue",
+    #     "scenario57": "g",
+    #     "scenario2": "r",
+    #     "scenario3": "blue",
+    #     "scenario4": "g",
+    #     "scenario5": "orange",
+    #     "scenario27": "r",
+    #     "scenario29": "blue",
+    # }
 
     fallback_colors = [
         "r",
@@ -199,16 +199,16 @@ def plot_compare_arrival_time_cdfs(
         value = np.sort(value)
         cdf = np.arange(1, len(value) + 1) / len(value)
 
-        color = scenario_color_map.get(
-            scenario_id,
-            fallback_colors[index % len(fallback_colors)],
-        )
+        # color = scenario_color_map.get(
+        #     scenario_id,
+        #     fallback_colors[index % len(fallback_colors)],
+        # )
 
         plt.plot(
             value,
             cdf,
             label=scenario_id,
-            color=color,
+            # color=color,
             linestyle="-",
             linewidth=2,
         )
@@ -236,8 +236,8 @@ def plot_compare_arrival_time_cdfs(
         fontweight="semibold",
     )
 
-    if not no_legend:
-        plt.legend(fontsize=12)
+    # if not no_legend:
+    #     plt.legend(fontsize=12)
 
     plt.savefig(save_path, bbox_inches="tight")
     print(f"✅ Saved figure as: {save_path}")
