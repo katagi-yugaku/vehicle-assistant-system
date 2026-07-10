@@ -538,7 +538,7 @@ def _is_route_change_prohibited_edge(current_edgeID: str) -> bool:
     """
     目的地直前・目的地 edge では経路変更を行わない。
     """
-    return current_edgeID in ["E13", "E14", "E15", "E16", "E12", "E5"]
+    return current_edgeID in ["E13", "E150", "E15", "E16", "E12", "E5"]
 
 
 def _get_route_change_neighbor_counts(

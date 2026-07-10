@@ -20,7 +20,7 @@ DEFAULT_XLABEL = "p_follow"
 DEFAULT_YLABEL = "active_route_change_threshold_center"
 DEFAULT_COLORBAR_LABEL = "Completion Time [s]"
 
-DEFAULT_CMAP = "viridis"
+DEFAULT_CMAP = "Reds_r"
 
 FIG_WIDTH = 10.0
 FIG_HEIGHT = 7.0
@@ -40,6 +40,10 @@ Y_TICK_ROTATION = 0
 SHOW_GRID_LINES = False
 GRID_LINE_COLOR = "white"
 GRID_LINE_WIDTH = 0.8
+
+# 背景色の輝度がこの値未満の場合、セル内の文字を白色にする。
+# 値を大きくすると白文字になるセルが増える。
+ANNOTATION_LUMINANCE_THRESHOLD = 0.55
 
 
 def is_empty_row(row: list[str]) -> bool:
@@ -68,6 +72,34 @@ def parse_float_or_nan(value: str) -> float:
         return float(value)
     except ValueError:
         return math.nan
+
+
+def get_annotation_text_color(
+    image,
+    value: float,
+    luminance_threshold: float = ANNOTATION_LUMINANCE_THRESHOLD,
+) -> str:
+    """
+    heatmap のセル背景色に応じて注釈文字の色を返す。
+
+    背景色が暗い場合は白、明るい場合は黒を返す。
+    image.norm() と image.cmap() を使用するため、
+    vmin、vmax、カラーマップの反転にも自動で対応する。
+    """
+    normalized_value = image.norm(value)
+    red, green, blue, _ = image.cmap(normalized_value)
+
+    # 人間の視覚特性を考慮した相対輝度
+    luminance = (
+        0.2126 * red
+        + 0.7152 * green
+        + 0.0722 * blue
+    )
+
+    if luminance < luminance_threshold:
+        return "white"
+
+    return "black"
 
 
 def resolve_input_csv_path(csv_path: Path) -> Path:
@@ -219,11 +251,11 @@ def create_heatmap(
     fig, ax = plt.subplots(figsize=(fig_width, fig_height))
 
     im = ax.imshow(
-    values,
-    aspect="auto",
-    cmap="Reds_r",
-    vmin=vmin,
-    vmax=vmax,
+        values,
+        aspect="auto",
+        cmap=cmap,
+        vmin=vmin,
+        vmax=vmax,
     )
 
     # 横向き colorbar
@@ -233,7 +265,7 @@ def create_heatmap(
         orientation="vertical",
         pad=0.05,
     )
-    # colorbar.ax.invert_yaxis()
+    colorbar.ax.invert_yaxis()
     # colorbar.set_label(colorbar_label, fontsize=COLORBAR_LABEL_FONT_SIZE)
     colorbar.ax.tick_params(labelsize=TICK_LABEL_FONT_SIZE)
 
@@ -277,6 +309,11 @@ def create_heatmap(
             if math.isnan(value):
                 continue
 
+            text_color = get_annotation_text_color(
+                image=im,
+                value=value,
+            )
+
             ax.text(
                 col_index,
                 row_index,
@@ -285,6 +322,7 @@ def create_heatmap(
                 va="center",
                 fontsize=ANNOTATION_FONT_SIZE,
                 fontweight="bold",
+                color=text_color,
             )
 
     output_pdf_path.parent.mkdir(parents=True, exist_ok=True)
