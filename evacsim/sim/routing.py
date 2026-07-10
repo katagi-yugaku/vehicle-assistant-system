@@ -1497,8 +1497,8 @@ def get_route_time_difference_exceeding_threshold(current_edgeID, agent_by_targe
                                                                                                             custome_edge_list=custome_edge_list,
                                                                                                             debug=False
                                                                                                             )
-    if congestion_flg:
-        print(f"from_edgeID: {from_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}, route_edges_for_sumo: {route_edges_for_sumo}")
+    # if congestion_flg:
+    #     print(f"from_edgeID: {from_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}, route_edges_for_sumo: {route_edges_for_sumo}")
     return from_edgeID, shelterID, to_edge_list, time_gain, congestion_flg, route_edges_for_sumo
 
 

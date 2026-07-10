@@ -19,7 +19,7 @@ CONDITIONS_CSV_FILENAME = "conditions_additional.csv"
 
 # 最終的に扱いたい全体 grid
 parameter_grid = {
-    "p_follow": [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45],
+    "p_follow": [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40],
     "active_route_change_threshold_center": [
         100.0,
         150.0,
@@ -28,23 +28,22 @@ parameter_grid = {
         300.0,
         350.0,
         400.0,
-        450.0,
     ],
 }
 
 
-# すでに作成済み・実行済みの grid
-existing_parameter_grid = {
-    "p_follow": [0.10, 0.15, 0.20, 0.25, 0.30],
-    "active_route_change_threshold_center": [
-        200.0,
-        250.0,
-        300.0,
-        350.0,
-        400.0,
-        450.0,
-    ],
-}
+# # すでに作成済み・実行済みの grid
+# existing_parameter_grid = {
+#     "p_follow": [0.10, 0.15, 0.20, 0.25, 0.30],
+#     "active_route_change_threshold_center": [
+#         200.0,
+#         250.0,
+#         300.0,
+#         350.0,
+#         400.0,
+#         450.0,
+#     ],
+# }
 
 # 追加でデータあり
 
