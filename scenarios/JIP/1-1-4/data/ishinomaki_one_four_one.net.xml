@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-07-11 02:09:58 by Eclipse SUMO netedit Version 1.20.0
+<!-- generated on 2026-07-11 05:44:26 by Eclipse SUMO netedit Version 1.20.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/neteditConfiguration.xsd">
 
     <input>
@@ -34,7 +34,7 @@
 
 <net version="1.20" junctionCornerDetail="5" lefthand="true" limitTurnSpeed="5.50" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
 
-    <location netOffset="-520703.59,-4250601.64" convBoundary="4000.20,2379.15,11028.38,6227.14" origBoundary="141.237328,38.305646,141.419841,38.482093" projParameter="+proj=utm +zone=54 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
+    <location netOffset="-520703.59,-4250601.64" convBoundary="4000.20,2429.40,11028.38,6227.14" origBoundary="141.237328,38.305646,141.419841,38.482093" projParameter="+proj=utm +zone=54 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
 
     <type id="highway.tertiary" priority="10" numLanes="1" speed="22.22" disallow="tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" oneway="0"/>
     <type id="highway.trunk" priority="13" numLanes="2" speed="27.78" disallow="pedestrian bicycle tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" oneway="0"/>
@@ -267,7 +267,7 @@
         <lane id=":J1_1_0" index="0" speed="13.89" length="0.15" shape="5518.21,2864.52 5518.21,2864.56 5518.21,2864.59 5518.21,2864.62 5518.20,2864.67"/>
     </edge>
     <edge id=":J2_0" function="internal">
-        <lane id=":J2_0_0" index="0" speed="13.89" length="3.00" shape="5549.98,2519.15 5550.69,2516.23"/>
+        <lane id=":J2_0_0" index="0" speed="13.89" length="3.56" shape="5549.84,2519.73 5550.10,2518.71 5550.35,2518.03 5550.70,2517.39 5551.29,2516.52"/>
     </edge>
     <edge id=":J4_0" function="internal">
         <lane id=":J4_0_0" index="0" speed="13.89" length="0.48" shape="5986.73,2890.63 5986.60,2890.58 5986.52,2890.53 5986.44,2890.47 5986.33,2890.38"/>
@@ -316,7 +316,7 @@
         <lane id="-E15_0" index="0" speed="13.89" length="198.60" shape="5510.08,2666.09 5518.21,2864.52"/>
     </edge>
     <edge id="-E150" from="J2" to="J8" priority="-1">
-        <lane id="-E150_0" index="0" speed="13.89" length="150.87" shape="5546.88,2518.37 5510.22,2664.72"/>
+        <lane id="-E150_0" index="0" speed="13.89" length="150.27" shape="5546.73,2518.95 5510.22,2664.72"/>
     </edge>
     <edge id="-E17" from="461192779" to="918333525" priority="-1">
         <lane id="-E17_0" index="0" speed="13.89" length="169.04" shape="5508.69,3491.05 5356.74,3565.10"/>
@@ -441,10 +441,10 @@
         <lane id="E15_0" index="0" speed="13.89" length="198.60" shape="5521.40,2864.39 5513.28,2665.96"/>
     </edge>
     <edge id="E150" from="J8" to="J2" priority="-1">
-        <lane id="E150_0" index="0" speed="13.89" length="150.87" shape="5513.32,2665.50 5549.98,2519.15"/>
+        <lane id="E150_0" index="0" speed="13.89" length="150.27" shape="5513.32,2665.50 5549.84,2519.73"/>
     </edge>
     <edge id="E16" from="J2" to="J3" priority="-1">
-        <lane id="E16_0" index="0" speed="13.89" length="140.51" shape="5550.69,2516.23 5583.14,2379.52"/>
+        <lane id="E16_0" index="0" speed="13.89" length="104.90" shape="5551.29,2516.52 5611.06,2430.31"/>
     </edge>
     <edge id="E17" from="918333525" to="461192779" priority="-1">
         <lane id="E17_0" index="0" speed="13.89" length="169.04" shape="5358.15,3567.98 5510.10,3493.92"/>
@@ -734,10 +734,10 @@
         <request index="1" response="00" foes="00" cont="0"/>
     </junction>
     <junction id="J10" type="dead_end" x="5621.75" y="2440.24" incLanes="E13_0" intLanes="" shape="5624.42,2438.48 5621.75,2440.24"/>
-    <junction id="J2" type="priority" x="5548.79" y="2517.32" incLanes="E150_0" intLanes=":J2_0_0" shape="5549.14,2515.86 5552.25,2516.60 5551.53,2519.54 5545.32,2517.98">
+    <junction id="J2" type="priority" x="5548.79" y="2517.32" incLanes="E150_0" intLanes=":J2_0_0" shape="5549.98,2515.61 5552.61,2517.43 5552.00,2518.35 5551.82,2518.69 5551.68,2519.06 5551.54,2519.51 5551.39,2520.12 5545.18,2518.56 5546.37,2517.10 5547.23,2516.93 5548.17,2516.80 5549.11,2516.44">
         <request index="0" response="0" foes="0" cont="0"/>
     </junction>
-    <junction id="J3" type="dead_end" x="5581.58" y="2379.15" incLanes="E16_0" intLanes="" shape="5584.69,2379.89 5581.58,2379.15"/>
+    <junction id="J3" type="dead_end" x="5609.75" y="2429.40" incLanes="E16_0" intLanes="" shape="5612.38,2431.22 5609.75,2429.40"/>
     <junction id="J4" type="priority" x="5985.64" y="2891.90" incLanes="E2_0 -E3_0" intLanes=":J4_0_0 :J4_1_0" shape="5987.38,2889.17 5984.78,2895.02 5984.13,2894.72 5983.92,2894.60 5983.72,2894.45 5983.48,2894.26 5983.18,2894.00">
         <request index="0" response="00" foes="00" cont="0"/>
         <request index="1" response="00" foes="00" cont="0"/>
