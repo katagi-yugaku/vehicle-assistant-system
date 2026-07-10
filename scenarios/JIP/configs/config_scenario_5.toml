@@ -19,8 +19,8 @@ vehicle_interval = 5
 # system により混雑情報を得た運転者が
 # 経路変更しやすくなる値にする．
 # ==================================================
-choice_shortest_route_rate = 0.1
-p_follow = 0.9
+choice_shortest_route_rate = 0.9
+p_follow = 0.1
 active_route_change_threshold_center = 300.0
 active_route_change_threshold_spread = 100.0
 cautious_route_change_threshold_center = 5200.0
