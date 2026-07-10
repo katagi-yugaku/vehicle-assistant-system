@@ -202,25 +202,13 @@ def generate_simple_init_vehID_based_one_routefile(
     """
     vehID_list = []
 
-    # ------------------------------------------------------------
-    # 車両IDを生成
-    #
-    # 既存の init_{shelterID}_{veh_count} 形式を大きく壊さず、
-    # 末尾に routeID を付けて、どの route に基づく車両か分かるようにする。
-    # ------------------------------------------------------------
-    if routeID is None:
-        new_veh_ID: str = "{}_{}_{}".format(
-            "init",
-            shelterID,
-            generate_veh_count,
-        )
-    else:
-        new_veh_ID: str = "{}_{}_{}_{}".format(
-            "init",
-            shelterID,
-            routeID,
-            generate_veh_count,
-        )
+    # 新しい車両IDを生成と出発時間を設定
+    new_veh_ID: str = "{}_{}_{}".format(
+        "init",
+        shelterID,
+        generate_veh_count,
+        generate_veh_count,
+    )
 
     vehID_list.append(new_veh_ID)
 
@@ -464,7 +452,7 @@ def generate_new_veh_based_on_route_time(
     agent.set_vehicle_abandoned_time(copy.deepcopy(agent_by_target_vehID.get_vehicle_abandoned_time()))
     agent.set_target_abandoned_vehID(copy.deepcopy(agent_by_target_vehID.get_target_abandoned_vehID()))
     agent.set_reserved_vehicle_abandonment_edgeID(copy.deepcopy(agent_by_target_vehID.get_reserved_vehicle_abandonment_edgeID()))
-    agent.set_evacuation_route_changed_flg(True)
+    agent.set_route_change_uturn_flg(True)
 
     agent_list[:] = [a for a in agent_list if a.get_vehID() != old_vehID]
     agent_by_vehID_dict.pop(old_vehID, None)

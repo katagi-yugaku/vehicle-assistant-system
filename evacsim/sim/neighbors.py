@@ -106,9 +106,26 @@ def count_rc_around_vehicles(
     custome_edge_list: list,
     current_edgeID: str,
     distance_threshold: float = 10.0,
-):
+) -> tuple[int, int]:
+    """
+    周囲にいる経路変更済み車両数と U-turn 経路変更済み車両数を数える。
+
+    Returns:
+        (rc_change_count, uturn_change_count)
+
+        rc_change_count:
+            通常の経路変更済み車両数。
+
+        uturn_change_count:
+            U-turn 系の経路変更済み車両数。
+
+    Notes:
+        candidate_action と vehInfo は既存呼び出しとの互換性のために残している。
+    """
     step_cache = None
     target_vehID = agent.get_vehID()
+    rc_change_count = 0
+    uturn_change_count = 0
 
     try:
         target_position = get_vehicle_position_cached(
@@ -116,8 +133,12 @@ def count_rc_around_vehicles(
             step_cache=step_cache,
         )
     except Exception as e:
-        print(f"Failed to get target vehicle position: vehID={target_vehID}, error={e}")
-        return 0
+        print(
+            f"Failed to get target vehicle position: "
+            f"vehID={target_vehID}, error={e}"
+        )
+        return 0, 0
+
     opposite_moving_vehIDs = []
     try:
         opposite_edgeID = get_opposite_edgeID_by_edgeID(current_edgeID)
@@ -126,8 +147,7 @@ def count_rc_around_vehicles(
             opposite_moving_vehIDs = list(
                 traci.edge.getLastStepVehicleIDs(opposite_edgeID)
             )
-            # if len(opposite_moving_vehIDs) > 0:
-            #     print(f"Found opposite moving vehicles: vehID={target_vehID}, current_edgeID:{current_edgeID} opposite_edgeID:{opposite_edgeID} opposite_moving_vehIDs={opposite_moving_vehIDs}, count={len(opposite_moving_vehIDs)}")
+
     except Exception as e:
         print(
             f"Failed to get opposite moving vehicles: "
@@ -142,13 +162,16 @@ def count_rc_around_vehicles(
             step_cache=step_cache,
         )
     except Exception as e:
-        print(f"Failed to get around vehicles: vehID={target_vehID}, error={e}")
+        print(
+            f"Failed to get around vehicles: "
+            f"vehID={target_vehID}, error={e}"
+        )
         around_vehIDs = []
 
-    # tuple + list 問題を避ける
-    # 同じ車両が重複して数えられるのも防ぐ
+    # opposite edge 上の車両と周囲車両を統合する。
+    # set にすることで、同じ車両の重複カウントを防ぐ。
     candidate_vehIDs = set(opposite_moving_vehIDs) | set(around_vehIDs)
-    same_action_count = 0
+
     for other_vehID in candidate_vehIDs:
         if other_vehID == target_vehID:
             continue
@@ -177,12 +200,11 @@ def count_rc_around_vehicles(
         if distance > distance_threshold:
             continue
 
-        if (
-            other_agent.get_evacuation_route_changed_flg()
-        ):
-            same_action_count += 1
-            # print(f"Found same action vehicle: target_vehID={target_vehID}, other_vehID={other_vehID}, distance={distance:.2f}")
-        # else:
-        #     print(f"Found different action vehicle: target_vehID={target_vehID}, other_vehID={other_vehID}, distance={distance:.2f} simulation_step={traci.simulation.getTime()}")
+        # U-turn 車両が evacuation_route_changed_flg も持つ可能性があるため、
+        # U-turn を優先して分類する。
+        if other_agent.get_route_change_uturn_flg():
+            uturn_change_count += 1
+        elif other_agent.get_evacuation_route_changed_flg():
+            rc_change_count += 1
 
-    return same_action_count
+    return rc_change_count, uturn_change_count

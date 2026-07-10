@@ -135,6 +135,7 @@ class Agent:
         self.normalcy_lane_change_motivation_flg: bool = False
         self.lane_minimum_motivation_value_flg: bool = False
         self.acceleration_flag: bool = False
+        self.route_change_uturn_flg: bool = False
 
         # --- 車両乗り捨て関連 ---
         self.vehicle_abandoned_flg: bool = False
@@ -497,6 +498,10 @@ class Agent:
         return self.acceleration_flag
     def set_acceleration_flag(self, acceleration_flag:bool):
         self.acceleration_flag = acceleration_flag
+    def get_route_change_uturn_flg(self):
+        return self.route_change_uturn_flg
+    def set_route_change_uturn_flg(self, route_change_uturn_flg:bool):
+        self.route_change_uturn_flg = route_change_uturn_flg
     
     # --- 車両乗り捨て関連 ---
     def get_vehicle_abandoned_flg(self):
