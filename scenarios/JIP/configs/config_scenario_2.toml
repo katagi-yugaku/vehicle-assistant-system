@@ -1,206 +1,57 @@
-scenario_id = 1
+scenario_id = 2
 num_simulations = 50
 comm_range = 200
-
 num_vehicles = 400
 vehicle_interval = 5
-
-# 方針2-4で同調性バイアスの影響変更
-# ==================================================
-# 経路変更閾値
-#
-# 現在の B(t) では，
-# B(368.60) ≒ 3250 程度であり，4000 ではない．
-#
-# 従来の 3000 / 3600 では，
-# 情報取得がなくても B(t) のみで決断しやすい．
-#
-# そのため，no-system では早期決断しにくく，
-# system により混雑情報を得た運転者が
-# 経路変更しやすくなる値にする．
-# ==================================================
-choice_shortest_route_rate = 0.3
-p_follow = 0.25
-active_route_change_threshold_center = 300.0
+choice_shortest_route_rate = 0.1
+p_follow = 0.1
+active_route_change_threshold_center = 150.0
 active_route_change_threshold_spread = 100.0
 cautious_route_change_threshold_center = 5200.0
 cautious_route_change_threshold_spread = 840.0
-
-# ==================================================
-# 経路変更に対する基礎的な抑制値
-#
-# 経路変更そのものに対する心理的な抵抗を表す．
-# 小さすぎると no-system でも自発的に経路変更しやすい．
-#
-# ただし，大きすぎると system で情報を得ても動かなくなるため，
-# B(t) のみで早期決断しにくい程度に設定する．
-# ==================================================
 normalcy_value_about_route_change_center = 600.0
 normalcy_value_about_route_change_spread = 120.0
-
-
-# ==================================================
-# 車両乗り捨て閾値
-#
-# 逆走・車両乗り捨ては，経路変更より心理的ハードルが高い行動である．
-# そのため，B(t) だけでは基本的に到達しにくくする．
-# ==================================================
 active_vehicle_abandantment_threshold_center = 5000.0
 active_vehicle_abandantment_threshold_spread = 400.0
 cautious_vehicle_abandantment_threshold_center = 5500.0
 cautious_vehicle_abandantment_threshold_spread = 450.0
-
-
-# ==================================================
-# 逆走閾値
-#
-# 津波接近情報，避難地満杯情報，同調性バイアスが加わった場合に，
-# active 運転者から発生し得る値にする．
-# ==================================================
 active_wrong_way_driving_threshold_center = 5500.0
 active_wrong_way_driving_threshold_spread = 400.0
 cautious_wrong_way_driving_threshold_center = 6000.0
 cautious_wrong_way_driving_threshold_spread = 450.0
-
-
-
-# ==================================================
-# 逆走行為の最小動機付け値
-#
-# 従来の 3200〜3800 では閾値に近すぎるため，
-# 時間経過だけで逆走が発生しやすい．
-#
-# ここでは，逆走の最低値をやや下げ，
-# 情報取得や同調性バイアスが加わった場合に
-# 閾値へ到達しやすくする．
-# ==================================================
 min_motivation_start = 2500
 min_motivation_end = 3200
-
-# ==================================================
-# 津波接近情報による行動促進値
-#
-# 変数名は normalcy_value_about_* だが，
-# 現状実装では「情報取得時にモチベーションを増加させる値」として扱う．
-#
-# active 運転者は，正常性バイアスの影響が小さいため，
-# 津波接近情報を取得したときに行動しやすい．
-#
-# cautious 運転者は，正常性バイアスの影響が大きいため，
-# 情報を得ても反応は弱い．
-#
-# ただし，active と cautious の差が大きすぎると，
-# 運転者タイプの違いだけで結果が極端に分かれるため，
-# おおよそ 2 : 1 程度の差に抑える．
-# ==================================================
 active_normalcy_value_about_tsunami_precursor_info_center = 650.0
 active_normalcy_value_about_tsunami_precursor_info_spread = 150.0
 cautious_normalcy_value_about_tsunami_precursor_info_center = 350.0
 cautious_normalcy_value_about_tsunami_precursor_info_spread = 100.0
-
-# ==================================================
-# 経路混雑情報による行動促進値
-#
-# 経路混雑情報は，主に経路変更を促す情報である．
-# active は混雑情報を受け取ると経路変更しやすくする．
-# cautious は情報を得ても一定程度は現経路を維持しやすくする．
-#
-# ここも差を大きくしすぎず，
-# active : cautious ≒ 2 : 1 程度にする．
-# ==================================================
 active_normalcy_value_about_route_congestion_info_center = 600.0
 active_normalcy_value_about_route_congestion_info_spread = 130.0
 cautious_normalcy_value_about_route_congestion_info_center = 300.0
 cautious_normalcy_value_about_route_congestion_info_spread = 90.0
-
-# ==================================================
-# 避難地満杯情報による行動促進値
-#
-# 避難地満杯情報は，経路変更，別避難地選択，
-# 車両乗り捨てを促す情報である．
-#
-# 津波接近情報と同様に，active の反応を大きくするが，
-# cautious との差は極端にしない．
-# ==================================================
 active_normalcy_value_about_shelter_full_info_center = 650.0
 active_normalcy_value_about_shelter_full_info_spread = 150.0
 cautious_normalcy_value_about_shelter_full_info_center = 350.0
 cautious_normalcy_value_about_shelter_full_info_spread = 100.0
-
-# ==================================================
-# 周囲車両による同調性バイアス 増加
-#
-# 周囲に同じ行動を取る車両が存在する場合，
-# その行動を選択しやすくする値．
-#
-# ただし，ここを大きくしすぎると，
-# system の情報共有効果ではなく，
-# 周囲行動の連鎖だけで行動が広がる．
-#
-# そのため，従来の 1200 / 1500 より小さくする．
-# ==================================================
 active_majority_increase_value_center = 400.0
 active_majority_increase_value_spread = 150.0
 cautious_majority_increase_value_center = 400.0
 cautious_majority_increase_value_spread = 150.0
-
-# ==================================================
-# 周囲車両による同調性バイアス 減少
-#
-# 周囲に同じ行動を取る車両が存在しない場合，
-# その行動を控えやすくする値．
-#
-# no-system での自発的な決断が多すぎる問題を抑えるため，
-# 従来より大きくする．
-# ==================================================
 active_majority_decrease_value_center = 300.0
 active_majority_decrease_value_spread = 120.0
 cautious_majority_decrease_value_center = 300.0
 cautious_majority_decrease_value_spread = 120.0
-
-# ==================================================
-# 避難所混雑率閾値
-#
-# active は早めに満杯リスクを認識し，
-# cautious は高い混雑率になるまで行動しにくい．
-# ==================================================
 active_shelter_occupancy_rate_threshold_start = 0.65
 active_shelter_occupancy_rate_threshold_end = 0.8
 cautious_shelter_occupancy_rate_threshold_start = 0.8
 cautious_shelter_occupancy_rate_threshold_end = 0.95
-
-# ==================================================
-# 避難所容量・津波接近情報・視認距離
-# ==================================================
 shelter_capacity_threshold = 1.0
-
 tsunami_sign_start_time = 600
 tsunami_sign_end_time = 800
-
 driver_visibility_distance = 50
-
-# ==================================================
-# 基礎モチベーション B(t) の時間増加係数
-#
-# B(t) は two_stage_sigmoid により決まるため，
-# alpha は既存の実装で使っている場合のみ有効．
-# 現状維持．
-# ==================================================
-alpha = 0.10
-
-# ==================================================
-# 追従率
-#
-# 高すぎると同調性バイアスによる行動連鎖が強くなりすぎるため，
-# 現状維持．
-# ==================================================
+alpha = 0.1
 following_rate = 0.2
-
-# ==================================================
-# 避難所容量・初期目的地配分
-# ==================================================
 shelter_A_capacity = 150
 vehicles_to_shelter_A = 150
-
 shelter_B_capacity = 150
 vehicles_to_shelter_B = 15
