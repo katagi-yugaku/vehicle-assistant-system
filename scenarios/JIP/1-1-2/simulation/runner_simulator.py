@@ -13,6 +13,7 @@ import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Literal
+import secrets
 
 # =========================
 # Third-party libraries
@@ -280,7 +281,7 @@ route_changed_logical_vehicle_ids: set[str] = set()
 
 # 同調性バイアス:
 # 同じ経路変更イベントは一度だけ評価するが、新しいイベントを観測した場合は再評価する。
-MAJORITY_OBSERVATION_WINDOW = 30.0
+MAJORITY_OBSERVATION_WINDOW = 60.0
 MAJORITY_EVENT_WEIGHTS: dict[str, float] = {
     "route_change": 1.0,
     "uturn": 1.0,
@@ -744,8 +745,6 @@ def control_vehicles():
                     slow_time=1.0,
                 )
 
-
-
         # V2V / V2Shelter 通信
         if (
             vehInfo_by_current_vehID.get_vehicle_comm_enabled_flag()
@@ -1151,24 +1150,24 @@ def control_vehicles():
             < observation.effective_probability
         )
 
-        if observation.uturn_change_count > 2:
-            print(
-                "[MAJORITY_BIAS_EVALUATION]",
-                f"logical_vehicle_id={logical_vehicle_id}",
-                f"sumo_vehicle_id={current_vehID}",
-                f"time={current_time}",
-                f"rc_change_count={observation.rc_change_count}",
-                f"uturn_change_count={observation.uturn_change_count}",
-                f"new_event_ids={new_event_ids}",
-                f"new_event_count={len(new_event_ids)}",
-                f"effective_observation_count="
-                f"{observation.effective_observation_count:.3f}",
-                f"p_follow={P_FOLLOW:.3f}",
-                f"effective_probability="
-                f"{observation.effective_probability:.6f}",
-                f"random_value={follow_random_value:.6f}",
-                f"should_follow={should_follow}",
-            )
+        # if observation.uturn_change_count > 0:
+        #     print(
+        #         "[MAJORITY_BIAS_EVALUATION]",
+        #         f"logical_vehicle_id={logical_vehicle_id}",
+        #         f"sumo_vehicle_id={current_vehID}",
+        #         f"time={current_time}",
+        #         f"rc_change_count={observation.rc_change_count}",
+        #         f"uturn_change_count={observation.uturn_change_count}",
+        #         f"new_event_ids={new_event_ids}",
+        #         f"new_event_count={len(new_event_ids)}",
+        #         f"effective_observation_count="
+        #         f"{observation.effective_observation_count:.3f}",
+        #         f"p_follow={P_FOLLOW:.3f}",
+        #         f"effective_probability="
+        #         f"{observation.effective_probability:.6f}",
+        #         f"random_value={follow_random_value:.6f}",
+        #         f"should_follow={should_follow}",
+        #     )
 
         if not should_follow:
             majority_bias_rejection_count_by_logical_vehicle_id[
@@ -1445,9 +1444,14 @@ if __name__ == "__main__":
     else:
         sumoBinary = checkBinary('sumo-gui')
     cfg = load_toml(Path(toml_path))
-    RANDOM_SEED: int = int(cfg.get("random_seed", DEFAULT_RANDOM_SEED))
+
+    # 実行ごとに異なる32bitのseedを生成する。
+    # 固定ではないが、出力されたseedを再設定すれば結果を再現できる。
+    RANDOM_SEED: int = secrets.randbits(31)
+
     random.seed(RANDOM_SEED)
     np.random.seed(RANDOM_SEED)
+
 
     COMM_RANGE: float = _req(cfg, "comm_range", float)
     NUM_VEHICLES: int = _req(cfg, "num_vehicles", int)
