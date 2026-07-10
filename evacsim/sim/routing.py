@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Literal
 
 
 from evacsim.sim.sumo_env import ensure_sumo_tools_on_path
@@ -47,12 +47,12 @@ FREE_FLOW_SPEED = 11.0
 V2V_PREFIX_INITIAL_COMMON_PREFIX = ("E0", "E1", "E20")
 
 V2V_ROUTE_FAMILY_MARKERS = {
-    # E0_E16_0 / E0_E13_0 系
+    # E0_E16_0 / E0_E13_1 系（short-side corridor）
     "short_side": {
         "E43", "E25", "E26", "E7", "E42", "E41",
     },
 
-    # E0_E13_1 / E0_E16_1 系
+    # E0_E13_0 / E0_E16_1 系（detour-side corridor）
     "detour_side": {
         "E22", "E21", "E23", "E29", "E8", "E30",
         "E31", "E9", "E17", "E32", "E18",
@@ -610,7 +610,7 @@ def find_alternative_route_better(
 #             current_speed = 1.8
 
 #     except traci.TraCIException as e:
-#         print(f"Error getting speed for {agent.get_vehID()}: {e}")
+#         dprint(f"Error getting speed for {agent.get_vehID()}: {e}")
 #         current_speed = 1.0
 
 #     estimated_current_route_evacuation_time = (
@@ -1021,9 +1021,9 @@ def find_alternative_better_choice_fixed(
     current_target_shelterID = agent.get_target_shelter()
 
     shelter_for_vehInfo: Shelter = shelter
-    print(f"current_target_shelterID: {current_target_shelterID}, shelter_for_vehInfo: {shelter_for_vehInfo.get_shelterID()}")
+    dprint(f"current_target_shelterID={current_target_shelterID}, shelter_for_vehInfo={shelter_for_vehInfo.get_shelterID()}")
     current_route_tuple = tuple(traci.vehicle.getRoute(agent.get_vehID()))
-    print(f"current_route_tuple: {current_route_tuple}")
+    dprint(f"current_route_tuple={current_route_tuple}")
     current_destination_edge = current_route_tuple[-1]
 
     distance_to_current_shelter = calculate_remaining_route_distance(
@@ -1434,12 +1434,12 @@ def find_alternative_better_choice_fixed(
                 congestion_flg
             )
         dprint("approach edge: apply best route directly with traci.vehicle.setRoute")
-        print("test5")
+        pass  # removed temporary debug print
         route = traci.simulation.findRoute(
             base_reroute_start_edgeID,
             best_candidate_edgeID
         )
-        print("test6")
+        pass  # removed temporary debug print
 
         if route.edges:
             traci.vehicle.setRoute(agent.get_vehID(), route.edges)
@@ -1483,8 +1483,6 @@ def is_route_time_difference_exceeding_threshold(current_edgeID, agent_by_target
                                                                                                             custome_edge_list=custome_edge_list,
                                                                                                             debug=False
                                                                                                             )
-    if congestion_flg:
-        print(f"base_reroute_start_edgeID: {base_reroute_start_edgeID}, shelterID: {shelterID}, to_edge_list: {to_edge_list}, time_gain: {time_gain:.3f}, congestion_flg: {congestion_flg}")
     return base_reroute_start_edgeID, to_edge_list, congestion_flg
 
 def get_route_time_difference_exceeding_threshold(current_edgeID, agent_by_target_vehID: Agent, vehInfo_by_target_vehID: VehicleInfo, shelter: Shelter, shelter_list: list[Shelter], custome_edge_list: list):
@@ -2135,13 +2133,23 @@ def find_uturn_shortest_route_to_current_shelter_group(
 #     return reroute_start_edgeID, best_shelterID, [best_edgeID]
 
 
-
 @dataclass(frozen=True)
 class CurrentRouteEstimate:
     target_shelter_id: str
-    route_tuple: tuple
+    route_tuple: tuple[str, ...]
     destination_edge_id: str
     estimated_time: float
+
+    # SUMOの現在位置から先だけを切り出した実走行予定経路。
+    # route_tuple全体ではなく、この値と候補route_edges_for_sumoを比較する。
+    remaining_route_tuple: tuple[str, ...] = tuple()
+
+    # traci.vehicle.getRouteIndex()で取得した現在edgeの位置。
+    # route内に同じedgeが複数回現れてもtuple.index()の誤選択を避ける。
+    current_edge_index: int = -1
+
+    remaining_distance: float = float("inf")
+    current_speed: float = FREE_FLOW_SPEED
 
 
 @dataclass(frozen=True)
@@ -2152,1720 +2160,1187 @@ class RerouteStartContext:
     should_return_without_calculation: bool = False
 
 
+ManeuverType = Literal["forward_reroute", "uturn"]
+CandidateSource = Literal[
+    "forward_free_flow",
+    "v2v_prefix_adjusted",
+    "u_turn",
+]
+TIME_COMPARISON_EPSILON = 1e-6
+MIN_ROUTE_EVALUATION_SPEED = 1.8
+
+
 @dataclass(frozen=True)
 class CandidateEvaluation:
+    """同じ時間単位（秒）で比較可能な経路変更候補。"""
+
     best_time: float
     shelter_id: str
     edge_id: str
     from_edge_id: str
-    best_source: str
-    time_free_flow: float
-    time_v2v_based: float = float("inf")
-    best_v2v_debug_info: Optional[dict] = None
+    best_source: CandidateSource
+    maneuver_type: ManeuverType
+    route_edges_for_sumo: tuple[str, ...]
+
+    # 新しい明示フィールド
+    time_forward_free_flow: float = float("inf")
     time_v2v_prefix_adjusted: float = float("inf")
     time_u_turn: float = float("inf")
     best_debug_info: Optional[dict] = None
+
+    # 既存コードとの互換フィールド
+    time_free_flow: float = float("inf")
+    time_v2v_based: float = float("inf")
+    best_v2v_debug_info: Optional[dict] = None
+
+
+@dataclass(frozen=True)
+class RouteManeuverDecision:
+    current_route: CurrentRouteEstimate
+    best_candidate: Optional[CandidateEvaluation]
+    candidate_results: tuple[CandidateEvaluation, ...]
+    time_gain: float
+    route_change_threshold: float
+    threshold_exceeded: bool
+    apply_normalcy_threshold: bool
+    corridor_family: Optional[str]
+
+    @property
+    def has_candidate(self) -> bool:
+        return self.best_candidate is not None
+
+    @property
+    def approved(self) -> bool:
+        if self.best_candidate is None:
+            return False
+        if self.apply_normalcy_threshold:
+            return self.threshold_exceeded
+        return True
+
+    @property
+    def maneuver_type(self) -> Optional[ManeuverType]:
+        if self.best_candidate is None:
+            return None
+        return self.best_candidate.maneuver_type
+
+    def to_legacy_tuple(self) -> tuple[
+        str,
+        str,
+        list[str],
+        float,
+        bool,
+        tuple[str, ...],
+    ]:
+        """既存の6値インターフェースへ変換する。"""
+        if not self.approved or self.best_candidate is None:
+            candidate_edges = list(dict.fromkeys(
+                candidate.edge_id for candidate in self.candidate_results
+            ))
+            return "", "", candidate_edges, self.time_gain, False, tuple()
+
+        candidate = self.best_candidate
+        return (
+            candidate.from_edge_id,
+            candidate.shelter_id,
+            [candidate.edge_id],
+            self.time_gain,
+            True,
+            candidate.route_edges_for_sumo,
+        )
 
 
 def _make_dprint(debug: bool) -> Callable[[str], None]:
     def dprint(message: str) -> None:
         if debug:
-            print(f"[find_alternative_better_choice] {message}")
+            print(f"[ROUTING_DEBUG] {message}")
 
     return dprint
 
 
-def _is_internal_junction_edge(edgeID: str) -> bool:
-    return edgeID.startswith(":")
+def _is_internal_junction_edge(edge_id: str) -> bool:
+    return edge_id.startswith(":")
+
+
+def classify_corridor(current_edge_id: str) -> Optional[str]:
+    """現在edgeが属する主要経路ファミリを返す。"""
+    for family_name, marker_edges in V2V_ROUTE_FAMILY_MARKERS.items():
+        if current_edge_id in marker_edges:
+            return family_name
+    return None
+
+
+def _classify_v2v_route_family(route_tuple: tuple[str, ...]) -> str:
+    """
+    route IDの末尾ではなく、実際に含まれるedge列から分類する。
+
+    正しい対応:
+        short_side:  E0_E16_0 / E0_E13_1
+        detour_side: E0_E13_0 / E0_E16_1
+    """
+    route_edges = set(route_tuple)
+    match_counts = {
+        family_name: len(route_edges & marker_edges)
+        for family_name, marker_edges in V2V_ROUTE_FAMILY_MARKERS.items()
+    }
+    positive_matches = {
+        family_name: count
+        for family_name, count in match_counts.items()
+        if count > 0
+    }
+    if not positive_matches:
+        return ""
+
+    max_count = max(positive_matches.values())
+    winners = [
+        family_name
+        for family_name, count in positive_matches.items()
+        if count == max_count
+    ]
+    if len(winners) != 1:
+        return ""
+    return winners[0]
 
 
 def _get_current_speed(
-    current_edgeID: str,
-    vehInfo: "VehicleInfo",
+    current_edge_id: str,
+    veh_info: "VehicleInfo",
     agent: "Agent",
     dprint: Callable[[str], None],
 ) -> float:
     try:
-        if vehInfo.get_vehicle_comm_enabled_flag():
-            current_speed = traci.edge.getLastStepMeanSpeed(current_edgeID)
+        communication_enabled = veh_info.get_vehicle_comm_enabled_flag()
+        if communication_enabled:
+            current_speed = float(
+                traci.edge.getLastStepMeanSpeed(current_edge_id)
+            )
         else:
             current_speed = FREE_FLOW_SPEED
+    except Exception as exc:
+        dprint(
+            "failed to obtain current edge speed; "
+            f"vehID={agent.get_vehID()}, edge={current_edge_id}, error={exc}"
+        )
+        current_speed = MIN_ROUTE_EVALUATION_SPEED
 
-        if current_speed < 1.8:
-            dprint(
-                f"current_speed is too low: {current_speed:.3f}. "
-                "clamped to 1.8"
-            )
-            current_speed = 1.8
+    if not math.isfinite(current_speed) or current_speed < MIN_ROUTE_EVALUATION_SPEED:
+        current_speed = MIN_ROUTE_EVALUATION_SPEED
+    return current_speed
 
-        return current_speed
 
-    except traci.TraCIException as e:
-        dprint(f"failed to get speed for {agent.get_vehID()}: {e}. use 1.8")
-        return 1.8
+def _extract_current_remaining_route(
+    *,
+    route_tuple: tuple[str, ...],
+    current_edge_id: str,
+    route_index: int,
+    dprint: Callable[[str], None],
+) -> tuple[int, tuple[str, ...]]:
+    """
+    SUMOの現在位置から先のrouteを返す。
+
+    原則としてtraci.vehicle.getRouteIndex()を使用する。
+    route indexが取得できない、または現在edgeと整合しない場合だけ、
+    current_edge_idによる検索へフォールバックする。
+    """
+    if not route_tuple:
+        return -1, tuple()
+
+    if 0 <= route_index < len(route_tuple):
+        indexed_edge = route_tuple[route_index]
+        if indexed_edge == current_edge_id:
+            return route_index, tuple(route_tuple[route_index:])
+
+        dprint(
+            "route index and current edge disagree; "
+            f"route_index={route_index}, "
+            f"indexed_edge={indexed_edge}, "
+            f"current_edge={current_edge_id}, "
+            "fall back to edge search"
+        )
+
+    matching_indices = [
+        index
+        for index, edge_id in enumerate(route_tuple)
+        if edge_id == current_edge_id
+    ]
+    if not matching_indices:
+        dprint(
+            "current edge is not contained in route; "
+            f"current_edge={current_edge_id}, route={route_tuple}"
+        )
+        return -1, tuple()
+
+    # routeIndexが壊れている場合、同一edgeが複数存在すると完全には特定できない。
+    # ただし通常はgetRouteIndex()が利用できるため、これは防御的フォールバック。
+    fallback_index = (
+        min(matching_indices, key=lambda index: abs(index - route_index))
+        if route_index >= 0
+        else matching_indices[0]
+    )
+    dprint(
+        "use current-edge fallback for remaining route; "
+        f"current_edge={current_edge_id}, "
+        f"fallback_index={fallback_index}, "
+        f"matching_indices={matching_indices}"
+    )
+    return fallback_index, tuple(route_tuple[fallback_index:])
 
 
 def _estimate_current_route_time(
-    current_edgeID: str,
-    vehInfo: "VehicleInfo",
+    current_edge_id: str,
+    veh_info: "VehicleInfo",
     agent: "Agent",
     shelter: "Shelter",
     dprint: Callable[[str], None],
 ) -> CurrentRouteEstimate:
-    current_target_shelterID = agent.get_target_shelter()
-    current_route_tuple = tuple(traci.vehicle.getRoute(agent.get_vehID()))
-    current_destination_edge = current_route_tuple[-1]
+    veh_id = agent.get_vehID()
 
-    distance_to_current_shelter = calculate_remaining_route_distance(
-        agent.get_vehID(),
-        current_destination_edge,
-        shelter=shelter,
-    )
+    try:
+        current_route_tuple = tuple(traci.vehicle.getRoute(veh_id))
+    except Exception as exc:
+        dprint(f"failed to get current route: {exc}")
+        current_route_tuple = tuple()
 
-    current_speed = _get_current_speed(
-        current_edgeID=current_edgeID,
-        vehInfo=vehInfo,
-        agent=agent,
+    try:
+        route_index = int(traci.vehicle.getRouteIndex(veh_id))
+    except Exception as exc:
+        dprint(f"failed to get current route index: {exc}")
+        route_index = -1
+
+    (
+        current_edge_index,
+        remaining_route_tuple,
+    ) = _extract_current_remaining_route(
+        route_tuple=current_route_tuple,
+        current_edge_id=current_edge_id,
+        route_index=route_index,
         dprint=dprint,
     )
 
-    estimated_current_time = distance_to_current_shelter / current_speed
+    current_target_shelter_id = agent.get_target_shelter()
+    current_destination_edge = (
+        remaining_route_tuple[-1]
+        if remaining_route_tuple
+        else (current_route_tuple[-1] if current_route_tuple else "")
+    )
+
+    if not current_destination_edge:
+        return CurrentRouteEstimate(
+            target_shelter_id=current_target_shelter_id,
+            route_tuple=current_route_tuple,
+            destination_edge_id="",
+            estimated_time=float("inf"),
+            remaining_route_tuple=remaining_route_tuple,
+            current_edge_index=current_edge_index,
+        )
+
+    try:
+        remaining_distance = float(
+            calculate_remaining_route_distance(
+                veh_id,
+                current_destination_edge,
+                shelter=shelter,
+            )
+        )
+    except Exception as exc:
+        dprint(f"failed to calculate current remaining distance: {exc}")
+        remaining_distance = float("inf")
+
+    current_speed = _get_current_speed(
+        current_edge_id=current_edge_id,
+        veh_info=veh_info,
+        agent=agent,
+        dprint=dprint,
+    )
+    estimated_time = (
+        remaining_distance / current_speed
+        if math.isfinite(remaining_distance) and remaining_distance >= 0.0
+        else float("inf")
+    )
 
     dprint(
-        "current route: "
-        f"target_shelter={current_target_shelterID}, "
-        f"destination_edge={current_destination_edge}, "
-        f"distance_to_current_shelter={distance_to_current_shelter:.3f}, "
-        f"current_speed={current_speed:.3f}, "
-        f"estimated_current_time={estimated_current_time:.3f}"
+        "current route snapshot: "
+        f"vehID={veh_id}, "
+        f"route_index={current_edge_index}, "
+        f"current_edge={current_edge_id}, "
+        f"destination={current_destination_edge}, "
+        f"remaining_route={remaining_route_tuple}"
     )
 
     return CurrentRouteEstimate(
-        target_shelter_id=current_target_shelterID,
+        target_shelter_id=current_target_shelter_id,
         route_tuple=current_route_tuple,
         destination_edge_id=current_destination_edge,
-        estimated_time=estimated_current_time,
+        estimated_time=estimated_time,
+        remaining_route_tuple=remaining_route_tuple,
+        current_edge_index=current_edge_index,
+        remaining_distance=remaining_distance,
+        current_speed=current_speed,
     )
 
 
 def _build_reroute_start_context(
-    current_edgeID: str,
-    vehInfo: "VehicleInfo",
+    current_edge_id: str,
+    veh_info: "VehicleInfo",
     dprint: Callable[[str], None],
 ) -> RerouteStartContext:
-    approach_edgeIDs_by_start_edgeID = vehInfo.get_approach_edge_dict()
-
+    approach_edge_ids_by_start = veh_info.get_approach_edge_dict()
     is_in_approach_list = any(
-        current_edgeID in edge_list
-        for edge_list in approach_edgeIDs_by_start_edgeID.values()
+        current_edge_id in edge_list
+        for edge_list in approach_edge_ids_by_start.values()
     )
 
-    if not is_in_approach_list:
-        base_reroute_start_edgeID = get_opposite_edgeID_by_edgeID(
-            edgeID=current_edgeID
-        )
-        approach_edge_flg = False
-        should_return_without_calculation = False
+    if is_in_approach_list:
+        base_start_edge = current_edge_id
+        should_return = not veh_info.get_vehicle_comm_enabled_flag()
     else:
-        base_reroute_start_edgeID = current_edgeID
-        approach_edge_flg = True
-        should_return_without_calculation = not vehInfo.get_vehicle_comm_enabled_flag()
+        try:
+            base_start_edge = get_opposite_edgeID_by_edgeID(
+                edgeID=current_edge_id
+            )
+        except TypeError:
+            base_start_edge = get_opposite_edgeID_by_edgeID(current_edge_id)
+        should_return = False
 
     dprint(
-        f"is_in_approach_list={is_in_approach_list}, "
-        f"approach_edge_flg={approach_edge_flg}, "
-        f"base_reroute_start_edgeID={base_reroute_start_edgeID}, "
-        f"should_return_without_calculation={should_return_without_calculation}"
+        f"approach_edge={is_in_approach_list}, "
+        f"base_start_edge={base_start_edge}, should_return={should_return}"
     )
-
     return RerouteStartContext(
-        approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID,
-        approach_edge_flg=approach_edge_flg,
-        base_reroute_start_edgeID=base_reroute_start_edgeID,
-        should_return_without_calculation=should_return_without_calculation,
+        approach_edgeIDs_by_start_edgeID=approach_edge_ids_by_start,
+        approach_edge_flg=is_in_approach_list,
+        base_reroute_start_edgeID=base_start_edge or "",
+        should_return_without_calculation=should_return,
     )
 
 
 def _merge_v2v_routes(
-    vehInfo: "VehicleInfo",
+    veh_info: "VehicleInfo",
     dprint: Callable[[str], None],
-) -> dict:
-    """
-    vehInfo.get_avg_evac_time_by_route_by_recive_time() は
-    {receive_time: {route_tuple: route_info}} の構造なので，
-    receive_time は計算に使わず，内側の route 情報だけを統合する。
-    """
-    avg_evac_time_data = vehInfo.get_avg_evac_time_by_route_by_recive_time()
-    if len(avg_evac_time_data) > 3:
-        print(f"vehInfo.get_avg_evac_time_by_route_by_recive_time() = {avg_evac_time_data}")
-    routes_dict = {}
-
-    if not avg_evac_time_data:
-        dprint("V2V info is empty")
-        return routes_dict
-
-    for receive_time in sorted(avg_evac_time_data.keys()):
-        route_dict_at_time = avg_evac_time_data.get(receive_time, {})
-
-        if not route_dict_at_time:
-            dprint(f"V2V info receive_time={receive_time}: empty")
-            continue
-
-        duplicate_count = sum(
-            1 for route_tuple in route_dict_at_time.keys()
-            if route_tuple in routes_dict
-        )
-
-        routes_dict.update(route_dict_at_time)
-
-        dprint(
-            f"V2V info receive_time={receive_time}: "
-            f"routes={len(route_dict_at_time)}, "
-            f"duplicates={duplicate_count}, "
-            f"merged_routes={len(routes_dict)}"
-        )
-
-    dprint(f"total merged V2V routes={len(routes_dict)}")
-    return routes_dict
+) -> dict[tuple[str, ...], dict]:
+    """受信時刻を除き、最新側で上書きしながらroute情報を統合する。"""
+    merged: dict[tuple[str, ...], dict] = {}
+    raw = veh_info.get_avg_evac_time_by_route_by_recive_time() or {}
+    for receive_time in sorted(raw):
+        route_dict = raw.get(receive_time) or {}
+        for route, info in route_dict.items():
+            route_tuple = tuple(route)
+            if route_tuple:
+                merged[route_tuple] = dict(info or {})
+    dprint(f"merged V2V route count={len(merged)}")
+    return merged
 
 
-def _get_current_route_name(current_edgeID: str, vehInfo: "VehicleInfo") -> str:
-    edgeIDs_within_junction_to_shelter_dict = (
-        vehInfo.get_edgeIDs_within_junction_to_shelter_dict()
-    )
-
-    route_name = find_route_name_by_edge(
-        edgeID=current_edgeID,
-        routes_dict=edgeIDs_within_junction_to_shelter_dict,
-    )
-
-    return route_name or ""
-
-
-def _should_skip_candidate(
-    candidate_shelterID: str,
-    candidate_edgeID: str,
-    current_route: CurrentRouteEstimate,
+def _collect_route_options(
+    v2v_routes: dict[tuple[str, ...], dict],
     dprint: Callable[[str], None],
-) -> bool:
-    if candidate_shelterID == current_route.target_shelter_id:
-        dprint(
-            f"skip candidate_shelter={candidate_shelterID}: "
-            "same as current target shelter ID"
-        )
-        return True
-
-    if candidate_edgeID == current_route.destination_edge_id:
-        dprint(
-            "skip candidate because candidate_edgeID is current destination: "
-            f"candidate_edgeID={candidate_edgeID}, "
-            f"current_destination_edge={current_route.destination_edge_id}"
-        )
-        return True
-
-    return False
-
-
-def _resolve_candidate_shelter(
-    candidate_shelterID: str,
-    candidate_edgeID: str,
-    shelter_list: list,
-    dprint: Callable[[str], None],
-) -> Optional["Shelter"]:
-    candidate_shelter = find_shelter_by_edgeID_connect_target_shelter(
-        edgeID=candidate_edgeID,
-        shelter_list=shelter_list,
-    )
-
-    if not candidate_shelter:
-        dprint(
-            f"skip candidate_shelter={candidate_shelterID}: "
-            f"candidate_edgeID={candidate_edgeID}, shelter not found"
-        )
-        return None
-
-    return candidate_shelter
-
-
-def _select_base_start_edge_for_candidate(
-    current_edgeID: str,
-    base_reroute_start_edgeID: str,
-    route_name: str,
-    current_group: str,
-    candidate_group: str,
-) -> str:
-    """
-    既存の迂回開始 edge 補正ロジックをそのまま隔離する。
-    """
-    edge_to_search_from = base_reroute_start_edgeID
-
-    if route_name.startswith("intermediate"):
-        if current_group == candidate_group:
-            edge_to_search_from = current_edgeID
-
-    elif route_name.startswith("ShelterA"):
-        if route_name.endswith("_opposite"):
-            if current_group == candidate_group:
-                edge_to_search_from = get_opposite_edgeID_by_edgeID(
-                    edgeID=current_edgeID
-                )
-            else:
-                edge_to_search_from = current_edgeID
-
-    elif route_name.startswith("ShelterB"):
-        if route_name.endswith("_opposite"):
-            if current_group == candidate_group:
-                edge_to_search_from = current_edgeID
-            else:
-                edge_to_search_from = get_opposite_edgeID_by_edgeID(
-                    edgeID=current_edgeID
-                )
-
-    # 既存の特殊ケースを維持
-    if current_edgeID in ["E20", "E1"]:
-        edge_to_search_from = current_edgeID
-
-    return edge_to_search_from
-
-
-def _unique_non_empty(values: list[str]) -> list[str]:
-    result = []
-    for value in values:
-        if value and value not in result:
-            result.append(value)
-    return result
-
-
-def _get_start_edge_options_for_candidate(
-    current_edgeID: str,
-    base_start_edge_for_candidate: str,
-) -> list[str]:
-    """
-    自由速度ベース評価に使う開始 edge 候補を返す。
-
-    以前は特定 edge ID に依存して current_edgeID を追加していたが，
-    順方向分岐候補は V2V prefix 補正で，Uターン候補は
-    _estimate_u_turn_reroute_time() でそれぞれ一般的に評価する。
-    そのため，ここでは既存の base_start_edge_for_candidate のみを返す。
-    """
-    start_edge_options = _unique_non_empty([base_start_edge_for_candidate])
-    if start_edge_options:
-        return start_edge_options
-
-    return [current_edgeID]
-
-
-def _safe_calculate_reroute_distance(
-    vehID: str,
-    from_edgeID: str,
-    to_edgeID: str,
-    shelter: "Shelter",
-    approach_edgeIDs_by_start_edgeID: dict,
-    dprint: Callable[[str], None],
-) -> float:
+) -> dict[tuple[str, ...], dict]:
+    """V2V経路にSUMO登録済みrouteを加え、edge列で重複排除する。"""
+    route_options = dict(v2v_routes)
     try:
-        return calculate_reroute_distance(
-            vehID=vehID,
-            from_edgeID=from_edgeID,
-            to_edgeID=to_edgeID,
-            shelter=shelter,
-            approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID,
-        )
-    except traci.TraCIException as e:
-        dprint(
-            "skip route because calculate_reroute_distance failed: "
-            f"from_edgeID={from_edgeID}, to_edgeID={to_edgeID}, error={e}"
-        )
+        route_ids = tuple(traci.route.getIDList())
+    except Exception as exc:
+        dprint(f"failed to list SUMO routes: {exc}")
+        route_ids = tuple()
+
+    for route_id in route_ids:
+        try:
+            route_tuple = tuple(traci.route.getEdges(route_id))
+        except Exception as exc:
+            dprint(f"failed to read routeID={route_id}: {exc}")
+            continue
+        if not route_tuple:
+            continue
+        route_options.setdefault(route_tuple, {"route_id": route_id})
+    return route_options
+
+
+def _is_valid_positive_time(value: float) -> bool:
+    return math.isfinite(value) and value > 0.0
+
+
+def _get_edge_length(edge_id: str) -> float:
+    if not edge_id or _is_internal_junction_edge(edge_id):
         return float("inf")
-
-
-def _estimate_free_flow_time(
-    agent: "Agent",
-    from_edgeID: str,
-    to_edgeID: str,
-    shelter: "Shelter",
-    approach_edgeIDs_by_start_edgeID: dict,
-    dprint: Callable[[str], None],
-) -> tuple[float, float]:
-    distance_free_flow = _safe_calculate_reroute_distance(
-        vehID=agent.get_vehID(),
-        from_edgeID=from_edgeID,
-        to_edgeID=to_edgeID,
-        shelter=shelter,
-        approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID,
-        dprint=dprint,
-    )
-
-    return distance_free_flow, distance_free_flow / FREE_FLOW_SPEED
-
-
-def _longest_common_prefix_length(route_a: tuple, route_b: tuple) -> int:
-    lcp_length = 0
-    min_len = min(len(route_a), len(route_b))
-
-    for i in range(min_len):
-        if route_a[i] == route_b[i]:
-            lcp_length += 1
-        else:
-            break
-
-    return lcp_length
-
-
-def _get_v2v_branch_target_edge(
-    current_route_tuple: tuple,
-    route_tuple: tuple,
-    candidate_shelterID: str,
-    dprint: Callable[[str], None],
-) -> Optional[str]:
-    lcp_length = _longest_common_prefix_length(current_route_tuple, route_tuple)
-    target_index = lcp_length
-
-    if target_index >= len(route_tuple):
-        target_index = 0
-
-    if target_index == 0:
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            "skip V2V route because branch target is invalid. "
-            f"lcp_length={lcp_length}, route={route_tuple}"
-        )
-        return None
-
-    return route_tuple[target_index]
-
-
-# def _is_unusable_distance(distance: float) -> bool:
-#     """
-#     距離・時間として使えない値を判定する。
-
-#     prefix 補正では 0m の区間は別途許容する場合があるため、
-#     この関数は「正の有限値が必要な場所」で使う。
-#     """
-#     return (not math.isfinite(distance)) or distance <= 0.0
-def _is_unusable_distance(distance: float) -> bool:
-    return distance == float("inf") or distance <= 0.0
-
-
-
-
-def _is_unusable_nonnegative_value(value: float) -> bool:
-    """
-    0 を許容しつつ、NaN / inf / 負値を除外する。
-
-    current_edgeID がすでに divergence edge の場合、
-    分岐点までの距離・時間は 0 になるため、この判定を使う。
-    """
-    return (not math.isfinite(value)) or value < 0.0
+    try:
+        lane_count = int(traci.edge.getLaneNumber(edge_id))
+        if lane_count <= 0:
+            return float("inf")
+        return float(traci.lane.getLength(f"{edge_id}_0"))
+    except Exception:
+        return float("inf")
 
 
 def _calculate_route_distance_from_edges(
     edge_ids: tuple[str, ...],
     dprint: Callable[[str], None],
 ) -> float:
-    """
-    edge ID の列から総距離を計算する。
-
-    まず edge/lane の長さを合計し，それが失敗した場合は
-    traci.simulation.findRoute(edge_ids[0], edge_ids[-1]) の length に
-    フォールバックする。どちらでも取得できない場合は float("inf") を返す。
-    """
     if not edge_ids:
-        dprint("route distance calculation failed: edge_ids is empty")
-        return float("inf")
-
+        return 0.0
     total_distance = 0.0
-    can_use_lane_lengths = True
-
     for edge_id in edge_ids:
-        if not edge_id or _is_internal_junction_edge(edge_id):
-            can_use_lane_lengths = False
-            dprint(
-                "route distance lane-length calculation skipped: "
-                f"edge_id={edge_id}"
-            )
-            break
-
-        try:
-            lane_count = traci.edge.getLaneNumber(edge_id)
-            if lane_count <= 0:
-                can_use_lane_lengths = False
-                dprint(
-                    "route distance lane-length calculation failed: "
-                    f"edge_id={edge_id}, lane_count={lane_count}"
-                )
-                break
-
-            lane_id = f"{edge_id}_0"
-            edge_length = traci.lane.getLength(lane_id)
-            if edge_length <= 0:
-                can_use_lane_lengths = False
-                dprint(
-                    "route distance lane-length calculation failed: "
-                    f"edge_id={edge_id}, lane_id={lane_id}, "
-                    f"edge_length={edge_length}"
-                )
-                break
-
-            total_distance += edge_length
-
-        except traci.TraCIException as e:
-            can_use_lane_lengths = False
-            dprint(
-                "route distance lane-length calculation failed: "
-                f"edge_id={edge_id}, error={e}"
-            )
-            break
-
-    if can_use_lane_lengths and total_distance > 0:
-        return total_distance
-
-    try:
-        fallback_route = traci.simulation.findRoute(edge_ids[0], edge_ids[-1])
-        fallback_length = getattr(fallback_route, "length", float("inf"))
-
-        if fallback_length > 0 and fallback_length != float("inf"):
-            dprint(
-                "route distance calculated by findRoute fallback: "
-                f"from_edgeID={edge_ids[0]}, to_edgeID={edge_ids[-1]}, "
-                f"length={fallback_length:.3f}"
-            )
-            return fallback_length
-
-        dprint(
-            "route distance findRoute fallback returned unusable length: "
-            f"from_edgeID={edge_ids[0]}, to_edgeID={edge_ids[-1]}, "
-            f"length={fallback_length}"
-        )
-
-    except traci.TraCIException as e:
-        dprint(
-            "route distance findRoute fallback failed: "
-            f"from_edgeID={edge_ids[0]}, to_edgeID={edge_ids[-1]}, error={e}"
-        )
-
-    return float("inf")
+        edge_length = _get_edge_length(edge_id)
+        if not math.isfinite(edge_length) or edge_length <= 0.0:
+            dprint(f"invalid edge length: edge={edge_id}, length={edge_length}")
+            return float("inf")
+        total_distance += edge_length
+    return total_distance
 
 
-def _extract_edges_from_current_to_divergence(
-    current_route_tuple: tuple,
-    current_edgeID: str,
-    divergence_edge_index: int,
-    dprint: Callable[[str], None],
-) -> Optional[tuple]:
-    """
-    current_route_tuple 上で、現在 edge から分岐 edge までの edge 群を返す。
-
-    注意:
-        current_edgeID がすでに divergence edge の場合は、
-        分岐 edge までの時間を二重計上しないため空 tuple を返す。
-
-    例:
-        current_edgeID = "E42", divergence = "E41"
-            -> ("E42", "E41")
-
-        current_edgeID = "E41", divergence = "E41"
-            -> ()
-    """
-    try:
-        current_edge_index = current_route_tuple.index(current_edgeID)
-    except ValueError:
-        dprint(
-            "skip V2V prefix candidate because current edge is not in "
-            f"current route: current_edgeID={current_edgeID}, "
-            f"current_route_tuple={current_route_tuple}"
-        )
-        return None
-
-    if divergence_edge_index < current_edge_index:
-        dprint(
-            "skip V2V prefix candidate because divergence edge is behind "
-            "the current edge: "
-            f"current_edge_index={current_edge_index}, "
-            f"divergence_edge_index={divergence_edge_index}"
-        )
-        return None
-
-    if current_edge_index == divergence_edge_index:
-        return tuple()
-
-    return tuple(current_route_tuple[current_edge_index:divergence_edge_index + 1])
-
-
-def _estimate_time_from_current_to_divergence(
-    current_edgeID: str,
-    vehInfo: "VehicleInfo",
-    agent: "Agent",
-    edges_from_current_to_divergence: tuple,
+def _remaining_length_on_current_edge(
+    veh_id: str,
+    current_edge_id: str,
     dprint: Callable[[str], None],
 ) -> float:
-    """
-    現在 edge から分岐 edge までの推定時間を現在速度で計算する。
-    """
-    distance_from_current_to_divergence = _calculate_route_distance_from_edges(
-        tuple(edges_from_current_to_divergence),
-        dprint=dprint,
-    )
-    if _is_unusable_distance(distance_from_current_to_divergence):
+    edge_length = _get_edge_length(current_edge_id)
+    if not _is_valid_positive_time(edge_length):
         return float("inf")
+    try:
+        lane_position = float(traci.vehicle.getLanePosition(veh_id))
+    except Exception as exc:
+        dprint(f"failed to get lane position; use full edge length: {exc}")
+        return edge_length
+    return max(0.0, edge_length - lane_position)
 
-    current_speed = _get_current_speed(
-        current_edgeID=current_edgeID,
-        vehInfo=vehInfo,
-        agent=agent,
-        dprint=dprint,
+
+def _longest_common_prefix_length(
+    route_a: tuple[str, ...],
+    route_b: tuple[str, ...],
+) -> int:
+    length = 0
+    for edge_a, edge_b in zip(route_a, route_b):
+        if edge_a != edge_b:
+            break
+        length += 1
+    return length
+
+
+def _route_starts_with_prefix(
+    route_tuple: tuple[str, ...],
+    prefix: tuple[str, ...],
+) -> bool:
+    return tuple(route_tuple[:len(prefix)]) == prefix
+
+
+def _has_only_initial_common_prefix(
+    current_route: tuple[str, ...],
+    alternative_route: tuple[str, ...],
+) -> bool:
+    lcp_length = _longest_common_prefix_length(
+        current_route,
+        alternative_route,
     )
-
-    return distance_from_current_to_divergence / current_speed
-
-
-def _estimate_time_after_divergence_from_v2v(
-    alternative_route_tuple: tuple,
-    divergence_edge_index: int,
-    alternative_avg_time: float,
-    dprint: Callable[[str], None],
-) -> float:
-    """
-    代替 route 全体の avg_time を、距離比により分岐 edge 後の時間へ補正する。
-
-    重要:
-        divergence edge は現在地から分岐点までの時間側で扱うため、
-        ここでは alternative_route_tuple[divergence_edge_index + 1:] を使う。
-    """
-    if alternative_avg_time is None:
-        return float("inf")
-
-    if divergence_edge_index < 0 or divergence_edge_index >= len(alternative_route_tuple):
-        return float("inf")
-
-    alternative_total_distance = _calculate_route_distance_from_edges(
-        tuple(alternative_route_tuple),
-        dprint=dprint,
-    )
-    if _is_unusable_distance(alternative_total_distance):
-        return float("inf")
-
-    alternative_edges_after_divergence = tuple(
-        alternative_route_tuple[divergence_edge_index + 1:]
-    )
-    alternative_distance_after_divergence = _calculate_route_distance_from_edges(
-        alternative_edges_after_divergence,
-        dprint=dprint,
-    )
-    if _is_unusable_distance(alternative_distance_after_divergence):
-        return float("inf")
-
     return (
-        alternative_avg_time
-        * alternative_distance_after_divergence
-        / alternative_total_distance
+        _route_starts_with_prefix(
+            current_route,
+            V2V_PREFIX_INITIAL_COMMON_PREFIX,
+        )
+        and _route_starts_with_prefix(
+            alternative_route,
+            V2V_PREFIX_INITIAL_COMMON_PREFIX,
+        )
+        and lcp_length <= len(V2V_PREFIX_INITIAL_COMMON_PREFIX)
     )
 
 
-def _estimate_forward_reroute_time_from_v2v_prefix(
-    current_edgeID: str,
-    vehInfo: "VehicleInfo",
-    agent: "Agent",
-    current_route: CurrentRouteEstimate,
-    alternative_route_tuple: tuple,
-    route_info: dict,
-    candidate_edgeID: str,
+def _validate_route_edge_sequence(
+    route_edges: tuple[str, ...],
     dprint: Callable[[str], None],
-) -> tuple[float, Optional[dict]]:
-    """
-    現在 route と代替 route の共通 prefix を使い、
-    現在位置から候補経路へ順方向に分岐した場合の推定所要時間を計算する。
+) -> bool:
+    """junction接続による事前検証。最終的な可否はsetRouteでも検証する。"""
+    if not route_edges:
+        return False
+    for from_edge, to_edge in zip(route_edges, route_edges[1:]):
+        try:
+            if (
+                traci.edge.getToJunction(from_edge)
+                != traci.edge.getFromJunction(to_edge)
+            ):
+                dprint(
+                    "route connection mismatch: "
+                    f"from={from_edge}, to={to_edge}"
+                )
+                return False
+        except Exception as exc:
+            dprint(
+                "route connection validation unavailable; "
+                f"from={from_edge}, to={to_edge}, error={exc}"
+            )
+            # 検証API失敗だけでは候補を捨てず、setRouteの例外捕捉へ委ねる。
+            return True
+    return True
 
-    重要:
-        - 現在 edge が共通 prefix 上にある場合だけ評価する。
-        - current_edgeID が分岐 edge と同じ場合、分岐 edge までの距離は 0 とする。
-        - 分岐後の代替 route 時間推定では、分岐 edge を含めない。
-        - SUMO setRoute 用 route は current_edgeID から始める。
-    """
 
-    def invalid(reason: str) -> tuple[float, None]:
-        dprint(f"skip V2V prefix candidate: {reason}")
-        return float("inf"), None
+def _time_from_current_to_divergence(
+    current_edge_id: str,
+    divergence_index: int,
+    current_route: CurrentRouteEstimate,
+    agent: "Agent",
+    dprint: Callable[[str], None],
+) -> tuple[float, float, tuple[str, ...]]:
+    current_index = current_route.current_edge_index
+    if (
+        current_index < 0
+        or current_index >= len(current_route.route_tuple)
+        or current_route.route_tuple[current_index] != current_edge_id
+    ):
+        return float("inf"), float("inf"), tuple()
 
+    if divergence_index < current_index:
+        return float("inf"), float("inf"), tuple()
+    if divergence_index == current_index:
+        return 0.0, 0.0, tuple()
+
+    edges = tuple(
+        current_route.route_tuple[current_index:divergence_index + 1]
+    )
+    current_remaining = _remaining_length_on_current_edge(
+        agent.get_vehID(),
+        current_edge_id,
+        dprint,
+    )
+    following_distance = _calculate_route_distance_from_edges(
+        tuple(edges[1:]),
+        dprint,
+    )
+    if not math.isfinite(current_remaining) or not math.isfinite(following_distance):
+        return float("inf"), float("inf"), edges
+
+    distance = current_remaining + following_distance
+    time_value = distance / current_route.current_speed
+    return time_value, distance, edges
+
+
+def _evaluate_forward_route(
+    *,
+    current_edge_id: str,
+    current_route: CurrentRouteEstimate,
+    alternative_route: tuple[str, ...],
+    route_info: dict,
+    candidate_shelter_id: str,
+    candidate_edge_id: str,
+    agent: "Agent",
+    dprint: Callable[[str], None],
+) -> Optional[CandidateEvaluation]:
+    if not alternative_route or alternative_route == current_route.route_tuple:
+        return None
+    if alternative_route[-1] != candidate_edge_id:
+        return None
+    if alternative_route[-1] == current_route.destination_edge_id:
+        return None
     if not current_route.route_tuple:
-        return invalid("current_route.route_tuple is empty")
+        return None
+    if not current_route.remaining_route_tuple:
+        return None
 
-    if not alternative_route_tuple:
-        return invalid("alternative_route_tuple is empty")
-
-    if alternative_route_tuple[-1] != candidate_edgeID:
-        return invalid(
-            "alternative route destination is not candidate edge: "
-            f"route_last_edge={alternative_route_tuple[-1]}, "
-            f"candidate_edgeID={candidate_edgeID}"
-        )
-
-    if alternative_route_tuple[-1] == current_route.destination_edge_id:
-        return invalid(
-            "alternative route destination is current destination: "
-            f"candidate_edgeID={candidate_edgeID}, "
-            f"current_destination_edge={current_route.destination_edge_id}"
-        )
-
-    if alternative_route_tuple == current_route.route_tuple:
-        return invalid(
-            "alternative route is exactly current route: "
-            f"alternative_route_tuple={alternative_route_tuple}"
-        )
-
-    if alternative_route_tuple[0] != current_route.route_tuple[0]:
-        return invalid(
-            "start edge differs: "
-            f"current_start_edge={current_route.route_tuple[0]}, "
-            f"alternative_start_edge={alternative_route_tuple[0]}, "
-            f"alternative_route_tuple={alternative_route_tuple}"
-        )
-
-    alternative_avg_time = route_info.get("avg_time")
-    if alternative_avg_time is None:
-        return invalid(
-            "avg_time is missing: "
-            f"alternative_route_tuple={alternative_route_tuple}"
-        )
-
-    if (not isinstance(alternative_avg_time, (int, float))) or _is_unusable_distance(float(alternative_avg_time)):
-        return invalid(
-            "avg_time is not positive finite value: "
-            f"alternative_avg_time={alternative_avg_time}"
-        )
+    current_family = _classify_v2v_route_family(current_route.route_tuple)
+    alternative_family = _classify_v2v_route_family(alternative_route)
+    if not current_family or current_family != alternative_family:
+        return None
+    if _has_only_initial_common_prefix(
+        current_route.route_tuple,
+        alternative_route,
+    ):
+        return None
 
     common_prefix_length = _longest_common_prefix_length(
         current_route.route_tuple,
-        alternative_route_tuple,
+        alternative_route,
     )
     if common_prefix_length <= 0:
-        return invalid(
-            "common prefix is empty: "
-            f"alternative_route_tuple={alternative_route_tuple}"
+        return None
+    common_prefix = tuple(alternative_route[:common_prefix_length])
+    if current_edge_id not in common_prefix:
+        return None
+
+    divergence_index = common_prefix_length - 1
+    current_index = current_route.current_edge_index
+    if (
+        current_index < 0
+        or current_index >= len(current_route.route_tuple)
+        or current_route.route_tuple[current_index] != current_edge_id
+    ):
+        return None
+    if divergence_index < current_index:
+        return None
+
+    route_edges_for_sumo = tuple(alternative_route[current_index:])
+
+    # 重要:
+    # route_tuple全体ではなく、現在位置から先の実走行予定経路と比較する。
+    # 通過済みprefixが異なるだけの「見かけ上の変更」を候補にしない。
+    if route_edges_for_sumo == current_route.remaining_route_tuple:
+        dprint(
+            "skip forward candidate because it equals current remaining route: "
+            f"current_edge={current_edge_id}, "
+            f"candidate_shelter={candidate_shelter_id}, "
+            f"candidate_edge={candidate_edge_id}, "
+            f"remaining_route={current_route.remaining_route_tuple}"
         )
+        return None
 
-    common_prefix = tuple(alternative_route_tuple[:common_prefix_length])
-    if current_edgeID not in common_prefix:
-        return invalid(
-            "current edge is not on common prefix: "
-            f"current_edgeID={current_edgeID}, "
-            f"common_prefix={common_prefix}"
-        )
+    if (
+        not route_edges_for_sumo
+        or route_edges_for_sumo[0] != current_edge_id
+        or route_edges_for_sumo[-1] != candidate_edge_id
+        or not _validate_route_edge_sequence(route_edges_for_sumo, dprint)
+    ):
+        return None
 
-    divergence_edge_index = common_prefix_length - 1
-    divergence_edge_id = alternative_route_tuple[divergence_edge_index]
-
-    try:
-        current_edge_index = current_route.route_tuple.index(current_edgeID)
-    except ValueError:
-        return invalid(
-            "current edge is not in current route: "
-            f"current_edgeID={current_edgeID}, "
-            f"current_route_tuple={current_route.route_tuple}"
-        )
-
-    if current_edge_index > divergence_edge_index:
-        return invalid(
-            "divergence edge is behind current edge: "
-            f"current_edge_index={current_edge_index}, "
-            f"divergence_edge_index={divergence_edge_index}, "
-            f"divergence_edge_id={divergence_edge_id}"
-        )
-
-    edges_from_current_to_divergence = _extract_edges_from_current_to_divergence(
-        current_route_tuple=current_route.route_tuple,
-        current_edgeID=current_edgeID,
-        divergence_edge_index=divergence_edge_index,
-        dprint=dprint,
-    )
-    if edges_from_current_to_divergence is None:
-        return float("inf"), None
-
-    if edges_from_current_to_divergence:
-        distance_from_current_to_divergence = _calculate_route_distance_from_edges(
-            tuple(edges_from_current_to_divergence),
-            dprint=dprint,
-        )
-        if _is_unusable_distance(distance_from_current_to_divergence):
-            return invalid(
-                "distance from current to divergence is unusable: "
-                f"edges_from_current_to_divergence={edges_from_current_to_divergence}, "
-                f"distance_from_current_to_divergence="
-                f"{distance_from_current_to_divergence}"
-            )
-    else:
-        distance_from_current_to_divergence = 0.0
-
-    current_speed = _get_current_speed(
-        current_edgeID=current_edgeID,
-        vehInfo=vehInfo,
+    (
+        time_to_divergence,
+        distance_to_divergence,
+        edges_to_divergence,
+    ) = _time_from_current_to_divergence(
+        current_edge_id=current_edge_id,
+        divergence_index=divergence_index,
+        current_route=current_route,
         agent=agent,
         dprint=dprint,
     )
-    if _is_unusable_distance(current_speed):
-        return invalid(f"current speed is unusable: current_speed={current_speed}")
+    if not math.isfinite(time_to_divergence) or time_to_divergence < 0.0:
+        return None
 
-    time_from_current_to_divergence = (
-        distance_from_current_to_divergence / current_speed
+    edges_after_divergence = tuple(
+        alternative_route[divergence_index + 1:]
     )
-    if _is_unusable_nonnegative_value(time_from_current_to_divergence):
-        return invalid(
-            "time from current to divergence is unusable: "
-            f"time_from_current_to_divergence="
-            f"{time_from_current_to_divergence}"
-        )
+    distance_after_divergence = _calculate_route_distance_from_edges(
+        edges_after_divergence,
+        dprint,
+    )
+    if not _is_valid_positive_time(distance_after_divergence):
+        return None
 
+    time_after_divergence_free_flow = (
+        distance_after_divergence / FREE_FLOW_SPEED
+    )
+    forward_free_flow_time = (
+        time_to_divergence + time_after_divergence_free_flow
+    )
+
+    alternative_avg_time = route_info.get("avg_time")
+    v2v_prefix_adjusted_time = float("inf")
+    v2v_time_after_divergence_raw = float("inf")
     alternative_total_distance = _calculate_route_distance_from_edges(
-        tuple(alternative_route_tuple),
-        dprint=dprint,
+        alternative_route,
+        dprint,
     )
-    if _is_unusable_distance(alternative_total_distance):
-        return invalid(
-            "alternative total distance is unusable: "
-            f"alternative_total_distance={alternative_total_distance}, "
-            f"alternative_route_tuple={alternative_route_tuple}"
+    if (
+        isinstance(alternative_avg_time, (int, float))
+        and _is_valid_positive_time(float(alternative_avg_time))
+        and _is_valid_positive_time(alternative_total_distance)
+    ):
+        v2v_time_after_divergence_raw = (
+            float(alternative_avg_time)
+            * distance_after_divergence
+            / alternative_total_distance
+        )
+        v2v_time_after_divergence = max(
+            v2v_time_after_divergence_raw,
+            time_after_divergence_free_flow,
+        )
+        v2v_prefix_adjusted_time = (
+            time_to_divergence + v2v_time_after_divergence
         )
 
-    # 時間推定用: divergence edge は含めない。
-    alternative_edges_after_divergence = tuple(
-        alternative_route_tuple[divergence_edge_index + 1:]
-    )
-    alternative_distance_after_divergence = _calculate_route_distance_from_edges(
-        alternative_edges_after_divergence,
-        dprint=dprint,
-    )
-    if _is_unusable_distance(alternative_distance_after_divergence):
-        return invalid(
-            "alternative distance after divergence is unusable: "
-            f"alternative_edges_after_divergence="
-            f"{alternative_edges_after_divergence}, "
-            f"alternative_distance_after_divergence="
-            f"{alternative_distance_after_divergence}"
-        )
+    if (
+        _is_valid_positive_time(v2v_prefix_adjusted_time)
+        and v2v_prefix_adjusted_time
+        < forward_free_flow_time - TIME_COMPARISON_EPSILON
+    ):
+        best_time = v2v_prefix_adjusted_time
+        best_source: CandidateSource = "v2v_prefix_adjusted"
+    else:
+        best_time = forward_free_flow_time
+        best_source = "forward_free_flow"
 
-    estimated_time_after_divergence_raw = (
-    alternative_avg_time
-    * alternative_distance_after_divergence
-    / alternative_total_distance
-    )
-
-    estimated_time_after_divergence, free_flow_time_after_divergence, was_clamped_by_free_flow = (
-        _apply_free_flow_lower_bound_to_v2v_time(
-            estimated_time_raw=estimated_time_after_divergence_raw,
-            distance=alternative_distance_after_divergence,
-            dprint=dprint,
-            context=(
-                f"candidate_edgeID={candidate_edgeID}, "
-                f"divergence_edge_id={divergence_edge_id}"
-            ),
-        )
-    )
-
-    if estimated_time_after_divergence == float("inf"):
-        dprint(
-            "skip V2V prefix candidate because estimated time after divergence "
-            "became invalid after free-flow lower-bound correction: "
-            f"estimated_time_after_divergence_raw="
-            f"{estimated_time_after_divergence_raw}, "
-            f"alternative_distance_after_divergence="
-            f"{alternative_distance_after_divergence}"
-        )
-        return float("inf"), None
-
-    forward_reroute_estimated_time = (
-        time_from_current_to_divergence
-        + estimated_time_after_divergence
-    )
-
-    # SUMO setRoute 用: current_edgeID から始める。
-    route_edges_for_sumo = tuple(alternative_route_tuple[current_edge_index:])
+    if not _is_valid_positive_time(best_time):
+        return None
 
     debug_info = {
-        "source": "v2v_prefix_adjusted",
-        "from_edgeID": current_edgeID,
-        "candidate_edgeID": candidate_edgeID,
-        "current_edgeID": current_edgeID,
-        "current_route_tuple": current_route.route_tuple,
-        "alternative_route_tuple": alternative_route_tuple,
-        "current_route_estimated_time": current_route.estimated_time,
-        "alternative_avg_time": float(alternative_avg_time),
-        "vehicles": route_info.get("vehicles"),
+        "source": best_source,
+        "current_route": current_route.route_tuple,
+        "current_remaining_route": current_route.remaining_route_tuple,
+        "current_route_index": current_route.current_edge_index,
+        "alternative_route": alternative_route,
+        "forward_route": route_edges_for_sumo,
+        "forward_route_valid": True,
+        "current_family": current_family,
+        "alternative_family": alternative_family,
         "common_prefix": common_prefix,
         "common_prefix_length": common_prefix_length,
-        "divergence_edge_index": divergence_edge_index,
-        "divergence_edge_id": divergence_edge_id,
-        "current_edge_index": current_edge_index,
-        "edges_from_current_to_divergence": edges_from_current_to_divergence,
-        "distance_from_current_to_divergence": distance_from_current_to_divergence,
-        "current_speed": current_speed,
-        "time_from_current_to_divergence": time_from_current_to_divergence,
-        "alternative_edges_after_divergence": alternative_edges_after_divergence,
+        "divergence_edge_index": divergence_index,
+        "divergence_edge_id": alternative_route[divergence_index],
+        "current_edge_index": current_index,
+        "edges_from_current_to_divergence": edges_to_divergence,
+        "distance_from_current_to_divergence": distance_to_divergence,
+        "time_from_current_to_divergence": time_to_divergence,
+        "alternative_edges_after_divergence": edges_after_divergence,
+        "alternative_distance_after_divergence": distance_after_divergence,
         "alternative_total_distance": alternative_total_distance,
-        "alternative_distance_after_divergence": alternative_distance_after_divergence,
-        "estimated_time_after_divergence": estimated_time_after_divergence,
-        "forward_reroute_estimated_time": forward_reroute_estimated_time,
-        "v2v_prefix_adjusted_time": forward_reroute_estimated_time,
+        "alternative_avg_time": alternative_avg_time,
+        "v2v_time_after_divergence_raw": v2v_time_after_divergence_raw,
+        "forward_free_flow_time": forward_free_flow_time,
+        "v2v_prefix_adjusted_time": v2v_prefix_adjusted_time,
         "route_edges_for_sumo": route_edges_for_sumo,
     }
-
-    dprint(
-        "V2V prefix candidate evaluated: "
-        f"candidate_edgeID={candidate_edgeID}, "
-        f"alternative_avg_time={float(alternative_avg_time):.3f}, "
-        f"common_prefix_length={common_prefix_length}, "
-        f"divergence_edge_index={divergence_edge_index}, "
-        f"divergence_edge_id={divergence_edge_id}, "
-        f"current_edge_index={current_edge_index}, "
-        f"edges_from_current_to_divergence={edges_from_current_to_divergence}, "
-        f"distance_from_current_to_divergence="
-        f"{distance_from_current_to_divergence:.3f}, "
-        f"current_speed={current_speed:.3f}, "
-        f"time_from_current_to_divergence="
-        f"{time_from_current_to_divergence:.3f}, "
-        f"alternative_edges_after_divergence="
-        f"{alternative_edges_after_divergence}, "
-        f"alternative_total_distance={alternative_total_distance:.3f}, "
-        f"alternative_distance_after_divergence="
-        f"{alternative_distance_after_divergence:.3f}, "
-        f"estimated_time_after_divergence="
-        f"{estimated_time_after_divergence:.3f}, "
-        f"forward_reroute_estimated_time="
-        f"{forward_reroute_estimated_time:.3f}, "
-        f"route_edges_for_sumo={route_edges_for_sumo}"
+    return CandidateEvaluation(
+        best_time=best_time,
+        shelter_id=candidate_shelter_id,
+        edge_id=candidate_edge_id,
+        from_edge_id=current_edge_id,
+        best_source=best_source,
+        maneuver_type="forward_reroute",
+        route_edges_for_sumo=route_edges_for_sumo,
+        time_forward_free_flow=forward_free_flow_time,
+        time_v2v_prefix_adjusted=v2v_prefix_adjusted_time,
+        time_u_turn=float("inf"),
+        best_debug_info=debug_info,
+        time_free_flow=forward_free_flow_time,
+        time_v2v_based=v2v_prefix_adjusted_time,
+        best_v2v_debug_info=(
+            debug_info if best_source == "v2v_prefix_adjusted" else None
+        ),
     )
 
-    return forward_reroute_estimated_time, debug_info
 
-
-def _estimate_best_v2v_prefix_adjusted_time(
-    current_edgeID: str,
-    vehInfo: "VehicleInfo",
-    agent: "Agent",
-    candidate_shelterID: str,
-    candidate_edgeID: str,
+def _evaluate_best_forward_candidate(
+    *,
+    current_edge_id: str,
     current_route: CurrentRouteEstimate,
-    routes_dict: dict,
-    dprint: Callable[[str], None],
-) -> tuple[float, Optional[dict]]:
-    """
-    routes_dict 内の V2V route を走査し，
-    現在 route と同じ経路系統に属し，かつ共通 prefix を持つ
-    代替 route の中から，最も短い prefix 補正済み推定時間を返す。
-
-    重要:
-        - E0 E1 E20 のような初期共通区間だけ一致する route は除外する。
-        - short_side 系と detour_side 系を混同しない。
-        - 例:
-            E0_E16_0 -> E0_E13_0 は評価対象
-            E0_E16_0 -> E0_E13_1 は除外
-            E0_E16_1 -> E0_E13_1 は評価対象
-            E0_E16_1 -> E0_E13_0 は除外
-    """
-    best_v2v_prefix_adjusted_time = float("inf")
-    best_v2v_prefix_adjusted_debug_info = None
-
-    if not routes_dict:
-        return best_v2v_prefix_adjusted_time, best_v2v_prefix_adjusted_debug_info
-
-    if not current_route.route_tuple:
-        dprint(
-            "skip V2V prefix search because current_route.route_tuple is empty"
-        )
-        return best_v2v_prefix_adjusted_time, best_v2v_prefix_adjusted_debug_info
-
-    current_route_family = _classify_v2v_route_family(current_route.route_tuple)
-
-    dprint(
-        "V2V prefix search start: "
-        f"current_edgeID={current_edgeID}, "
-        f"candidate_shelterID={candidate_shelterID}, "
-        f"candidate_edgeID={candidate_edgeID}, "
-        f"current_route_family={current_route_family}, "
-        f"current_route={current_route.route_tuple}"
-    )
-
-    for route_tuple, route_info in routes_dict.items():
-        alternative_route_tuple = tuple(route_tuple)
-
-        if not alternative_route_tuple:
-            continue
-
-        if alternative_route_tuple[-1] != candidate_edgeID:
-            continue
-
-        if alternative_route_tuple[-1] == current_route.destination_edge_id:
-            dprint(
-                f"candidate={candidate_shelterID}: "
-                "skip V2V prefix route because destination edge is current "
-                f"destination: route_last_edge={alternative_route_tuple[-1]}, "
-                f"current_destination_edge={current_route.destination_edge_id}, "
-                f"route={alternative_route_tuple}"
-            )
-            continue
-
-        if alternative_route_tuple == current_route.route_tuple:
-            dprint(
-                f"candidate={candidate_shelterID}: "
-                "skip V2V prefix route because it is exactly current route: "
-                f"route={alternative_route_tuple}"
-            )
-            continue
-
-        alternative_avg_time = route_info.get("avg_time")
-        if (
-            alternative_avg_time is None
-            or alternative_avg_time <= 0
-            or alternative_avg_time == float("inf")
-        ):
-            dprint(
-                f"candidate={candidate_shelterID}: "
-                "skip V2V prefix route because avg_time is invalid: "
-                f"avg_time={alternative_avg_time}, "
-                f"route={alternative_route_tuple}"
-            )
-            continue
-
-        if alternative_route_tuple[0] != current_route.route_tuple[0]:
-            dprint(
-                f"candidate={candidate_shelterID}: "
-                "skip V2V prefix route because start edge differs: "
-                f"current_start_edge={current_route.route_tuple[0]}, "
-                f"alternative_start_edge={alternative_route_tuple[0]}, "
-                f"route={alternative_route_tuple}"
-            )
-            continue
-
-        if _should_skip_v2v_prefix_by_initial_common_prefix(
-            current_route_tuple=current_route.route_tuple,
-            alternative_route_tuple=alternative_route_tuple,
-            candidate_shelterID=candidate_shelterID,
-            dprint=dprint,
-        ):
-            continue
-
-        if _should_skip_v2v_prefix_by_route_family(
-            current_route_tuple=current_route.route_tuple,
-            alternative_route_tuple=alternative_route_tuple,
-            candidate_shelterID=candidate_shelterID,
-            dprint=dprint,
-        ):
-            continue
-
-        forward_reroute_estimated_time, debug_info = (
-            _estimate_forward_reroute_time_from_v2v_prefix(
-                current_edgeID=current_edgeID,
-                vehInfo=vehInfo,
-                agent=agent,
-                current_route=current_route,
-                alternative_route_tuple=alternative_route_tuple,
-                route_info=route_info,
-                candidate_edgeID=candidate_edgeID,
-                dprint=dprint,
-            )
-        )
-
-        if forward_reroute_estimated_time < best_v2v_prefix_adjusted_time:
-            best_v2v_prefix_adjusted_time = forward_reroute_estimated_time
-            best_v2v_prefix_adjusted_debug_info = debug_info
-
-    return best_v2v_prefix_adjusted_time, best_v2v_prefix_adjusted_debug_info
-
-def _apply_free_flow_lower_bound_to_v2v_time(
-    estimated_time_raw: float,
-    distance: float,
-    dprint: Callable[[str], None],
-    context: str = "",
-) -> tuple[float, float, bool]:
-    """
-    V2V による推定時間が自由流時間より短くならないように下限補正する。
-
-    return:
-        adjusted_time:
-            自由流時間を下限として補正した推定時間
-
-        free_flow_time:
-            distance / FREE_FLOW_SPEED で求めた自由流時間
-
-        was_clamped:
-            補正が発生した場合 True
-    """
-    if FREE_FLOW_SPEED <= 0:
-        dprint(
-            "free-flow lower bound failed because FREE_FLOW_SPEED is invalid: "
-            f"FREE_FLOW_SPEED={FREE_FLOW_SPEED}, context={context}"
-        )
-        return float("inf"), float("inf"), False
-
-    if distance <= 0 or distance == float("inf"):
-        dprint(
-            "free-flow lower bound failed because distance is invalid: "
-            f"distance={distance}, context={context}"
-        )
-        return float("inf"), float("inf"), False
-
-    free_flow_time = distance / FREE_FLOW_SPEED
-
-    if estimated_time_raw < free_flow_time:
-        dprint(
-            "V2V estimated time was clamped by free-flow lower bound: "
-            f"context={context}, "
-            f"estimated_time_raw={estimated_time_raw:.3f}, "
-            f"free_flow_time={free_flow_time:.3f}, "
-            f"distance={distance:.3f}, "
-            f"FREE_FLOW_SPEED={FREE_FLOW_SPEED:.3f}"
-        )
-        return free_flow_time, free_flow_time, True
-
-    return estimated_time_raw, free_flow_time, False
-
-def _estimate_u_turn_reroute_time(
-    current_edgeID: str,
-    candidate_edgeID: str,
-    vehInfo: "VehicleInfo",
+    route_options: dict[tuple[str, ...], dict],
+    candidate_shelter_id: str,
+    candidate_edge_id: str,
     agent: "Agent",
     dprint: Callable[[str], None],
-) -> tuple[float, Optional[dict]]:
-    """
-    現在 edge の反対車線から候補避難地 edge へ向かう Uターン候補の推定時間を計算する。
+) -> Optional[CandidateEvaluation]:
+    candidates: list[CandidateEvaluation] = []
+    for route_tuple, route_info in route_options.items():
+        candidate = _evaluate_forward_route(
+            current_edge_id=current_edge_id,
+            current_route=current_route,
+            alternative_route=tuple(route_tuple),
+            route_info=route_info or {},
+            candidate_shelter_id=candidate_shelter_id,
+            candidate_edge_id=candidate_edge_id,
+            agent=agent,
+            dprint=dprint,
+        )
+        if candidate is not None:
+            candidates.append(candidate)
+    if not candidates:
+        return None
+    return _sort_candidates(candidates)[0]
 
-    return:
-        u_turn_estimated_time, debug_info
-    """
+
+def _evaluate_u_turn_candidate(
+    *,
+    current_edge_id: str,
+    candidate_shelter_id: str,
+    candidate_edge_id: str,
+    dprint: Callable[[str], None],
+) -> Optional[CandidateEvaluation]:
     try:
-        u_turn_start_edge_id = get_opposite_edgeID_by_edgeID(edgeID=current_edgeID)
+        u_turn_start_edge = get_opposite_edgeID_by_edgeID(
+            edgeID=current_edge_id
+        )
     except TypeError:
-        u_turn_start_edge_id = get_opposite_edgeID_by_edgeID(current_edgeID)
-
-    if not u_turn_start_edge_id:
-        dprint(
-            "skip U-turn candidate because opposite edge is empty: "
-            f"current_edgeID={current_edgeID}"
-        )
-        return float("inf"), None
+        u_turn_start_edge = get_opposite_edgeID_by_edgeID(current_edge_id)
+    if not u_turn_start_edge:
+        return None
 
     try:
-        u_turn_route = traci.simulation.findRoute(
-            u_turn_start_edge_id,
-            candidate_edgeID,
+        route = traci.simulation.findRoute(
+            u_turn_start_edge,
+            candidate_edge_id,
         )
-    except traci.TraCIException as e:
+    except Exception as exc:
         dprint(
-            "skip U-turn candidate because findRoute failed: "
-            f"u_turn_start_edge_id={u_turn_start_edge_id}, "
-            f"candidate_edgeID={candidate_edgeID}, error={e}"
+            "U-turn findRoute failed: "
+            f"from={u_turn_start_edge}, to={candidate_edge_id}, error={exc}"
         )
-        return float("inf"), None
+        return None
 
-    u_turn_route_edges = tuple(getattr(u_turn_route, "edges", tuple()))
-    if not u_turn_route_edges:
-        dprint(
-            "skip U-turn candidate because route edges are empty: "
-            f"u_turn_start_edge_id={u_turn_start_edge_id}, "
-            f"candidate_edgeID={candidate_edgeID}"
+    route_edges = tuple(getattr(route, "edges", tuple()))
+    if not route_edges:
+        return None
+    route_distance = float(getattr(route, "length", 0.0) or 0.0)
+    if not _is_valid_positive_time(route_distance):
+        route_distance = _calculate_route_distance_from_edges(
+            route_edges,
+            dprint,
         )
-        return float("inf"), None
+    if not _is_valid_positive_time(route_distance):
+        return None
 
-    u_turn_route_distance = _calculate_route_distance_from_edges(
-        u_turn_route_edges,
-        dprint=dprint,
-    )
-    if _is_unusable_distance(u_turn_route_distance):
-        dprint(
-            "skip U-turn candidate because distance is unusable: "
-            f"u_turn_route_edges={u_turn_route_edges}, "
-            f"u_turn_route_distance={u_turn_route_distance}"
-        )
-        return float("inf"), None
-
-    u_turn_estimated_time = u_turn_route_distance / FREE_FLOW_SPEED
+    u_turn_time = route_distance / FREE_FLOW_SPEED
+    if not _is_valid_positive_time(u_turn_time):
+        return None
 
     debug_info = {
         "source": "u_turn",
-        "from_edgeID": u_turn_start_edge_id,
-        "candidate_edgeID": candidate_edgeID,
-        "u_turn_start_edge_id": u_turn_start_edge_id,
-        "u_turn_route_edges": u_turn_route_edges,
-        "u_turn_route_distance": u_turn_route_distance,
-        "u_turn_estimated_time": u_turn_estimated_time,
+        "u_turn_start_edge": u_turn_start_edge,
+        "u_turn_route": route_edges,
+        "u_turn_route_distance": route_distance,
+        "u_turn_time": u_turn_time,
     }
-
-    dprint(
-        "U-turn candidate evaluated: "
-        f"u_turn_start_edge_id={u_turn_start_edge_id}, "
-        f"candidate_edgeID={candidate_edgeID}, "
-        f"u_turn_route_edges={u_turn_route_edges}, "
-        f"u_turn_route_distance={u_turn_route_distance:.3f}, "
-        f"u_turn_estimated_time={u_turn_estimated_time:.3f}"
-    )
-
-    return u_turn_estimated_time, debug_info
-
-def _estimate_best_v2v_time(
-    agent: "Agent",
-    candidate_shelterID: str,
-    candidate_edgeID: str,
-    candidate_shelter: "Shelter",
-    from_edgeID: str,
-    current_route: CurrentRouteEstimate,
-    routes_dict: dict,
-    approach_edgeIDs_by_start_edgeID: dict,
-    dprint: Callable[[str], None],
-) -> tuple[float, Optional[dict]]:
-    time_v2v_based = float("inf")
-    best_v2v_debug_info = None
-
-    if not routes_dict:
-        return time_v2v_based, best_v2v_debug_info
-
-    for route_tuple, route_info in routes_dict.items():
-        # 候補避難所につながる edge で終わる経路だけを見る
-        if route_tuple[-1] != candidate_edgeID:
-            continue
-
-        # 現在目的地 edge に向かう V2V 経路は代替候補から除外する
-        if route_tuple[-1] == current_route.destination_edge_id:
-            dprint(
-                f"candidate={candidate_shelterID}: "
-                "skip V2V route because destination edge is current destination. "
-                f"route_last_edge={route_tuple[-1]}, "
-                f"current_destination_edge={current_route.destination_edge_id}, "
-                f"route={route_tuple}"
-            )
-            continue
-
-        # 現在経路そのものは迂回候補から除外
-        if route_tuple == current_route.route_tuple:
-            dprint(
-                f"candidate={candidate_shelterID}: "
-                "skip V2V route because it is exactly current route: "
-                f"route={route_tuple}"
-            )
-            continue
-
-        v2v_avg_time = route_info.get("avg_time")
-        if v2v_avg_time is None:
-            dprint(
-                f"candidate={candidate_shelterID}: "
-                f"skip V2V route because avg_time is missing: {route_tuple}"
-            )
-            continue
-
-        branch_target_edge = _get_v2v_branch_target_edge(
-            current_route_tuple=current_route.route_tuple,
-            route_tuple=route_tuple,
-            candidate_shelterID=candidate_shelterID,
-            dprint=dprint,
-        )
-
-        if branch_target_edge is None:
-            continue
-
-        distance_to_branch = _safe_calculate_reroute_distance(
-            vehID=agent.get_vehID(),
-            from_edgeID=from_edgeID,
-            to_edgeID=branch_target_edge,
-            shelter=candidate_shelter,
-            approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID,
-            dprint=dprint,
-        )
-        time_to_branch = distance_to_branch / FREE_FLOW_SPEED
-
-        # 既存実装の近似を踏襲:
-        # 現在地から分岐先までは自由速度で補い，その先に V2V の avg_time を足す。
-        calculated_time = time_to_branch + v2v_avg_time
-
-        dprint(
-            f"candidate={candidate_shelterID}: V2V route matched. "
-            f"from_edgeID={from_edgeID}, "
-            f"route_last_edge={route_tuple[-1]}, "
-            f"branch_target_edge={branch_target_edge}, "
-            f"distance_to_branch={distance_to_branch:.3f}, "
-            f"time_to_branch={time_to_branch:.3f}, "
-            f"v2v_avg_time={v2v_avg_time:.3f}, "
-            f"calculated_time={calculated_time:.3f}, "
-            f"vehicles={route_info.get('vehicles')}"
-        )
-
-        if calculated_time < time_v2v_based:
-            time_v2v_based = calculated_time
-            best_v2v_debug_info = {
-                "route_tuple": route_tuple,
-                "from_edgeID": from_edgeID,
-                "branch_target_edge": branch_target_edge,
-                "distance_to_branch": distance_to_branch,
-                "time_to_branch": time_to_branch,
-                "v2v_avg_time": v2v_avg_time,
-                "calculated_time": calculated_time,
-                "vehicles": route_info.get("vehicles"),
-            }
-
-    return time_v2v_based, best_v2v_debug_info
-
-
-def _evaluate_candidate_from_start_edge(
-    current_edgeID: str,
-    agent: "Agent",
-    vehInfo: "VehicleInfo",
-    current_route: CurrentRouteEstimate,
-    candidate_shelterID: str,
-    candidate_edgeID: str,
-    candidate_shelter: "Shelter",
-    from_edgeID: str,
-    routes_dict: dict,
-    approach_edgeIDs_by_start_edgeID: dict,
-    dprint: Callable[[str], None],
-) -> CandidateEvaluation:
-    
-    # Uターンではなく、経路を変更する
-    distance_free_flow, time_free_flow = _estimate_free_flow_time(
-        agent=agent,
-        from_edgeID=from_edgeID,
-        to_edgeID=candidate_edgeID,
-        shelter=candidate_shelter,
-        approach_edgeIDs_by_start_edgeID=approach_edgeIDs_by_start_edgeID,
-        dprint=dprint,
-    )
-
-    free_flow_debug_info = {
-        "source": "free_flow",
-        "from_edgeID": from_edgeID,
-        "candidate_edgeID": candidate_edgeID,
-        "distance_free_flow": distance_free_flow,
-        "time_free_flow": time_free_flow,
-    }
-
-    dprint(
-        f"candidate={candidate_shelterID}: "
-        f"from_edgeID={from_edgeID}, "
-        f"free_flow distance={distance_free_flow:.3f}, "
-        f"time_free_flow={time_free_flow:.3f}"
-    )
-
-    time_v2v_prefix_adjusted, best_v2v_prefix_adjusted_debug_info = (
-        _estimate_best_v2v_prefix_adjusted_time(
-            current_edgeID=current_edgeID,
-            vehInfo=vehInfo,
-            agent=agent,
-            candidate_shelterID=candidate_shelterID,
-            candidate_edgeID=candidate_edgeID,
-            current_route=current_route,
-            routes_dict=routes_dict,
-            dprint=dprint,
-        )
-    )
-
-    if time_v2v_prefix_adjusted == float("inf"):
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            "no usable V2V prefix-adjusted route."
-        )
-    else:
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            f"time_v2v_prefix_adjusted={time_v2v_prefix_adjusted:.3f}, "
-            f"best_v2v_prefix_adjusted_debug_info="
-            f"{best_v2v_prefix_adjusted_debug_info}"
-        )
-
-    time_u_turn, u_turn_debug_info = _estimate_u_turn_reroute_time(
-        current_edgeID=current_edgeID,
-        candidate_edgeID=candidate_edgeID,
-        vehInfo=vehInfo,
-        agent=agent,
-        dprint=dprint,
-    )
-
-    if time_u_turn == float("inf"):
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            "no usable U-turn route."
-        )
-    else:
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            f"time_u_turn={time_u_turn:.3f}, "
-            f"u_turn_debug_info={u_turn_debug_info}"
-        )
-
-    # print(f"time_free_flow: {time_free_flow}, time_v2v_prefix_adjusted: {time_v2v_prefix_adjusted}, time_u_turn: {time_u_turn}")
-    best_time = min(
-        time_free_flow,
-        time_v2v_prefix_adjusted,
-        time_u_turn,
-    )
-
-    if (
-        best_time == time_v2v_prefix_adjusted
-        and best_v2v_prefix_adjusted_debug_info is not None
-    ):
-        best_source = "v2v_prefix_adjusted"
-        best_debug_info = best_v2v_prefix_adjusted_debug_info
-    elif best_time == time_u_turn and u_turn_debug_info is not None:
-        best_source = "u_turn"
-        best_debug_info = u_turn_debug_info
-    else:
-        best_source = "free_flow"
-        best_debug_info = free_flow_debug_info
-
-    best_from_edge_id = best_debug_info.get("from_edgeID", from_edgeID)
-
-    dprint(
-        f"candidate={candidate_shelterID}: "
-        f"time_free_flow={time_free_flow:.3f}, "
-        f"time_v2v_prefix_adjusted={time_v2v_prefix_adjusted:.3f}, "
-        f"time_u_turn={time_u_turn:.3f}, "
-        f"best_source={best_source}, "
-        f"best_time={best_time:.3f}, "
-        f"best_debug_info={best_debug_info}"
-    )
-
     return CandidateEvaluation(
-        best_time=best_time,
-        shelter_id=candidate_shelterID,
-        edge_id=candidate_edgeID,
-        from_edge_id=best_from_edge_id,
-        best_source=best_source,
-        time_free_flow=time_free_flow,
-        time_v2v_based=time_v2v_prefix_adjusted,
-        best_v2v_debug_info=best_v2v_prefix_adjusted_debug_info,
-        time_v2v_prefix_adjusted=time_v2v_prefix_adjusted,
-        time_u_turn=time_u_turn,
-        best_debug_info=best_debug_info,
+        best_time=u_turn_time,
+        shelter_id=candidate_shelter_id,
+        edge_id=candidate_edge_id,
+        from_edge_id=u_turn_start_edge,
+        best_source="u_turn",
+        maneuver_type="uturn",
+        route_edges_for_sumo=tuple(),
+        time_forward_free_flow=float("inf"),
+        time_v2v_prefix_adjusted=float("inf"),
+        time_u_turn=u_turn_time,
+        best_debug_info=debug_info,
+        time_free_flow=float("inf"),
+        time_v2v_based=float("inf"),
+        best_v2v_debug_info=None,
     )
 
 
-def _evaluate_candidate(
-    current_edgeID: str,
-    agent: "Agent",
-    vehInfo: "VehicleInfo",
-    current_route: CurrentRouteEstimate,
-    candidate_shelterID: str,
-    candidate_edgeID: str,
-    shelter_list: list,
-    route_name: str,
-    current_group: str,
-    reroute_start_context: RerouteStartContext,
-    routes_dict: dict,
-    dprint: Callable[[str], None],
-) -> Optional[CandidateEvaluation]:
-    dprint(
-        f"current_edgeID={current_edgeID}, "
-        f"current_route.route_tuple={current_route.route_tuple}, "
-        f"current_route.destination_edge_id={current_route.destination_edge_id}, "
-        f"current_target_shelterID={current_route.target_shelter_id}, "
-        f"candidate_shelterID={candidate_shelterID}, "
-        f"candidate_edgeID={candidate_edgeID}"
+def _candidate_compare(
+    left: CandidateEvaluation,
+    right: CandidateEvaluation,
+) -> int:
+    delta = left.best_time - right.best_time
+    if abs(delta) > TIME_COMPARISON_EPSILON:
+        return -1 if delta < 0 else 1
+
+    maneuver_priority = {
+        "forward_reroute": 0,
+        "uturn": 1,
+    }
+    left_key = (
+        maneuver_priority[left.maneuver_type],
+        left.shelter_id,
+        left.edge_id,
+        left.best_source,
+        left.route_edges_for_sumo,
     )
-
-    if _should_skip_candidate(
-        candidate_shelterID=candidate_shelterID,
-        candidate_edgeID=candidate_edgeID,
-        current_route=current_route,
-        dprint=dprint,
-    ):
-        return None
-
-    candidate_shelter = _resolve_candidate_shelter(
-        candidate_shelterID=candidate_shelterID,
-        candidate_edgeID=candidate_edgeID,
-        shelter_list=shelter_list,
-        dprint=dprint,
+    right_key = (
+        maneuver_priority[right.maneuver_type],
+        right.shelter_id,
+        right.edge_id,
+        right.best_source,
+        right.route_edges_for_sumo,
     )
-    if candidate_shelter is None:
-        return None
+    return (left_key > right_key) - (left_key < right_key)
 
-    candidate_group = _get_shelter_group(candidate_shelterID)
 
-    base_start_edge_for_candidate = _select_base_start_edge_for_candidate(
-        current_edgeID=current_edgeID,
-        base_reroute_start_edgeID=reroute_start_context.base_reroute_start_edgeID,
-        route_name=route_name,
-        current_group=current_group,
-        candidate_group=candidate_group,
-    )
+def _sort_candidates(
+    candidates: list[CandidateEvaluation],
+) -> list[CandidateEvaluation]:
+    from functools import cmp_to_key
 
-    start_edge_options = _get_start_edge_options_for_candidate(
-        current_edgeID=current_edgeID,
-        base_start_edge_for_candidate=base_start_edge_for_candidate,
-    )
-
-    dprint(
-        f"candidate start: shelter={candidate_shelterID}, "
-        f"candidate_edgeID={candidate_edgeID}, "
-        f"candidate_group={candidate_group}, "
-        f"start_edge_options={start_edge_options}"
-    )
-
-    evaluations = [
-        _evaluate_candidate_from_start_edge(
-            current_edgeID=current_edgeID,
-            agent=agent,
-            vehInfo=vehInfo,
-            current_route=current_route,
-            candidate_shelterID=candidate_shelterID,
-            candidate_edgeID=candidate_edgeID,
-            candidate_shelter=candidate_shelter,
-            from_edgeID=from_edgeID,
-            routes_dict=routes_dict,
-            approach_edgeIDs_by_start_edgeID=(
-                reroute_start_context.approach_edgeIDs_by_start_edgeID
-            ),
-            dprint=dprint,
-        )
-        for from_edgeID in start_edge_options
+    usable = [
+        candidate
+        for candidate in candidates
+        if _is_valid_positive_time(candidate.best_time)
     ]
+    return sorted(usable, key=cmp_to_key(_candidate_compare))
 
-    if not evaluations:
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            "no start edge options. skip candidate."
-        )
-        return None
-    # print(f"evaluations for candidate_shelterID={candidate_shelterID}, candidate_edgeID={candidate_edgeID}: {evaluations}")
-    best_evaluation = min(evaluations, key=lambda item: item.best_time)
 
-    dprint(
-        f"candidate result: shelter={best_evaluation.shelter_id}, "
-        f"candidate_edgeID={best_evaluation.edge_id}, "
-        f"from_edgeID={best_evaluation.from_edge_id}, "
-        f"best_time={best_evaluation.best_time:.3f}, "
-        f"best_source={best_evaluation.best_source}, "
-        f"best_debug_info={best_evaluation.best_debug_info}"
+def _is_same_forward_candidate_as_current_route(
+    *,
+    candidate: CandidateEvaluation,
+    current_route: CurrentRouteEstimate,
+) -> bool:
+    """現在位置から先の経路が完全一致するforward候補かを判定する。"""
+    return (
+        candidate.maneuver_type == "forward_reroute"
+        and bool(candidate.route_edges_for_sumo)
+        and candidate.route_edges_for_sumo
+        == current_route.remaining_route_tuple
     )
-
-    return best_evaluation
 
 
 def _evaluate_all_candidates(
-    current_edgeID: str,
+    *,
+    current_edge_id: str,
     agent: "Agent",
-    vehInfo: "VehicleInfo",
     current_route: CurrentRouteEstimate,
-    shelter_list: list,
-    reroute_start_context: RerouteStartContext,
-    routes_dict: dict,
+    route_options: dict[tuple[str, ...], dict],
     dprint: Callable[[str], None],
 ) -> list[CandidateEvaluation]:
-    route_name = _get_current_route_name(current_edgeID=current_edgeID, vehInfo=vehInfo)
-    current_group = _get_shelter_group(current_route.target_shelter_id)
+    results: list[CandidateEvaluation] = []
+    candidate_map = agent.get_candidate_edge_by_shelterID() or {}
 
-    dprint(
-        f"route_name={route_name}, "
-        f"current_group={current_group}, "
-        f"candidate_shelters={list(agent.get_candidate_edge_by_shelterID().keys())}"
-    )
-    # 出発地が同じで、routeが一部同じものに関しては、その差分で、交差点から避難地のまでの差分がわかる
-    # 現在のedge_IDからrouteが異なるところまでお
-    candidate_results = []
+    for candidate_shelter_id, candidate_edge_id in candidate_map.items():
+        if candidate_shelter_id == current_route.target_shelter_id:
+            continue
+        if candidate_edge_id == current_route.destination_edge_id:
+            continue
+        if not candidate_edge_id:
+            continue
 
-    for candidate_shelterID, candidate_edgeID in (
-        agent.get_candidate_edge_by_shelterID().items()
-    ):
-        evaluation = _evaluate_candidate(
-            current_edgeID=current_edgeID,
-            agent=agent,
-            vehInfo=vehInfo,
+        forward = _evaluate_best_forward_candidate(
+            current_edge_id=current_edge_id,
             current_route=current_route,
-            candidate_shelterID=candidate_shelterID,
-            candidate_edgeID=candidate_edgeID,
-            shelter_list=shelter_list,
-            route_name=route_name,
-            current_group=current_group,
-            reroute_start_context=reroute_start_context,
-            routes_dict=routes_dict,
+            route_options=route_options,
+            candidate_shelter_id=candidate_shelter_id,
+            candidate_edge_id=candidate_edge_id,
+            agent=agent,
             dprint=dprint,
         )
+        if forward is not None:
+            if _is_same_forward_candidate_as_current_route(
+                candidate=forward,
+                current_route=current_route,
+            ):
+                dprint(
+                    "discard forward candidate equal to current remaining route: "
+                    f"shelter={forward.shelter_id}, "
+                    f"edge={forward.edge_id}, "
+                    f"route={forward.route_edges_for_sumo}"
+                )
+            else:
+                results.append(forward)
 
-        if evaluation is not None:
-            candidate_results.append(evaluation)
-
-    candidate_results = [
-        item for item in candidate_results
-        if item.edge_id != current_route.destination_edge_id
-    ]
-    candidate_results.sort(key=lambda item: item.best_time)
-
-    dprint(f"candidate_results_list={candidate_results}")
-    dprint(f"to_edge_list={[item.edge_id for item in candidate_results]}")
-
-    return candidate_results
-
-
-def _apply_approach_edge_route_if_needed(
-    agent: "Agent",
-    from_edgeID: str,
-    to_edgeID: str,
-    dprint: Callable[[str], None],
-    route_edges_for_sumo: tuple = tuple(),
-) -> None:
-    dprint("approach edge: apply best route directly with traci.vehicle.setRoute")
-
-    if route_edges_for_sumo:
-        dprint(
-            "apply route_edges_for_sumo from best candidate debug info: "
-            f"route_edges_for_sumo={route_edges_for_sumo}"
+        u_turn = _evaluate_u_turn_candidate(
+            current_edge_id=current_edge_id,
+            candidate_shelter_id=candidate_shelter_id,
+            candidate_edge_id=candidate_edge_id,
+            dprint=dprint,
         )
-        traci.vehicle.setRoute(agent.get_vehID(), list(route_edges_for_sumo))
+        if u_turn is not None:
+            results.append(u_turn)
+
+    return _sort_candidates(results)
+
+
+def _debug_route_maneuver_comparison(
+    *,
+    debug: bool,
+    logical_vehicle_id: str,
+    current_edge_id: str,
+    current_route: CurrentRouteEstimate,
+    corridor_family: Optional[str],
+    candidates: list[CandidateEvaluation],
+    selected: Optional[CandidateEvaluation],
+    time_gain: float,
+    threshold: float,
+) -> None:
+    if not debug:
         return
 
-    route = traci.simulation.findRoute(from_edgeID, to_edgeID)
-    if route.edges:
-        traci.vehicle.setRoute(agent.get_vehID(), route.edges)
+    selected_edge = selected.edge_id if selected else ""
+    same_destination = [
+        candidate
+        for candidate in candidates
+        if candidate.edge_id == selected_edge
+    ]
+    forward = next(
+        (
+            candidate
+            for candidate in same_destination
+            if candidate.maneuver_type == "forward_reroute"
+        ),
+        None,
+    )
+    u_turn = next(
+        (
+            candidate
+            for candidate in same_destination
+            if candidate.maneuver_type == "uturn"
+        ),
+        None,
+    )
+
+    try:
+        current_time = float(traci.simulation.getTime())
+    except Exception:
+        current_time = float("nan")
+
+    forward_debug = forward.best_debug_info if forward else {}
+    u_turn_debug = u_turn.best_debug_info if u_turn else {}
+    payload = {
+        "vehID": logical_vehicle_id,
+        "logical_vehicle_id": logical_vehicle_id,
+        "current_time": current_time,
+        "current_edgeID": current_edge_id,
+        "corridor_family": corridor_family,
+        "current_route": current_route.route_tuple,
+        "current_remaining_route": current_route.remaining_route_tuple,
+        "current_route_index": current_route.current_edge_index,
+        "current_destination_edge": current_route.destination_edge_id,
+        "current_route_estimated_time": current_route.estimated_time,
+        "candidate_shelter_id": selected.shelter_id if selected else "",
+        "candidate_edge_id": selected_edge,
+        "forward_route": (
+            forward.route_edges_for_sumo if forward else tuple()
+        ),
+        "forward_route_valid": forward is not None,
+        "forward_free_flow_time": (
+            forward.time_forward_free_flow if forward else float("inf")
+        ),
+        "v2v_prefix_adjusted_time": (
+            forward.time_v2v_prefix_adjusted if forward else float("inf")
+        ),
+        "u_turn_start_edge": u_turn_debug.get("u_turn_start_edge", ""),
+        "u_turn_route": u_turn_debug.get("u_turn_route", tuple()),
+        "u_turn_time": u_turn.time_u_turn if u_turn else float("inf"),
+        "selected_source": selected.best_source if selected else "",
+        "selected_maneuver_type": (
+            selected.maneuver_type if selected else ""
+        ),
+        "selected_time": selected.best_time if selected else float("inf"),
+        "time_gain": time_gain,
+        "route_change_threshold": threshold,
+        "route_edges_for_sumo": (
+            selected.route_edges_for_sumo if selected else tuple()
+        ),
+        "forward_debug": forward_debug,
+    }
+    print("[ROUTE_MANEUVER_COMPARISON]", payload)
 
 
-# def _build_final_decision(
-#     agent: "Agent",
-#     estimated_current_route_time: float,
-#     candidate_results: list[CandidateEvaluation],
-#     base_reroute_start_edgeID: str,
-#     approach_edge_flg: bool,
-#     dprint: Callable[[str], None],
-# ) -> tuple:
-#     shelterID = ""
-#     congestion_flg = False
-
-#     if not candidate_results:
-#         dprint("no candidate results. keep current route.")
-#         return base_reroute_start_edgeID, shelterID, [], 0.0, congestion_flg
-
-#     best_candidate = candidate_results[0]
-#     time_gain = estimated_current_route_time - best_candidate.best_time
-#     threshold = agent.get_route_change_threshold()
-
-#     dprint(
-#         f"final decision: estimated_current_time={estimated_current_route_time:.3f}, "
-#         f"best_candidate_time={best_candidate.best_time:.3f}, "
-#         f"time_gain={time_gain:.3f}, "
-#         f"threshold={threshold:.3f}, "
-#         f"best_candidate={best_candidate}"
-#     )
-
-#     if time_gain > threshold:
-#         congestion_flg = True
-
-#         if not approach_edge_flg:
-#             return (
-#                 best_candidate.from_edge_id,
-#                 best_candidate.shelter_id,
-#                 [best_candidate.edge_id],
-#                 time_gain,
-#                 congestion_flg,
-#             )
-
-#         route_edges_for_sumo = tuple()
-#         if best_candidate.best_debug_info:
-#             route_edges_for_sumo = tuple(
-#                 best_candidate.best_debug_info.get("route_edges_for_sumo", tuple())
-#             )
-
-#         _apply_approach_edge_route_if_needed(
-#             agent=agent,
-#             from_edgeID=best_candidate.from_edge_id,
-#             to_edgeID=best_candidate.edge_id,
-#             dprint=dprint,
-#             route_edges_for_sumo=route_edges_for_sumo,
-#         )
-#         return (
-#             best_candidate.from_edge_id,
-#             best_candidate.shelter_id,
-#             [],
-#             time_gain,
-#             congestion_flg,
-#         )
-
-#     to_edge_list = [item.edge_id for item in candidate_results]
-#     print(f"Check base_reroute_start_edgeID={base_reroute_start_edgeID}, shelterID={shelterID}, to_edge_list={to_edge_list}, time_gain={time_gain:.3f}, congestion_flg={congestion_flg}")
-
-#     return base_reroute_start_edgeID, shelterID, to_edge_list, time_gain, congestion_flg
-def _build_final_decision(
+def evaluate_route_maneuver_decision(
+    current_edgeID: str,
+    vehInfo: "VehicleInfo",
     agent: "Agent",
-    estimated_current_route_time: float,
-    candidate_results: list[CandidateEvaluation],
-    base_reroute_start_edgeID: str,
-    approach_edge_flg: bool,
-    dprint: Callable[[str], None],
-) -> tuple[str, str, list[str], float, bool, tuple[str, ...]]:
+    shelter: "Shelter",
+    shelter_list: list,
+    custome_edge_list: list,
+    *,
+    apply_normalcy_threshold: bool,
+    debug: bool = False,
+    logical_vehicle_id: Optional[str] = None,
+) -> RouteManeuverDecision:
     """
-    Returns:
-        from_edgeID
-        shelterID
-        to_edge_list
-        time_gain
-        congestion_flg
-        route_edges_for_sumo
+    順方向変更とUターンを同じ秒単位で評価する。
 
-    route_edges_for_sumo は、現在edgeから目的地edgeまでの
-    SUMOに直接渡せる残り経路を表す。
+    apply_normalcy_threshold=True:
+        time_gain > 個人閾値の場合だけapproved。
+
+    apply_normalcy_threshold=False:
+        同調性ですでに変更意思が成立しているため、最短の実行可能候補を
+        thresholdなしでapprovedとする。
     """
-    shelterID = ""
-    congestion_flg = False
-    route_edges_for_sumo: tuple[str, ...] = tuple()
+    del shelter_list, custome_edge_list  # 既存シグネチャ互換
+    dprint = _make_dprint(debug)
+    logical_id = logical_vehicle_id or agent.get_vehID()
 
-    if not candidate_results:
-        dprint("no candidate results. keep current route.")
-        return (
-            base_reroute_start_edgeID,
-            shelterID,
-            [],
-            0.0,
-            congestion_flg,
-            route_edges_for_sumo,
+    empty_current_route = CurrentRouteEstimate(
+        target_shelter_id=agent.get_target_shelter(),
+        route_tuple=tuple(),
+        destination_edge_id="",
+        estimated_time=float("inf"),
+        remaining_route_tuple=tuple(),
+        current_edge_index=-1,
+    )
+    if _is_internal_junction_edge(current_edgeID):
+        return RouteManeuverDecision(
+            current_route=empty_current_route,
+            best_candidate=None,
+            candidate_results=tuple(),
+            time_gain=0.0,
+            route_change_threshold=agent.get_route_change_threshold(),
+            threshold_exceeded=False,
+            apply_normalcy_threshold=apply_normalcy_threshold,
+            corridor_family=None,
         )
 
-    best_candidate = candidate_results[0]
-    time_gain = estimated_current_route_time - best_candidate.best_time
-    threshold = agent.get_route_change_threshold()
-
-    if best_candidate.best_debug_info:
-        route_edges_for_sumo = tuple(
-            best_candidate.best_debug_info.get("route_edges_for_sumo", tuple())
+    current_route = _estimate_current_route_time(
+        current_edge_id=current_edgeID,
+        veh_info=vehInfo,
+        agent=agent,
+        shelter=shelter,
+        dprint=dprint,
+    )
+    reroute_context = _build_reroute_start_context(
+        current_edge_id=current_edgeID,
+        veh_info=vehInfo,
+        dprint=dprint,
+    )
+    if reroute_context.should_return_without_calculation:
+        return RouteManeuverDecision(
+            current_route=current_route,
+            best_candidate=None,
+            candidate_results=tuple(),
+            time_gain=0.0,
+            route_change_threshold=agent.get_route_change_threshold(),
+            threshold_exceeded=False,
+            apply_normalcy_threshold=apply_normalcy_threshold,
+            corridor_family=classify_corridor(current_edgeID),
         )
 
-    dprint(
-        f"final decision: estimated_current_time={estimated_current_route_time:.3f}, "
-        f"best_candidate_time={best_candidate.best_time:.3f}, "
-        f"time_gain={time_gain:.3f}, "
-        f"threshold={threshold:.3f}, "
-        f"best_candidate_from={best_candidate.from_edge_id}, "
-        f"best_candidate_to={best_candidate.edge_id}, "
-        f"route_edges_for_sumo={route_edges_for_sumo}, "
-        f"best_candidate={best_candidate}"
+    v2v_routes = _merge_v2v_routes(vehInfo, dprint)
+    route_options = _collect_route_options(v2v_routes, dprint)
+    candidates = _evaluate_all_candidates(
+        current_edge_id=current_edgeID,
+        agent=agent,
+        current_route=current_route,
+        route_options=route_options,
+        dprint=dprint,
     )
 
-    if time_gain > threshold:
-        congestion_flg = True
-
-        return (
-            best_candidate.from_edge_id,
-            best_candidate.shelter_id,
-            [best_candidate.edge_id],
-            time_gain,
-            congestion_flg,
-            route_edges_for_sumo,
+    # 最終防御:
+    # 下位関数の変更や外部候補生成があっても、現在の残り経路と同一の
+    # forward_rerouteを最終選択へ進めない。
+    candidate_count_before_same_route_filter = len(candidates)
+    candidates = [
+        candidate
+        for candidate in candidates
+        if not _is_same_forward_candidate_as_current_route(
+            candidate=candidate,
+            current_route=current_route,
+        )
+    ]
+    removed_same_route_count = (
+        candidate_count_before_same_route_filter - len(candidates)
+    )
+    if removed_same_route_count > 0:
+        dprint(
+            "removed candidates equal to current remaining route: "
+            f"count={removed_same_route_count}, "
+            f"remaining_route={current_route.remaining_route_tuple}"
         )
 
-    to_edge_list = [item.edge_id for item in candidate_results]
+    candidates = _sort_candidates(candidates)
 
-    dprint(
-        f"route change rejected by threshold: "
-        f"base_reroute_start_edgeID={base_reroute_start_edgeID}, "
-        f"candidate_from_edgeID={best_candidate.from_edge_id}, "
-        f"shelterID={best_candidate.shelter_id}, "
-        f"to_edge_list={to_edge_list}, "
-        f"time_gain={time_gain:.3f}, "
-        f"threshold={threshold:.3f}, "
-        f"congestion_flg={congestion_flg}, "
-        f"route_edges_for_sumo={route_edges_for_sumo}"
+    best_candidate = candidates[0] if candidates else None
+    if (
+        best_candidate is not None
+        and math.isfinite(current_route.estimated_time)
+    ):
+        time_gain = current_route.estimated_time - best_candidate.best_time
+    else:
+        time_gain = 0.0
+
+    threshold = float(agent.get_route_change_threshold())
+    threshold_exceeded = bool(
+        best_candidate is not None
+        and math.isfinite(time_gain)
+        and time_gain > threshold
+    )
+    corridor_family = classify_corridor(current_edgeID)
+
+    _debug_route_maneuver_comparison(
+        debug=debug,
+        logical_vehicle_id=logical_id,
+        current_edge_id=current_edgeID,
+        current_route=current_route,
+        corridor_family=corridor_family,
+        candidates=candidates,
+        selected=best_candidate,
+        time_gain=time_gain,
+        threshold=threshold,
     )
 
-    return (
-        base_reroute_start_edgeID,
-        shelterID,
-        to_edge_list,
-        time_gain,
-        congestion_flg,
-        route_edges_for_sumo,
+    return RouteManeuverDecision(
+        current_route=current_route,
+        best_candidate=best_candidate,
+        candidate_results=tuple(candidates),
+        time_gain=time_gain,
+        route_change_threshold=threshold,
+        threshold_exceeded=threshold_exceeded,
+        apply_normalcy_threshold=apply_normalcy_threshold,
+        corridor_family=corridor_family,
     )
+
 
 def find_alternative_better_choice_fixed_divide(
     current_edgeID: str,
@@ -3876,198 +3351,38 @@ def find_alternative_better_choice_fixed_divide(
     custome_edge_list: list,
     debug: bool = False,
 ):
-    """
-    現在の経路と，V2V情報および自由速度計算に基づく迂回経路を比較し，
-    より良い選択肢があれば経路変更情報を返す。
-
-    返り値の形式は既存と同じ:
-        return from_edgeID, shelterID, to_edge_list, time_gain, congestion_flg
-    """
-    dprint = _make_dprint(debug)
-    shelterID_to_return = vehInfo.get_target_shelter()
-    to_edge_list_to_return = []
-    congestion_flg = False
-
-    dprint(
-        f"start vehID={agent.get_vehID()}, "
-        f"current_edgeID={current_edgeID}"
-    )
-
-    if _is_internal_junction_edge(current_edgeID):
-        dprint(f"skip: current_edgeID is internal junction edge: {current_edgeID}")
-        return "", shelterID_to_return, to_edge_list_to_return, 0.0, congestion_flg
-
-    # 現在のルートでかかる時間
-    current_route = _estimate_current_route_time(
+    """正常性バイアス用。既存の6値形式を維持する。"""
+    decision = evaluate_route_maneuver_decision(
         current_edgeID=current_edgeID,
         vehInfo=vehInfo,
         agent=agent,
         shelter=shelter,
-        dprint=dprint,
-    )
-
-
-    reroute_start_context = _build_reroute_start_context(
-        current_edgeID=current_edgeID,
-        vehInfo=vehInfo,
-        dprint=dprint,
-    )
-
-    if reroute_start_context.should_return_without_calculation:
-        dprint(
-            "vehicle is in approach edge and communication is disabled. "
-            "return without reroute calculation."
-        )
-        return (
-            reroute_start_context.base_reroute_start_edgeID,
-            shelterID_to_return,
-            [],
-            0.0,
-            congestion_flg,
-        )
-
-    routes_dict = _merge_v2v_routes(vehInfo=vehInfo, dprint=dprint)
-    # if len(routes_dict) > 3:
-    #     print(f"current_route={current_route}")
-    #     print(f"routes_dict={routes_dict}")
-
-    candidate_results = _evaluate_all_candidates(
-        current_edgeID=current_edgeID,
-        agent=agent,
-        vehInfo=vehInfo,
-        current_route=current_route,
         shelter_list=shelter_list,
-        reroute_start_context=reroute_start_context,
-        routes_dict=routes_dict,
-        dprint=dprint,
+        custome_edge_list=custome_edge_list,
+        apply_normalcy_threshold=True,
+        debug=debug,
     )
-    # print(f"candidate_results={candidate_results}")
+    return decision.to_legacy_tuple()
 
-    return _build_final_decision(
-        agent=agent,
-        estimated_current_route_time=current_route.estimated_time,
-        candidate_results=candidate_results,
-        base_reroute_start_edgeID=reroute_start_context.base_reroute_start_edgeID,
-        approach_edge_flg=reroute_start_context.approach_edge_flg,
-        dprint=dprint,
+
+def get_best_route_maneuver_without_threshold(
+    current_edgeID: str,
+    agent_by_target_vehID: "Agent",
+    vehInfo_by_target_vehID: "VehicleInfo",
+    shelter: "Shelter",
+    shelter_list: list["Shelter"],
+    custome_edge_list: list,
+    debug: bool = False,
+):
+    """同調性バイアス用。個人の正常性閾値を再適用しない。"""
+    decision = evaluate_route_maneuver_decision(
+        current_edgeID=current_edgeID,
+        vehInfo=vehInfo_by_target_vehID,
+        agent=agent_by_target_vehID,
+        shelter=shelter,
+        shelter_list=shelter_list,
+        custome_edge_list=custome_edge_list,
+        apply_normalcy_threshold=False,
+        debug=debug,
     )
-
-
-def _route_starts_with_prefix(
-    route_tuple: tuple,
-    prefix: tuple[str, ...],
-) -> bool:
-    if len(route_tuple) < len(prefix):
-        return False
-
-    return tuple(route_tuple[:len(prefix)]) == prefix
-
-
-def _classify_v2v_route_family(route_tuple: tuple) -> str:
-    """
-    V2V prefix 補正に使うため，route を経路系統に分類する。
-
-    例:
-        E0_E16_0 / E0_E13_0 -> short_side
-        E0_E13_1 / E0_E16_1 -> detour_side
-
-    どの系統にも分類できない場合は空文字を返す。
-    """
-    route_edges = set(route_tuple)
-
-    for family_name, marker_edges in V2V_ROUTE_FAMILY_MARKERS.items():
-        if route_edges & marker_edges:
-            return family_name
-
-    return ""
-
-
-def _should_skip_v2v_prefix_by_route_family(
-    current_route_tuple: tuple,
-    alternative_route_tuple: tuple,
-    candidate_shelterID: str,
-    dprint: Callable[[str], None],
-) -> bool:
-    """
-    初期共通区間だけ一致している route を V2V prefix 補正から除外する。
-
-    目的:
-        E0_E16_0 から E0_E13_1 のように，
-        E0 E1 E20 までは一致するが，その後の経路系統が異なる route を
-        prefix 補正候補にしない。
-    """
-    current_family = _classify_v2v_route_family(current_route_tuple)
-    alternative_family = _classify_v2v_route_family(alternative_route_tuple)
-
-    if not current_family or not alternative_family:
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            "skip V2V prefix route because route family is unknown: "
-            f"current_family={current_family}, "
-            f"alternative_family={alternative_family}, "
-            f"current_route={current_route_tuple}, "
-            f"alternative_route={alternative_route_tuple}"
-        )
-        return True
-
-    if current_family != alternative_family:
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            "skip V2V prefix route because route family differs: "
-            f"current_family={current_family}, "
-            f"alternative_family={alternative_family}, "
-            f"current_route={current_route_tuple}, "
-            f"alternative_route={alternative_route_tuple}"
-        )
-        return True
-
-    return False
-
-
-def _should_skip_v2v_prefix_by_initial_common_prefix(
-    current_route_tuple: tuple,
-    alternative_route_tuple: tuple,
-    candidate_shelterID: str,
-    dprint: Callable[[str], None],
-) -> bool:
-    """
-    common prefix が初期共通区間だけの場合は除外する。
-
-    例:
-        current  = E0_E16_0
-        alt      = E0_E13_1
-
-        common prefix = E0 E1 E20
-
-    この場合，実質的には「現在走っている経路上での前方分岐」ではなく，
-    初期分岐の別系統 route なので V2V prefix 補正には使わない。
-    """
-    common_prefix_length = _longest_common_prefix_length(
-        current_route_tuple,
-        alternative_route_tuple,
-    )
-
-    ignored_prefix_length = len(V2V_PREFIX_INITIAL_COMMON_PREFIX)
-
-    if (
-        _route_starts_with_prefix(
-            current_route_tuple,
-            V2V_PREFIX_INITIAL_COMMON_PREFIX,
-        )
-        and _route_starts_with_prefix(
-            alternative_route_tuple,
-            V2V_PREFIX_INITIAL_COMMON_PREFIX,
-        )
-        and common_prefix_length <= ignored_prefix_length
-    ):
-        dprint(
-            f"candidate={candidate_shelterID}: "
-            "skip V2V prefix route because common prefix is only initial trunk: "
-            f"common_prefix_length={common_prefix_length}, "
-            f"initial_common_prefix={V2V_PREFIX_INITIAL_COMMON_PREFIX}, "
-            f"current_route={current_route_tuple}, "
-            f"alternative_route={alternative_route_tuple}"
-        )
-        return True
-
-    return False
+    return decision.to_legacy_tuple()
