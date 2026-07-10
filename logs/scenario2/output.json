@@ -1,0 +1,28 @@
+{
+  "nosystem": {
+    "scenario": 2,
+    "mode": null,
+    "early_rate": 1.0,
+    "v2v_rate": 0.0,
+    "condition_key": "s2_e1.0_v0.0",
+    "run_status": {
+      "expected_run_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50],
+      "found_run_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50],
+      "missing_run_ids": [],
+      "parsed_run_ids": [],
+      "failed_run_ids": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]
+    },
+    "count_averages": { "avg_congestion_duration": null, "pedestrian_count": null, "route_changed_vehicle_count": null, "rate_vehicle_abandonment": null, "wrong_way_driving_count": null, "vehicle_abandonment_count": null, "normalcy_bias_route_change_count": null, "majority_bias_route_change_count": null, "lane_changed_vehicle_count": null, "info_obtained_lanechange_count": null, "elapsed_time_lanechange_count": null, "majority_bias_lanechange_count": null },
+    "arrival_time": {
+      "arrival_time_list": [],
+      "vehicle_mean_arrival_time": {}
+    },
+    "abandonment": {
+      "mean_abandon_time": null,
+      "mean_walking_distance": null,
+      "all_abandon_time_events": [],
+      "vehicle_mean_abandon_time": {},
+      "vehicle_mean_walking_distance": {}
+    }
+  }
+}
