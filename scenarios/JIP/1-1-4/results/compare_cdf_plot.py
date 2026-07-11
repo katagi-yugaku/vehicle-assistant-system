@@ -218,7 +218,7 @@ def plot_compare_arrival_time_cdfs(
     if plotted_count == 0:
         raise ValueError("プロット対象の arrival_time_list がありません。")
 
-    max_time = 2200
+    max_time = 2300
     min_time = 100
     y_min = 0.0
 
