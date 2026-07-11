@@ -40,10 +40,8 @@ def load_toml(path: Path) -> dict[str, Any]:
 
 def extract_scenario_number_from_dir(path: Path) -> int:
     match = re.fullmatch(r"scenario(\d+)", path.name)
-    # if not match:
-    #     raise ValueError(f"Invalid scenario directory name:"scenario(\d+)", path.name)
-    # if not match:
-    #     raise ValueError(f"Invalid scenario directory name: {path.name}")
+    if not match:
+        raise ValueError(f"Invalid scenario directory name: {path.name}")
     return int(match.group(1))
 
 
@@ -63,14 +61,13 @@ def warn_and_skip(message: str) -> None:
 def collect_records(
     results_dir: Path,
     config_dir: Path,
-    scenario_start: int,
-    scenario_end: int,
+    scenario_ids: list[int],
 ) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
 
     scenario_dirs = [
-        results_dir / f"scenario{i}"
-        for i in range(scenario_start, scenario_end + 1)
+        results_dir / f"scenario{scenario_id}"
+        for scenario_id in scenario_ids
     ]
 
     for scenario_dir in scenario_dirs:
@@ -260,7 +257,7 @@ def build_route_change_annotation_table(
 
         annotation = (
             f"{total:.1f}\n"
-            f"N{normalcy_ratio:.0f} C{majority_ratio:.0f}"
+            f"{normalcy_ratio:.0f}:{majority_ratio:.0f}"
         )
 
         annotation_map[(row, col)] = annotation
@@ -412,17 +409,30 @@ def parse_args() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--scenario-ids",
+        nargs="+",
+        default=None,
+        metavar="ID",
+        help=(
+            "Scenario IDs to load. Examples: "
+            "--scenario-ids 1 3 5, "
+            "--scenario-ids 1,3,5, "
+            "--scenario-ids 31-36"
+        ),
+    )
+
+    parser.add_argument(
         "--scenario-start",
         type=int,
-        default=1,
-        help="First scenario number to load. Default: 1",
+        default=None,
+        help="First scenario number for range selection. Default: 1",
     )
 
     parser.add_argument(
         "--scenario-end",
         type=int,
-        default=64,
-        help="Last scenario number to load. Default: 64",
+        default=None,
+        help="Last scenario number for range selection. Default: 64",
     )
 
     return parser.parse_args()
@@ -446,13 +456,66 @@ def validate_scenario_range(scenario_start: int, scenario_end: int) -> None:
         )
 
 
+def parse_scenario_ids(raw_values: list[str]) -> list[int]:
+    scenario_ids: list[int] = []
+
+    for raw_value in raw_values:
+        for token in raw_value.split(","):
+            token = token.strip()
+            if not token:
+                continue
+
+            token = re.sub(r"^scenario", "", token, flags=re.IGNORECASE)
+
+            range_match = re.fullmatch(r"(\d+)-(?:scenario)?(\d+)", token, re.IGNORECASE)
+            if range_match:
+                range_start = int(range_match.group(1))
+                range_end = int(range_match.group(2))
+                validate_scenario_range(range_start, range_end)
+                scenario_ids.extend(range(range_start, range_end + 1))
+                continue
+
+            if not token.isdigit():
+                raise ValueError(
+                    f"Invalid scenario ID specification: {raw_value!r}"
+                )
+
+            scenario_id = int(token)
+            if scenario_id <= 0:
+                raise ValueError(
+                    f"Scenario ID must be positive: {scenario_id}"
+                )
+            scenario_ids.append(scenario_id)
+
+    if not scenario_ids:
+        raise ValueError("No scenario IDs were specified")
+
+    # Remove duplicates while preserving the user-specified order.
+    return list(dict.fromkeys(scenario_ids))
+
+
+def resolve_scenario_ids(args: argparse.Namespace) -> list[int]:
+    uses_explicit_ids = args.scenario_ids is not None
+    uses_range = args.scenario_start is not None or args.scenario_end is not None
+
+    if uses_explicit_ids and uses_range:
+        raise ValueError(
+            "--scenario-ids cannot be used together with "
+            "--scenario-start or --scenario-end"
+        )
+
+    if uses_explicit_ids:
+        return parse_scenario_ids(args.scenario_ids)
+
+    scenario_start = args.scenario_start if args.scenario_start is not None else 1
+    scenario_end = args.scenario_end if args.scenario_end is not None else 64
+    validate_scenario_range(scenario_start, scenario_end)
+    return list(range(scenario_start, scenario_end + 1))
+
+
 def main() -> None:
     args = parse_args()
-
-    validate_scenario_range(
-        scenario_start=args.scenario_start,
-        scenario_end=args.scenario_end,
-    )
+    scenario_ids = resolve_scenario_ids(args)
 
     results_dir = (
         args.results_dir.resolve()
@@ -475,12 +538,11 @@ def main() -> None:
     records = collect_records(
         results_dir=results_dir,
         config_dir=config_dir,
-        scenario_start=args.scenario_start,
-        scenario_end=args.scenario_end,
+        scenario_ids=scenario_ids,
     )
 
     loaded_count = len(records)
-    expected_count = args.scenario_end - args.scenario_start + 1
+    expected_count = len(scenario_ids)
     skipped_count = expected_count - loaded_count
 
     (
@@ -523,7 +585,10 @@ def main() -> None:
         annotation_fontsize=8,
     )
 
-    print(f"Scenario range: scenario{args.scenario_start} - scenario{args.scenario_end}")
+    print(
+        "Scenario IDs: "
+        + ", ".join(f"scenario{scenario_id}" for scenario_id in scenario_ids)
+    )
     print(f"Expected scenarios: {expected_count}")
     print(f"Loaded scenarios: {loaded_count}")
     print(f"Skipped scenarios: {skipped_count}")
