@@ -30,7 +30,6 @@ data/maps/*.osm.pbf
 # Slurm / simulation logs
 # =========================
 slurm_logs/
-*.out
 *.err
 *.pyc
 __pycache__/
