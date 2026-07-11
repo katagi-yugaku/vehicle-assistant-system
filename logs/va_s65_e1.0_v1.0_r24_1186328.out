@@ -1,0 +1,203 @@
+=== Job Info ===
+host      : chopin
+jobid     : 1186328
+scenario  : 65
+early_rate: 1.0
+v2v_rate  : 1.0
+run_id    : 24
+config    : scenarios/JIP/configs/config_scenario_65.toml
+start     : Sat Jul 11 15:41:27 JST 2026
+Step #0.00 (0ms ?*RT. ?UPS, TraCI: 340ms, vehicles TOT 1 ACT 1 BUF 0)                     Step #100.00 (0ms ?*RT. ?UPS, TraCI: 41ms, vehicles TOT 26 ACT 26 BUF 0)                  Step #200.00 (0ms ?*RT. ?UPS, TraCI: 205ms, vehicles TOT 51 ACT 51 BUF 0)                 Step #300.00 (0ms ?*RT. ?UPS, TraCI: 127ms, vehicles TOT 77 ACT 77 BUF 0)                 Step #400.00 (0ms ?*RT. ?UPS, TraCI: 157ms, vehicles TOT 104 ACT 104 BUF 0)               Step #500.00 (1ms ~= 1000.00*RT, ~131000.00UPS, TraCI: 570ms, vehicles TOT 131 ACT 131 BUFStep #600.00 (1ms ~= 1000.00*RT, ~158000.00UPS, TraCI: 873ms, vehicles TOT 160 ACT 158 BUFStep #700.00 (1ms ~= 1000.00*RT, ~186000.00UPS, TraCI: 998ms, vehicles TOT 198 ACT 186 BUFStep #800.00 (1ms ~= 1000.00*RT, ~215000.00UPS, TraCI: 1122ms, vehicles TOT 234 ACT 215 BUStep #900.00 (1ms ~= 1000.00*RT, ~244000.00UPS, TraCI: 1427ms, vehicles TOT 281 ACT 244 BUStep #1000.00 (1ms ~= 1000.00*RT, ~274000.00UPS, TraCI: 1359ms, vehicles TOT 319 ACT 274 BStep #1100.00 (1ms ~= 1000.00*RT, ~304000.00UPS, TraCI: 1277ms, vehicles TOT 354 ACT 304 BStep #1200.00 (1ms ~= 1000.00*RT, ~335000.00UPS, TraCI: 1019ms, vehicles TOT 389 ACT 335 BStep #1300.00 (1ms ~= 1000.00*RT, ~368000.00UPS, TraCI: 1298ms, vehicles TOT 427 ACT 368 BStep #1400.00 (1ms ~= 1000.00*RT, ~399000.00UPS, TraCI: 841ms, vehicles TOT 467 ACT 399 BUStep #1500.00 (1ms ~= 1000.00*RT, ~400000.00UPS, TraCI: 291ms, vehicles TOT 480 ACT 400 BUStep #1600.00 (1ms ~= 1000.00*RT, ~400000.00UPS, TraCI: 208ms, vehicles TOT 480 ACT 400 BUStep #1700.00 (1ms ~= 1000.00*RT, ~400000.00UPS, TraCI: 114ms, vehicles TOT 480 ACT 400 BUStep #1800.00 (1ms ~= 1000.00*RT, ~400000.00UPS, TraCI: 94ms, vehicles TOT 480 ACT 400 BUFStep #1900.00 (1ms ~= 1000.00*RT, ~400000.00UPS, TraCI: 86ms, vehicles TOT 480 ACT 400 BUFStep #2000.00 (0ms ?*RT. ?UPS, TraCI: 83ms, vehicles TOT 480 ACT 400 BUF 0)               Step #2100.00 (0ms ?*RT. ?UPS, TraCI: 87ms, vehicles TOT 480 ACT 400 BUF 0)               Step #2200.00 (0ms ?*RT. ?UPS, TraCI: 80ms, vehicles TOT 480 ACT 400 BUF 0)               Step #2300.00 (0ms ?*RT. ?UPS, TraCI: 84ms, vehicles TOT 480 ACT 400 BUF 0)               Step #2400.00 (0ms ?*RT. ?UPS, TraCI: 80ms, vehicles TOT 480 ACT 400 BUF 0)               Step #2500.00 (1ms ~= 1000.00*RT, ~400000.00UPS, TraCI: 87ms, vehicles TOT 480 ACT 400 BUFStep #2600.00 (0ms ?*RT. ?UPS, TraCI: 94ms, vehicles TOT 480 ACT 400 BUF 0)               Step #2700.00 (0ms ?*RT. ?UPS, TraCI: 106ms, vehicles TOT 480 ACT 400 BUF 0)              Step #2800.00 (0ms ?*RT. ?UPS, TraCI: 91ms, vehicles TOT 480 ACT 400 BUF 0)               Step #2900.00 (0ms ?*RT. ?UPS, TraCI: 106ms, vehicles TOT 480 ACT 400 BUF 0)              Step #3000.00 (0ms ?*RT. ?UPS, TraCI: 82ms, vehicles TOT 480 ACT 400 BUF 0)               
+ Retrying in 1 seconds
+出現数: {'A2': 354, 'A1': 46}
+割合:
+  Total: 400
+  A1: 46 (11.50%)
+  A2: 354 (88.50%)
+  B1: 0 (0.00%)
+  B2: 0 (0.00%)
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', '-E40', '-E39', '-E38', 'E19', 'E33', 'E34', 'E35', 'E36', 'E6', 'E10', 'E11', 'E2', 'E3', 'E5', 'E12', 'E13']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', '-E40', '-E39', '-E38', 'E19', 'E33', 'E34', 'E35', 'E36', 'E6', 'E10', 'E11', 'E2', 'E3', 'E5', 'E12', 'E13']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', '-E40', '-E39', '-E38', 'E19', 'E33', 'E34', 'E35', 'E36', 'E6', 'E10', 'E11', 'E2', 'E3', 'E5', 'E12', 'E13']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', '-E40', '-E39', '-E38', 'E19', 'E33', 'E34', 'E35', 'E36', 'E6', 'E10', 'E11', 'E2', 'E3', 'E5', 'E12', 'E13']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E26', 'E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E7', 'E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E42', 'E41', 'E14', 'E15', 'E150', 'E16']
+route_edges:['E41', 'E14', 'E15', 'E150', 'E16']
+mean elapsed_time: 465.6075
+OK all vehs arrived 
+平均渋滞継続時間: 331.61秒
+OK all vehicle abandonment were detected
+102
+298
+===== Simlation Result Summary =====
+avg_congestion_duration: 331.61 
+arrival_time_by_vehID_dict:{'init_ShelterA_1_8': 218.0, 'init_ShelterA_1_9': 223.0, 'init_ShelterA_1_19': 257.0, 'init_ShelterA_1_20': 262.0, 'init_ShelterA_2_0': 281.0, 'init_ShelterA_2_1': 286.0, 'init_ShelterA_1_30': 301.0, 'init_ShelterA_2_2': 309.0, 'init_ShelterA_2_3': 316.0, 'init_ShelterA_2_4': 321.0, 'init_ShelterA_2_5': 327.0, 'init_ShelterA_2_6': 332.0, 'init_ShelterA_2_7': 337.0, 'init_ShelterA_2_10': 343.0, 'init_ShelterA_2_11': 349.0, 'init_ShelterA_2_12': 357.0, 'init_ShelterA_2_13': 362.0, 'init_ShelterA_2_14': 366.0, 'init_ShelterA_2_15': 374.0, 'init_ShelterA_2_16': 380.0, 'init_ShelterA_2_17': 385.0, 'init_ShelterA_2_18': 391.0, 'init_ShelterA_2_21': 396.0, 'init_ShelterA_1_52': 403.0, 'init_ShelterA_2_22': 403.0, 'init_ShelterA_1_55': 408.0, 'init_ShelterA_2_23': 410.0, 'init_ShelterA_1_58': 413.0, 'init_ShelterA_2_24': 417.0, 'init_ShelterA_2_25': 425.0, 'init_ShelterA_2_26': 434.0, 'init_ShelterA_2_27': 443.0, 'init_ShelterA_2_28': 452.0, 'init_ShelterA_2_29': 461.0, 'init_ShelterA_2_31': 470.0, 'init_ShelterA_2_32': 480.0, 'init_ShelterA_2_33': 489.0, 'init_ShelterA_1_66': 493.0, 'init_ShelterA_1_70': 497.0, 'init_ShelterA_2_34': 499.0, 'init_ShelterA_2_35': 508.0, 'init_ShelterA_2_36': 518.0, 'init_ShelterA_2_37': 528.0, 'init_ShelterA_2_38': 538.0, 'init_ShelterA_2_39': 547.0, 'init_ShelterA_2_40': 557.0, 'init_ShelterA_1_96': 560.0, 'init_ShelterA_1_97': 565.0, 'init_ShelterA_2_41': 566.0, 'init_ShelterA_1_100': 570.0, 'init_ShelterA_2_42': 576.0, 'init_ShelterA_2_43': 586.0, 'init_ShelterA_2_44': 595.0, 'init_ShelterA_2_45': 605.0, 'init_ShelterA_1_107': 607.0, 'init_ShelterA_2_46': 615.0, 'init_ShelterA_1_110': 616.0, 'init_ShelterA_1_111': 621.0, 'init_ShelterA_2_47': 624.0, 'init_ShelterA_2_48': 634.0, 'init_ShelterA_2_49': 644.0, 'init_ShelterA_2_50': 653.0, 'init_ShelterA_2_51': 663.0, 'init_ShelterA_1_123': 670.0, 'init_ShelterA_2_53': 673.0, 'init_ShelterA_2_54': 682.0, 'init_ShelterA_2_56': 692.0, 'init_ShelterA_2_57': 701.0, 'init_ShelterA_2_59': 711.0, 'init_ShelterA_2_60': 721.0, 'init_ShelterA_1_142': 728.0, 'init_ShelterA_2_61': 730.0, 'init_ShelterA_1_148': 740.0, 'init_ShelterA_2_62': 740.0, 'init_ShelterA_2_63': 749.0, 'init_ShelterA_2_64': 759.0, 'init_ShelterA_2_65': 769.0, 'newveh_ShelterA_1_85_1': 777.0, 'init_ShelterA_2_67': 778.0, 'newveh_ShelterA_1_84_0': 785.0, 'init_ShelterA_2_68': 788.0, 'newveh_ShelterA_1_139_10': 790.0, 'newveh_ShelterA_1_86_2': 794.0, 'init_ShelterA_2_69': 798.0, 'init_ShelterA_2_71': 807.0, 'newveh_ShelterA_1_90_3': 807.0, 'newveh_ShelterA_1_92_4': 814.0, 'init_ShelterA_2_72': 817.0, 'newveh_ShelterA_1_94_5': 820.0, 'init_ShelterA_1_168': 825.0, 'init_ShelterA_2_73': 826.0, 'newveh_ShelterA_1_98_6': 829.0, 'init_ShelterA_2_74': 836.0, 'init_ShelterA_2_75': 846.0, 'newveh_ShelterA_1_103_8': 851.0, 'init_ShelterA_2_76': 855.0, 'newveh_ShelterA_1_102_7': 858.0, 'init_ShelterA_2_77': 865.0, 'newveh_ShelterA_1_104_9': 865.0, 'newveh_ShelterA_1_113_11': 870.0, 'init_ShelterA_2_78': 874.0, 'newveh_ShelterA_1_114_12': 874.0, 'init_ShelterA_2_79': 884.0, 'init_ShelterA_2_80': 894.0, 'init_ShelterA_1_185': 898.0, 'init_ShelterA_2_81': 903.0, 'init_ShelterA_1_194': 905.0, 'init_ShelterA_2_82': 913.0, 'newveh_ShelterA_1_117_13': 918.0, 'init_ShelterA_2_83': 922.0, 'newveh_ShelterA_1_120_14': 926.0, 'newveh_ShelterA_1_124_15': 931.0, 'init_ShelterA_2_87': 932.0, 'init_ShelterA_2_88': 942.0, 'newveh_ShelterA_1_128_17': 942.0, 'init_ShelterA_1_195': 951.0, 'init_ShelterA_2_89': 951.0, 'init_ShelterA_1_196': 956.0, 'init_ShelterA_2_91': 961.0, 'init_ShelterA_1_200': 963.0, 'init_ShelterA_2_201': 965.0, 'init_ShelterA_2_93': 970.0, 'newveh_ShelterA_1_127_16': 974.0, 'init_ShelterA_2_95': 980.0, 'newveh_ShelterA_1_140_18': 980.0, 'newveh_ShelterA_1_149_21': 986.0, 'init_ShelterA_2_99': 990.0, 'init_ShelterA_2_101': 999.0, 'newveh_ShelterA_1_146_20': 1002.0, 'init_ShelterA_2_202': 1004.0, 'init_ShelterA_2_203': 1006.0, 'init_ShelterA_2_105': 1009.0, 'init_ShelterA_2_204': 1009.0, 'init_ShelterA_2_205': 1012.0, 'init_ShelterA_2_106': 1018.0, 'newveh_ShelterA_1_144_19': 1019.0, 'newveh_ShelterA_1_150_23': 1025.0, 'init_ShelterA_2_108': 1028.0, 'newveh_ShelterA_1_135_22': 1034.0, 'init_ShelterA_2_109': 1037.0, 'newveh_ShelterA_1_153_25': 1044.0, 'init_ShelterA_2_112': 1047.0, 'init_ShelterA_2_115': 1056.0, 'newveh_ShelterA_1_136_24': 1060.0, 'init_ShelterA_2_206': 1062.0, 'init_ShelterA_2_207': 1065.0, 'init_ShelterA_2_116': 1066.0, 'init_ShelterA_2_208': 1067.0, 'init_ShelterA_2_209': 1070.0, 'init_ShelterA_2_210': 1073.0, 'init_ShelterA_2_118': 1075.0, 'newveh_ShelterA_1_161_27': 1080.0, 'init_ShelterA_2_119': 1085.0, 'newveh_ShelterA_1_160_26': 1087.0, 'init_ShelterA_2_121': 1094.0, 'newveh_ShelterA_1_164_29': 1096.0, 'init_ShelterA_2_122': 1104.0, 'newveh_ShelterA_1_163_28': 1105.0, 'init_ShelterA_2_125': 1113.0, 'newveh_ShelterA_1_169_31': 1115.0, 'init_ShelterA_2_126': 1122.0, 'newveh_ShelterA_1_166_30': 1124.0, 'init_ShelterA_2_129': 1132.0, 'newveh_ShelterA_1_172_34': 1134.0, 'init_ShelterA_2_130': 1141.0, 'newveh_ShelterA_1_171_33': 1144.0, 'init_ShelterA_2_131': 1151.0, 'newveh_ShelterA_1_170_32': 1153.0, 'init_ShelterA_2_132': 1160.0, 'newveh_ShelterA_1_156_36': 1163.0, 'init_ShelterA_2_133': 1169.0, 'newveh_ShelterA_1_155_35': 1173.0, 'init_ShelterA_2_134': 1178.0, 'newveh_ShelterA_1_177_37': 1182.0, 'init_ShelterA_2_137': 1188.0, 'newveh_ShelterA_1_181_39': 1192.0, 'init_ShelterA_2_212': 1194.0, 'init_ShelterA_2_138': 1197.0, 'init_ShelterA_2_141': 1206.0, 'newveh_ShelterA_1_179_38': 1211.0, 'init_ShelterA_2_213': 1213.0, 'init_ShelterA_2_143': 1215.0, 'init_ShelterA_2_214': 1215.0, 'init_ShelterA_2_215': 1217.0, 'init_ShelterA_2_216': 1221.0, 'init_ShelterA_2_217': 1223.0, 'init_ShelterA_2_145': 1224.0, 'init_ShelterA_2_218': 1226.0, 'init_ShelterA_2_219': 1229.0, 'init_ShelterA_2_221': 1232.0, 'init_ShelterA_2_147': 1233.0, 'init_ShelterA_2_222': 1235.0, 'init_ShelterA_2_223': 1238.0, 'init_ShelterA_2_224': 1241.0, 'init_ShelterA_2_151': 1242.0, 'init_ShelterA_2_225': 1244.0, 'init_ShelterA_2_226': 1247.0, 'init_ShelterA_2_152': 1251.0, 'newveh_ShelterA_1_190_41': 1253.0, 'init_ShelterA_2_154': 1260.0, 'newveh_ShelterA_1_192_43': 1260.0, 'newveh_ShelterA_1_191_42': 1268.0, 'init_ShelterA_2_157': 1269.0, 'init_ShelterA_2_158': 1278.0, 'newveh_ShelterA_1_193_44': 1284.0, 'init_ShelterA_2_227': 1286.0, 'init_ShelterA_2_159': 1287.0, 'init_ShelterA_2_228': 1289.0, 'init_ShelterA_2_229': 1290.0, 'init_ShelterA_2_230': 1293.0, 'init_ShelterA_2_162': 1295.0, 'newveh_ShelterA_1_199_47': 1301.0, 'init_ShelterA_2_165': 1304.0, 'newveh_ShelterA_1_184_46': 1309.0, 'init_ShelterA_2_167': 1313.0, 'init_ShelterA_2_173': 1322.0, 'newveh_ShelterA_1_183_45': 1325.0, 'init_ShelterA_2_231': 1327.0, 'init_ShelterA_2_232': 1329.0, 'init_ShelterA_2_174': 1331.0, 'init_ShelterA_2_233': 1332.0, 'init_ShelterA_2_234': 1334.0, 'init_ShelterA_2_235': 1336.0, 'init_ShelterA_2_236': 1339.0, 'init_ShelterA_2_175': 1340.0, 'init_ShelterA_2_237': 1342.0, 'init_ShelterA_2_238': 1345.0, 'init_ShelterA_2_239': 1348.0, 'init_ShelterA_2_176': 1349.0, 'init_ShelterA_2_240': 1351.0, 'init_ShelterA_2_241': 1354.0, 'init_ShelterA_2_242': 1356.0, 'init_ShelterA_2_178': 1358.0, 'init_ShelterA_2_243': 1359.0, 'init_ShelterA_2_244': 1362.0, 'init_ShelterA_2_180': 1367.0, 'init_ShelterA_2_182': 1375.0, 'newveh_ShelterA_1_197_48': 1378.0, 'init_ShelterA_2_245': 1380.0, 'init_ShelterA_2_246': 1383.0, 'init_ShelterA_2_186': 1384.0, 'init_ShelterA_2_247': 1385.0, 'init_ShelterA_2_248': 1387.0, 'init_ShelterA_2_251': 1389.0, 'init_ShelterA_2_187': 1393.0, 'newveh_ShelterA_1_255_40': 1399.0, 'init_ShelterA_2_252': 1401.0, 'init_ShelterA_2_188': 1402.0, 'init_ShelterA_2_189': 1411.0, 'init_ShelterA_1_253': 1418.0, 'init_ShelterA_2_198': 1419.0, 'init_ShelterA_2_254': 1420.0, 'init_ShelterA_1_211': 1421.0, 'init_ShelterA_2_256': 1422.0, 'init_ShelterA_1_220': 1423.0, 'init_ShelterA_2_257': 1425.0, 'init_ShelterA_2_258': 1427.0, 'init_ShelterA_2_259': 1429.0, 'init_ShelterA_2_249': 1430.0, 'init_ShelterA_2_260': 1432.0, 'init_ShelterA_2_250': 1435.0, 'init_ShelterA_2_261': 1435.0, 'init_ShelterA_2_262': 1437.0, 'newveh_ShelterA_2_270_50': 1439.0, 'init_ShelterA_2_263': 1440.0, 'init_ShelterA_2_264': 1443.0, 'init_ShelterA_2_265': 1446.0, 'init_ShelterA_2_266': 1449.0, 'init_ShelterA_2_267': 1452.0, 'init_ShelterA_2_268': 1455.0, 'init_ShelterA_2_269': 1458.0, 'init_ShelterA_2_271': 1461.0, 'init_ShelterA_2_272': 1464.0, 'init_ShelterA_2_273': 1466.0, 'init_ShelterA_1_274': 1475.0, 'newveh_ShelterA_2_295_51': 1484.0, 'init_ShelterA_1_275': 1490.0, 'init_ShelterA_2_276': 1492.0, 'init_ShelterA_2_277': 1495.0, 'init_ShelterA_2_278': 1496.0, 'init_ShelterA_2_279': 1499.0, 'init_ShelterA_2_280': 1501.0, 'newveh_ShelterA_1_285_49': 1518.0, 'init_ShelterA_2_281': 1520.0, 'init_ShelterA_2_282': 1523.0, 'init_ShelterA_2_283': 1525.0, 'init_ShelterA_2_284': 1527.0, 'init_ShelterA_2_286': 1529.0, 'init_ShelterA_2_287': 1531.0, 'init_ShelterA_2_288': 1534.0, 'init_ShelterA_2_289': 1537.0, 'init_ShelterA_2_290': 1540.0, 'init_ShelterA_2_291': 1543.0, 'init_ShelterA_2_292': 1546.0, 'init_ShelterA_2_293': 1549.0, 'init_ShelterA_2_294': 1552.0, 'init_ShelterA_2_298': 1555.0, 'init_ShelterA_2_299': 1558.0, 'init_ShelterA_2_300': 1561.0, 'init_ShelterA_2_301': 1564.0, 'newveh_ShelterA_2_318_54': 1565.0, 'init_ShelterA_1_311': 1568.0, 'newveh_ShelterA_1_297_53': 1572.0, 'newveh_ShelterA_1_296_52': 1587.0, 'init_ShelterA_2_302': 1589.0, 'init_ShelterA_2_303': 1592.0, 'init_ShelterA_2_304': 1593.0, 'newveh_ShelterA_2_320_55': 1593.0, 'init_ShelterA_2_305': 1595.0, 'init_ShelterA_2_306': 1598.0, 'init_ShelterA_2_307': 1600.0, 'init_ShelterA_2_308': 1602.0, 'init_ShelterA_2_309': 1605.0, 'init_ShelterA_2_310': 1608.0, 'init_ShelterA_2_312': 1611.0, 'init_ShelterA_2_313': 1613.0, 'newveh_ShelterA_2_322_56': 1614.0, 'init_ShelterA_2_314': 1616.0, 'init_ShelterA_2_315': 1619.0, 'init_ShelterA_2_316': 1622.0, 'init_ShelterA_2_317': 1625.0, 'newveh_ShelterA_2_327_58': 1626.0, 'init_ShelterA_2_319': 1628.0, 'init_ShelterA_2_323': 1631.0, 'newveh_ShelterA_2_321_57': 1631.0, 'init_ShelterA_2_324': 1634.0, 'init_ShelterA_2_325': 1637.0, 'init_ShelterA_2_326': 1640.0, 'init_ShelterA_2_328': 1643.0, 'init_ShelterA_2_329': 1646.0, 'init_ShelterA_2_330': 1649.0, 'init_ShelterA_2_332': 1652.0, 'init_ShelterA_2_333': 1655.0, 'init_ShelterA_2_334': 1658.0, 'init_ShelterA_2_336': 1661.0, 'init_ShelterA_1_335': 1664.0, 'init_ShelterA_2_337': 1664.0, 'init_ShelterA_2_338': 1667.0, 'init_ShelterA_2_339': 1669.0, 'init_ShelterA_2_340': 1673.0, 'init_ShelterA_2_341': 1675.0, 'init_ShelterA_2_343': 1678.0, 'init_ShelterA_2_344': 1681.0, 'newveh_ShelterA_2_331_62': 1683.0, 'init_ShelterA_2_348': 1684.0, 'init_ShelterA_2_349': 1687.0, 'newveh_ShelterA_2_347_63': 1689.0, 'init_ShelterA_2_350': 1690.0, 'init_ShelterA_2_351': 1693.0, 'newveh_ShelterA_2_368_65': 1697.0, 'init_ShelterA_1_352': 1701.0, 'newveh_ShelterA_2_363_67': 1701.0, 'newveh_ShelterA_1_346_61': 1716.0, 'init_ShelterA_2_353': 1718.0, 'newveh_ShelterA_2_367_69': 1719.0, 'init_ShelterA_2_354': 1720.0, 'init_ShelterA_2_355': 1722.0, 'init_ShelterA_2_356': 1725.0, 'init_ShelterA_2_357': 1727.0, 'init_ShelterA_2_358': 1729.0, 'init_ShelterA_2_359': 1731.0, 'newveh_ShelterA_1_345_60': 1741.0, 'newveh_ShelterA_1_342_59': 1750.0, 'newveh_ShelterA_1_369_66': 1759.0, 'init_ShelterA_2_360': 1761.0, 'init_ShelterA_2_361': 1763.0, 'init_ShelterA_1_362': 1776.0, 'init_ShelterA_2_364': 1778.0, 'init_ShelterA_2_365': 1781.0, 'init_ShelterA_2_366': 1782.0, 'newveh_ShelterA_1_376_68': 1791.0, 'newveh_ShelterA_1_379_74': 1799.0, 'newveh_ShelterA_1_378_73': 1808.0, 'newveh_ShelterA_1_375_72': 1816.0, 'newveh_ShelterA_1_372_71': 1826.0, 'newveh_ShelterA_1_371_70': 1842.0, 'init_ShelterA_2_370': 1844.0, 'init_ShelterA_2_373': 1846.0, 'init_ShelterA_2_374': 1848.0, 'init_ShelterA_2_377': 1850.0, 'init_ShelterA_2_380': 1853.0, 'init_ShelterA_2_381': 1855.0, 'init_ShelterA_2_382': 1857.0, 'init_ShelterA_2_383': 1859.0, 'init_ShelterA_2_384': 1861.0, 'init_ShelterA_2_385': 1864.0, 'init_ShelterA_2_386': 1867.0, 'newveh_ShelterA_1_398_77': 1877.0, 'newveh_ShelterA_1_391_76': 1885.0, 'newveh_ShelterA_1_389_75': 1893.0, 'newveh_ShelterA_1_396_79': 1902.0, 'newveh_ShelterA_1_395_78': 1911.0, 'init_ShelterA_2_387': 1914.0, 'init_ShelterA_2_388': 1916.0, 'newveh_ShelterA_1_393_64': 1934.0, 'init_ShelterA_2_390': 1936.0, 'init_ShelterA_2_392': 1938.0, 'init_ShelterA_2_394': 1940.0, 'init_ShelterA_2_397': 1942.0, 'init_ShelterA_2_399': 1944.0}
+vehicle_abandant_time_by_pedestrianID_dict:{}
+walking_distance_by_pedestrianID_dict:{}
+route_change_time_by_vehID_dict:{'init_ShelterA_2_84': 600.0, 'init_ShelterA_2_85': 600.0, 'init_ShelterA_2_86': 610.0, 'init_ShelterA_2_90': 620.0, 'init_ShelterA_2_92': 630.0, 'init_ShelterA_2_94': 640.0, 'init_ShelterA_2_98': 650.0, 'init_ShelterA_2_102': 670.0, 'init_ShelterA_2_103': 670.0, 'init_ShelterA_2_104': 680.0, 'init_ShelterA_2_139': 690.0, 'init_ShelterA_2_113': 700.0, 'init_ShelterA_2_114': 710.0, 'init_ShelterA_2_117': 750.0, 'init_ShelterA_2_120': 760.0, 'init_ShelterA_2_124': 770.0, 'init_ShelterA_2_127': 780.0, 'init_ShelterA_2_128': 780.0, 'init_ShelterA_2_140': 790.0, 'init_ShelterA_2_144': 810.0, 'init_ShelterA_2_146': 810.0, 'init_ShelterA_2_149': 810.0, 'init_ShelterA_2_135': 820.0, 'init_ShelterA_2_150': 820.0, 'init_ShelterA_2_136': 830.0, 'init_ShelterA_2_153': 830.0, 'init_ShelterA_2_160': 860.0, 'init_ShelterA_2_161': 860.0, 'init_ShelterA_2_163': 870.0, 'init_ShelterA_2_164': 870.0, 'init_ShelterA_2_201': 870.0, 'init_ShelterA_2_202': 870.0, 'init_ShelterA_2_203': 870.0, 'init_ShelterA_2_166': 880.0, 'init_ShelterA_2_169': 880.0, 'init_ShelterA_2_204': 880.0, 'init_ShelterA_2_205': 880.0, 'init_ShelterA_2_170': 890.0, 'init_ShelterA_2_171': 890.0, 'init_ShelterA_2_172': 890.0, 'init_ShelterA_2_206': 890.0, 'init_ShelterA_2_207': 890.0, 'init_ShelterA_2_155': 900.0, 'init_ShelterA_2_156': 900.0, 'init_ShelterA_2_208': 900.0, 'init_ShelterA_2_209': 900.0, 'init_ShelterA_2_212': 910.0, 'init_ShelterA_1_211': 920.0, 'init_ShelterA_2_177': 920.0, 'init_ShelterA_2_210': 920.0, 'init_ShelterA_2_179': 930.0, 'init_ShelterA_2_181': 930.0, 'init_ShelterA_2_213': 930.0, 'init_ShelterA_2_214': 930.0, 'init_ShelterA_2_215': 930.0, 'init_ShelterA_2_216': 930.0, 'init_ShelterA_2_217': 930.0, 'init_ShelterA_2_218': 940.0, 'init_ShelterA_2_219': 940.0, 'init_ShelterA_2_255': 940.0, 'init_ShelterA_1_220': 960.0, 'init_ShelterA_2_190': 960.0, 'init_ShelterA_2_221': 960.0, 'init_ShelterA_2_222': 960.0, 'init_ShelterA_2_191': 970.0, 'init_ShelterA_2_192': 970.0, 'init_ShelterA_2_223': 970.0, 'init_ShelterA_2_230': 970.0, 'init_ShelterA_2_231': 970.0, 'init_ShelterA_2_193': 980.0, 'init_ShelterA_2_232': 980.0, 'init_ShelterA_2_233': 980.0, 'init_ShelterA_2_234': 980.0, 'init_ShelterA_2_235': 980.0, 'init_ShelterA_2_236': 980.0, 'init_ShelterA_2_237': 980.0, 'init_ShelterA_2_238': 980.0, 'init_ShelterA_2_224': 990.0, 'init_ShelterA_2_225': 990.0, 'init_ShelterA_2_226': 990.0, 'init_ShelterA_2_227': 990.0, 'init_ShelterA_2_228': 990.0, 'init_ShelterA_2_239': 990.0, 'init_ShelterA_2_229': 1000.0, 'init_ShelterA_2_183': 1010.0, 'init_ShelterA_2_184': 1010.0, 'init_ShelterA_2_199': 1010.0, 'init_ShelterA_2_240': 1010.0, 'init_ShelterA_2_241': 1010.0, 'init_ShelterA_2_242': 1010.0, 'init_ShelterA_2_243': 1010.0, 'init_ShelterA_2_244': 1030.0, 'init_ShelterA_2_245': 1030.0, 'init_ShelterA_2_246': 1030.0, 'init_ShelterA_2_197': 1040.0, 'init_ShelterA_2_252': 1040.0, 'init_ShelterA_2_285': 1040.0, 'init_ShelterA_2_254': 1050.0, 'init_ShelterA_2_256': 1050.0, 'init_ShelterA_2_257': 1050.0, 'init_ShelterA_2_258': 1050.0, 'init_ShelterA_2_259': 1050.0, 'init_ShelterA_2_260': 1050.0, 'init_ShelterA_2_261': 1070.0, 'init_ShelterA_2_262': 1070.0, 'init_ShelterA_2_263': 1070.0, 'init_ShelterA_2_264': 1070.0, 'init_ShelterA_2_265': 1080.0, 'init_ShelterA_2_266': 1080.0, 'init_ShelterA_2_267': 1080.0, 'init_ShelterA_2_268': 1090.0, 'init_ShelterA_2_251': 1100.0, 'init_ShelterA_2_269': 1100.0, 'init_ShelterA_2_279': 1110.0, 'init_ShelterA_2_280': 1110.0, 'init_ShelterA_1_270': 1130.0, 'init_ShelterA_2_247': 1130.0, 'init_ShelterA_2_248': 1130.0, 'init_ShelterA_2_271': 1130.0, 'init_ShelterA_2_272': 1130.0, 'init_ShelterA_2_273': 1130.0, 'init_ShelterA_2_276': 1130.0, 'init_ShelterA_2_277': 1130.0, 'init_ShelterA_2_278': 1140.0, 'init_ShelterA_2_281': 1140.0, 'init_ShelterA_2_282': 1150.0, 'init_ShelterA_2_283': 1150.0, 'init_ShelterA_2_291': 1150.0, 'init_ShelterA_2_292': 1150.0, 'init_ShelterA_2_293': 1150.0, 'init_ShelterA_2_284': 1160.0, 'init_ShelterA_2_294': 1160.0, 'init_ShelterA_1_295': 1170.0, 'init_ShelterA_2_286': 1170.0, 'init_ShelterA_2_287': 1170.0, 'init_ShelterA_2_296': 1170.0, 'init_ShelterA_2_297': 1170.0, 'init_ShelterA_2_288': 1180.0, 'init_ShelterA_2_289': 1200.0, 'init_ShelterA_2_290': 1230.0, 'init_ShelterA_2_298': 1240.0, 'init_ShelterA_2_299': 1250.0, 'init_ShelterA_2_306': 1250.0, 'init_ShelterA_2_307': 1250.0, 'init_ShelterA_2_308': 1250.0, 'init_ShelterA_2_309': 1250.0, 'init_ShelterA_2_312': 1250.0, 'init_ShelterA_1_318': 1260.0, 'init_ShelterA_2_300': 1260.0, 'init_ShelterA_2_310': 1260.0, 'init_ShelterA_2_314': 1260.0, 'init_ShelterA_2_315': 1260.0, 'init_ShelterA_2_316': 1260.0, 'init_ShelterA_2_319': 1260.0, 'init_ShelterA_1_320': 1270.0, 'init_ShelterA_2_301': 1270.0, 'init_ShelterA_2_302': 1270.0, 'init_ShelterA_2_313': 1270.0, 'init_ShelterA_2_317': 1270.0, 'init_ShelterA_2_328': 1270.0, 'init_ShelterA_2_329': 1270.0, 'init_ShelterA_2_330': 1270.0, 'init_ShelterA_1_322': 1280.0, 'init_ShelterA_2_323': 1280.0, 'init_ShelterA_2_324': 1280.0, 'init_ShelterA_2_333': 1280.0, 'init_ShelterA_2_303': 1290.0, 'init_ShelterA_2_304': 1290.0, 'init_ShelterA_2_325': 1290.0, 'init_ShelterA_2_326': 1290.0, 'init_ShelterA_2_334': 1290.0, 'init_ShelterA_1_321': 1300.0, 'init_ShelterA_1_327': 1300.0, 'init_ShelterA_2_336': 1300.0, 'init_ShelterA_2_341': 1300.0, 'init_ShelterA_2_337': 1310.0, 'init_ShelterA_2_338': 1310.0, 'init_ShelterA_2_339': 1310.0, 'init_ShelterA_2_340': 1310.0, 'init_ShelterA_2_343': 1310.0, 'init_ShelterA_2_344': 1310.0, 'init_ShelterA_2_342': 1320.0, 'init_ShelterA_2_345': 1320.0, 'init_ShelterA_2_346': 1320.0, 'init_ShelterA_2_332': 1330.0, 'init_ShelterA_1_331': 1340.0, 'init_ShelterA_1_335': 1350.0, 'init_ShelterA_2_351': 1350.0, 'init_ShelterA_2_305': 1360.0, 'init_ShelterA_2_354': 1360.0, 'init_ShelterA_2_356': 1360.0, 'init_ShelterA_1_347': 1370.0, 'init_ShelterA_2_358': 1370.0, 'init_ShelterA_2_357': 1380.0, 'init_ShelterA_2_359': 1380.0, 'init_ShelterA_2_360': 1380.0, 'init_ShelterA_2_361': 1380.0, 'init_ShelterA_2_393': 1380.0, 'init_ShelterA_1_368': 1390.0, 'init_ShelterA_2_349': 1390.0, 'init_ShelterA_2_369': 1390.0, 'init_ShelterA_1_363': 1400.0, 'init_ShelterA_2_348': 1400.0, 'init_ShelterA_2_353': 1400.0, 'init_ShelterA_2_364': 1400.0, 'init_ShelterA_2_366': 1400.0, 'init_ShelterA_2_370': 1400.0, 'init_ShelterA_1_311': 1410.0, 'init_ShelterA_2_350': 1410.0, 'init_ShelterA_2_355': 1410.0, 'init_ShelterA_2_365': 1410.0, 'init_ShelterA_2_376': 1410.0, 'init_ShelterA_1_367': 1420.0, 'init_ShelterA_2_371': 1420.0, 'init_ShelterA_2_372': 1420.0, 'init_ShelterA_2_375': 1420.0, 'init_ShelterA_2_378': 1420.0, 'init_ShelterA_2_379': 1420.0, 'init_ShelterA_2_377': 1430.0, 'init_ShelterA_2_382': 1450.0, 'init_ShelterA_2_385': 1450.0, 'init_ShelterA_2_387': 1450.0, 'init_ShelterA_2_388': 1450.0, 'init_ShelterA_2_373': 1460.0, 'init_ShelterA_2_386': 1460.0, 'init_ShelterA_2_390': 1460.0, 'init_ShelterA_2_392': 1460.0, 'init_ShelterA_2_394': 1460.0, 'init_ShelterA_2_374': 1470.0, 'init_ShelterA_2_389': 1480.0, 'init_ShelterA_2_391': 1480.0, 'init_ShelterA_2_398': 1480.0, 'init_ShelterA_2_395': 1490.0, 'init_ShelterA_2_396': 1490.0, 'init_ShelterA_2_397': 1500.0, 'init_ShelterA_2_399': 1500.0, 'init_ShelterA_2_381': 1510.0, 'init_ShelterA_2_380': 1540.0, 'init_ShelterA_2_383': 1560.0, 'init_ShelterA_2_384': 1600.0}
+pedestrian_count:0
+route_changed_vehicle_count:240
+route_change_event_count:240
+rate_vehicle_abandonment:0.00%
+wrong_way_driving_count:0
+vehicle_abandonment_count:0
+normalcy_bias_route_change_count:235
+majority_bias_route_change_count:5
+lane_changed_vehicle_count:0
+info_obtained_lanechange_count:0
+elapsed_time_lanechange_count:0
+majority_bias_lanechange_count:0
+end       : Sat Jul 11 15:46:47 JST 2026
