@@ -257,7 +257,7 @@ def build_route_change_annotation_table(
 
         annotation = (
             f"{total:.1f}\n"
-            f"{normalcy_ratio:.0f}:{majority_ratio:.0f}"
+            f"({normalcy_ratio:.0f}:{majority_ratio:.0f})"
         )
 
         annotation_map[(row, col)] = annotation
