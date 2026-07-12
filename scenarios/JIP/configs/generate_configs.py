@@ -25,10 +25,8 @@ parameter_grid = {
         0.20,
         0.25,
         0.30,
-        0.35,
     ],
     "active_route_change_threshold_center": [
-        100.0,
         150.0,
         200.0,
         250.0,
