@@ -9,15 +9,7 @@ Usage:
 Examples:
   ./batch_jobs.sh 1 36 1-1-2
   ./batch_jobs.sh 24 25 1-1-4
-  ./batch_jobs.sh 24 25 1-1-4-v2vonly
-
-TARGET_SCENARIO_DIR:
-  scenarios/JIP/ の直下にあるディレクトリ名を指定する。
-
-  例:
-    1-1-2
-    1-1-4
-    1-1-4-v2vonly
+  ./batch_jobs.sh 70 73 1-1-4-v2vonly
 USAGE
 }
 
@@ -30,14 +22,12 @@ SCENARIO_FROM="$1"
 SCENARIO_TO="$2"
 TARGET_SCENARIO_DIR="$3"
 
-# このスクリプトが置かれているプロジェクトルートへ移動する。
 SCRIPT_DIR="$(
   cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
   pwd -P
 )"
 cd "${SCRIPT_DIR}"
 
-# 数値チェック
 if [[ ! "${SCENARIO_FROM}" =~ ^[0-9]+$ ]]; then
   echo "ERROR: SCENARIO_FROM must be an integer: ${SCENARIO_FROM}" >&2
   exit 2
@@ -53,8 +43,6 @@ if (( SCENARIO_FROM > SCENARIO_TO )); then
   exit 2
 fi
 
-# ディレクトリトラバーサルなどを防ぐため、
-# scenarios/JIP直下の単一ディレクトリ名だけを受け付ける。
 if [[ ! "${TARGET_SCENARIO_DIR}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   echo "ERROR: Invalid TARGET_SCENARIO_DIR: ${TARGET_SCENARIO_DIR}" >&2
   exit 2
@@ -75,18 +63,19 @@ if [[ ! -f "${SLURM_SCRIPT}" ]]; then
   exit 2
 fi
 
-# 実験設定
+# 各条件の実行回数
 n=50
 
 # early_rateは固定
 early_rate="1.0"
 
-# v2v_rateのみsweep
+# v2v_rate
 v2v_capable_vehicle_rate_list=(
   "1.0"
 )
 
-# mountが正常なノードだけ使用
+# 使用を許可するノード
+# 1ジョブにつき、この中のいずれか1台を割り当てる。
 ALIVE_NODES="paganini,elgar,chopin"
 
 mkdir -p logs
@@ -99,7 +88,8 @@ echo "scenario range  : ${SCENARIO_FROM}..${SCENARIO_TO}"
 echo "n               : ${n}"
 echo "early_rate      : ${early_rate}"
 echo "v2v_list        : (${v2v_capable_vehicle_rate_list[*]})"
-echo "nodes           : ${ALIVE_NODES}"
+echo "allowed nodes   : ${ALIVE_NODES}"
+echo "nodes per job   : 1"
 
 for ((
   scenarioID = SCENARIO_FROM;
@@ -119,6 +109,8 @@ for ((
 
       sbatch \
         --partition=ubuntu \
+        --nodes=1 \
+        --ntasks=1 \
         --nodelist="${ALIVE_NODES}" \
         --job-name="${job_name}" \
         "${SLURM_SCRIPT}" \
