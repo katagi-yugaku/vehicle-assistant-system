@@ -60,11 +60,7 @@ if [[ ! "${TARGET_SCENARIO_DIR}" =~ ^[A-Za-z0-9._-]+$ ]]; then
   exit 2
 fi
 
-TARGET_RUNNER_PATH="${
-  SCRIPT_DIR
-}/scenarios/JIP/${
-  TARGET_SCENARIO_DIR
-}/simulation/runner_simulator.py"
+TARGET_RUNNER_PATH="${SCRIPT_DIR}/scenarios/JIP/${TARGET_SCENARIO_DIR}/simulation/runner_simulator.py"
 
 if [[ ! -f "${TARGET_RUNNER_PATH}" ]]; then
   echo "ERROR: runner_simulator.py was not found:" >&2
