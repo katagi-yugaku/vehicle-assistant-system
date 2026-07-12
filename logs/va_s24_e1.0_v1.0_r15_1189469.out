@@ -1,0 +1,9 @@
+=== Job Info ===
+host      : paganini
+jobid     : 1189469
+scenario  : 24
+early_rate: 1.0
+v2v_rate  : 1.0
+run_id    : 15
+config    : scenarios/JIP/configs/config_scenario_24.toml
+start     : Mon Jul 13 03:37:58 JST 2026

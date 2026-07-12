@@ -1,0 +1,10 @@
+=== Job Info ===
+host      : chopin
+jobid     : 1189450
+scenario  : 23
+early_rate: 1.0
+v2v_rate  : 1.0
+run_id    : 46
+config    : scenarios/JIP/configs/config_scenario_23.toml
+start     : Mon Jul 13 03:34:03 JST 2026
+Step #0.00 (0ms ?*RT. ?UPS, TraCI: 342ms, vehicles TOT 1 ACT 1 BUF 0)                     Step #100.00 (0ms ?*RT. ?UPS, TraCI: 21ms, vehicles TOT 26 ACT 26 BUF 0)                  Step #200.00 (0ms ?*RT. ?UPS, TraCI: 50ms, vehicles TOT 51 ACT 51 BUF 0)                  Step #300.00 (0ms ?*RT. ?UPS, TraCI: 69ms, vehicles TOT 77 ACT 77 BUF 0)                  Step #400.00 (1ms ~= 1000.00*RT, ~104000.00UPS, TraCI: 1420ms, vehicles TOT 104 ACT 104 BUStep #500.00 (0ms ?*RT. ?UPS, TraCI: 2491ms, vehicles TOT 131 ACT 131 BUF 0)              Step #600.00 (1ms ~= 1000.00*RT, ~158000.00UPS, TraCI: 2718ms, vehicles TOT 158 ACT 158 BUStep #700.00 (1ms ~= 1000.00*RT, ~186000.00UPS, TraCI: 3115ms, vehicles TOT 186 ACT 186 BUStep #800.00 (1ms ~= 1000.00*RT, ~213000.00UPS, TraCI: 4468ms, vehicles TOT 219 ACT 213 BUStep #900.00 (1ms ~= 1000.00*RT, ~224000.00UPS, TraCI: 4139ms, vehicles TOT 264 ACT 224 BUStep #1000.00 (1ms ~= 1000.00*RT, ~256000.00UPS, TraCI: 4341ms, vehicles TOT 302 ACT 256 BStep #1100.00 (1ms ~= 1000.00*RT, ~289000.00UPS, TraCI: 4515ms, vehicles TOT 341 ACT 289 BStep #1200.00 (2ms ~= 500.00*RT, ~159500.00UPS, TraCI: 4949ms, vehicles TOT 377 ACT 319 BUStep #1300.00 (2ms ~= 500.00*RT, ~174500.00UPS, TraCI: 5710ms, vehicles TOT 417 ACT 349 BU

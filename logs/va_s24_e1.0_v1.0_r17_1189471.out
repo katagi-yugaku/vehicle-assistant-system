@@ -1,0 +1,10 @@
+=== Job Info ===
+host      : elgar
+jobid     : 1189471
+scenario  : 24
+early_rate: 1.0
+v2v_rate  : 1.0
+run_id    : 17
+config    : scenarios/JIP/configs/config_scenario_24.toml
+start     : 2026年  7月 13日 月曜日 03:38:43 JST
+Step #0.00 (0ms ?*RT. ?UPS, TraCI: 235ms, vehicles TOT 1 ACT 1 BUF 0)                     Step #100.00 (0ms ?*RT. ?UPS, TraCI: 14ms, vehicles TOT 26 ACT 26 BUF 0)                  Step #200.00 (0ms ?*RT. ?UPS, TraCI: 29ms, vehicles TOT 51 ACT 51 BUF 0)                  Step #300.00 (1ms ~= 1000.00*RT, ~77000.00UPS, TraCI: 42ms, vehicles TOT 77 ACT 77 BUF 0) Step #400.00 (0ms ?*RT. ?UPS, TraCI: 1043ms, vehicles TOT 104 ACT 104 BUF 0)              Step #500.00 (1ms ~= 1000.00*RT, ~131000.00UPS, TraCI: 1733ms, vehicles TOT 131 ACT 131 BUStep #600.00 (1ms ~= 1000.00*RT, ~158000.00UPS, TraCI: 2146ms, vehicles TOT 158 ACT 158 BUStep #700.00 (1ms ~= 1000.00*RT, ~186000.00UPS, TraCI: 2347ms, vehicles TOT 186 ACT 186 BUStep #800.00 (1ms ~= 1000.00*RT, ~215000.00UPS, TraCI: 2523ms, vehicles TOT 217 ACT 215 BUStep #900.00 (0ms ?*RT. ?UPS, TraCI: 3467ms, vehicles TOT 250 ACT 224 BUF 20)             Step #1000.00 (0ms ?*RT. ?UPS, TraCI: 3685ms, vehicles TOT 292 ACT 263 BUF 11)            Step #1100.00 (0ms ?*RT. ?UPS, TraCI: 3305ms, vehicles TOT 325 ACT 287 BUF 17)            Step #1200.00 (1ms ~= 1000.00*RT, ~310000.00UPS, TraCI: 3887ms, vehicles TOT 360 ACT 310 BStep #1300.00 (1ms ~= 1000.00*RT, ~334000.00UPS, TraCI: 4153ms, vehicles TOT 394 ACT 334 BStep #1400.00 (1ms ~= 1000.00*RT, ~364000.00UPS, TraCI: 4765ms, vehicles TOT 427 ACT 364 B

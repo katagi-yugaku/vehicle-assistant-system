@@ -1,0 +1,9 @@
+=== Job Info ===
+host      : elgar
+jobid     : 1189499
+scenario  : 24
+early_rate: 1.0
+v2v_rate  : 1.0
+run_id    : 45
+config    : scenarios/JIP/configs/config_scenario_24.toml
+start     : 2026年  7月 13日 月曜日 03:46:34 JST

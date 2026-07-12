@@ -1,0 +1,9 @@
+=== Job Info ===
+host      : chopin
+jobid     : 1189452
+scenario  : 23
+early_rate: 1.0
+v2v_rate  : 1.0
+run_id    : 48
+config    : scenarios/JIP/configs/config_scenario_23.toml
+start     : Mon Jul 13 03:34:13 JST 2026
