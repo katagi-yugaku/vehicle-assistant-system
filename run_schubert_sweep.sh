@@ -4,21 +4,30 @@ set -uo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  run_schubert_sweep.sh SCENARIO_FROM SCENARIO_TO [MAX_PARALLEL]
+  run_schubert_sweep.sh [--start-at JOB_NAME] SCENARIO_FROM SCENARIO_TO [MAX_PARALLEL]
 
 Examples:
   ./run_schubert_sweep.sh 1 36
   MAX_PARALLEL=16 ./run_schubert_sweep.sh 1 36
   ./run_schubert_sweep.sh 1 36 16
+  ./run_schubert_sweep.sh --start-at va_s15_e1.0_v1.0_r17 15 25 25
+  START_AT_JOB=va_s15_e1.0_v1.0_r17 ./run_schubert_sweep.sh 15 25 25
+
+Start-point behavior:
+  --start-at JOB_NAME
+      Skip every planned job before JOB_NAME and begin at JOB_NAME.
+      JOB_NAME must exactly match the generated name:
+      va_s{scenario}_e{early_rate}_v{v2v_rate}_r{run_id}
 
 Environment variables:
   N                    Runs per parameter combination; default: 50
-  MAX_PARALLEL         Maximum concurrent jobs; default: 20
+  MAX_PARALLEL         Maximum concurrent jobs; default: 25
   EARLY_RATE_LIST      Space-separated early-rate values; default: "1.0"
   V2V_RATE_LIST        Space-separated V2V-rate values; default: "1.0"
   PROJECT_ROOT         Override the detected Git/project root.
   ALLOW_NON_SCHUBERT   Set to 1 to allow execution on hosts other than schubert.
   FORCE_RERUN          Set to 1 to rerun successful jobs.
+  START_AT_JOB         Same as --start-at. The command-line option takes precedence.
 USAGE
 }
 
@@ -113,7 +122,12 @@ reap_one() {
 print_summary() {
   local end_time="$1"
   local successful_total=$((SUCCESS_THIS_RUN + SKIPPED_COUNT))
-  local not_launched=$((TOTAL_EXPERIMENTS - LAUNCHED_COUNT - SKIPPED_COUNT))
+  local not_launched=$((
+    TOTAL_EXPERIMENTS
+    - LAUNCHED_COUNT
+    - SKIPPED_COUNT
+    - SKIPPED_BEFORE_START_COUNT
+  ))
 
   printf '\n=== Sweep Summary ===\n'
   printf '総実験数=%s\n' "${TOTAL_EXPERIMENTS}"
@@ -122,6 +136,7 @@ print_summary() {
   printf '成功数=%s\n' "${successful_total}"
   printf '  今回成功=%s\n' "${SUCCESS_THIS_RUN}"
   printf '  成功済みスキップ=%s\n' "${SKIPPED_COUNT}"
+  printf '開始地点以前のスキップ=%s\n' "${SKIPPED_BEFORE_START_COUNT}"
   printf '失敗数=%s\n' "${FAILED_COUNT}"
   printf '開始時刻=%s\n' "${SWEEP_START_TIME}"
   printf '終了時刻=%s\n' "${end_time}"
@@ -179,6 +194,49 @@ handle_sweep_signal() {
   exit "${exit_code}"
 }
 
+START_AT_JOB="${START_AT_JOB:-}"
+declare -a POSITIONAL_ARGS=()
+
+while (( $# > 0 )); do
+  case "$1" in
+    --start-at)
+      if (( $# < 2 )); then
+        echo "ERROR: --start-at requires JOB_NAME." >&2
+        usage >&2
+        exit 2
+      fi
+      START_AT_JOB="$2"
+      shift 2
+      ;;
+    --start-at=*)
+      START_AT_JOB="${1#*=}"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      while (( $# > 0 )); do
+        POSITIONAL_ARGS+=("$1")
+        shift
+      done
+      ;;
+    -*)
+      echo "ERROR: Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+set -- "${POSITIONAL_ARGS[@]}"
+
 if (( $# < 2 || $# > 3 )); then
   usage >&2
   exit 2
@@ -188,6 +246,13 @@ SCENARIO_FROM="$1"
 SCENARIO_TO="$2"
 MAX_PARALLEL="${3:-${MAX_PARALLEL:-25}}"
 n="${N:-50}"
+
+if [[ -n "${START_AT_JOB}" ]] && \
+   [[ ! "${START_AT_JOB}" =~ ^va_s[0-9]+_e[^[:space:]]+_v[^[:space:]]+_r[1-9][0-9]*$ ]]; then
+  echo "ERROR: Invalid START_AT_JOB format: ${START_AT_JOB}" >&2
+  echo "Expected: va_s{scenario}_e{early_rate}_v{v2v_rate}_r{run_id}" >&2
+  exit 2
+fi
 
 if ! is_integer "${SCENARIO_FROM}"; then
   echo "ERROR: SCENARIO_FROM must be an integer: ${SCENARIO_FROM}" >&2
@@ -312,6 +377,7 @@ printf 'early_rate_list=%s\n' "${early_rate_list[*]}"
 printf 'v2v_rate_list=%s\n' "${v2v_capable_vehicle_rate_list[*]}"
 printf 'max_parallel=%s\n' "${MAX_PARALLEL}"
 printf 'force_rerun=%s\n' "${FORCE_RERUN:-0}"
+printf 'start_at_job=%s\n' "${START_AT_JOB:-<beginning>}"
 
 SWEEP_START_TIME="$(date '+%Y-%m-%dT%H:%M:%S%z')"
 TOTAL_EXPERIMENTS=$((
@@ -324,7 +390,15 @@ LAUNCHED_COUNT=0
 RUNNING_COUNT=0
 SUCCESS_THIS_RUN=0
 SKIPPED_COUNT=0
+SKIPPED_BEFORE_START_COUNT=0
 FAILED_COUNT=0
+
+if [[ -n "${START_AT_JOB}" ]]; then
+  START_REACHED=0
+else
+  START_REACHED=1
+fi
+
 declare -A PID_TO_JOB=()
 declare -a FAILED_JOBS=()
 
@@ -337,6 +411,16 @@ for ((scenario_id = SCENARIO_FROM; scenario_id <= SCENARIO_TO; scenario_id++)); 
       for ((run_id = 1; run_id <= n; run_id++)); do
         job_name="va_s${scenario_id}_e${early_rate}_v${v2v_rate}_r${run_id}"
         status_file="${LOG_ROOT}/${job_name}/status.txt"
+
+        if (( START_REACHED == 0 )); then
+          if [[ "${job_name}" == "${START_AT_JOB}" ]]; then
+            START_REACHED=1
+            printf '[RESUME] starting at %s\n' "${job_name}"
+          else
+            ((SKIPPED_BEFORE_START_COUNT += 1))
+            continue
+          fi
+        fi
 
         if [[ "${FORCE_RERUN:-0}" != "1" ]] && status_is_success "${status_file}"; then
           ((SKIPPED_COUNT += 1))
@@ -364,6 +448,14 @@ for ((scenario_id = SCENARIO_FROM; scenario_id <= SCENARIO_TO; scenario_id++)); 
     done
   done
 done
+
+if [[ -n "${START_AT_JOB}" ]] && (( START_REACHED == 0 )); then
+  echo "ERROR: The requested start job was not found in this sweep:" >&2
+  echo "  ${START_AT_JOB}" >&2
+  echo "Check SCENARIO_FROM/SCENARIO_TO, N, EARLY_RATE_LIST, and V2V_RATE_LIST." >&2
+  print_summary "$(date '+%Y-%m-%dT%H:%M:%S%z')"
+  exit 2
+fi
 
 while (( RUNNING_COUNT > 0 )); do
   reap_one
