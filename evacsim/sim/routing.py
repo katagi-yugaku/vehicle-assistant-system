@@ -284,7 +284,6 @@ def find_alternative_route_calculated_time(
         )
     else:
         route_iter = route_edges_by_routeID_dict.items()
-
     for routeID, edges_for_routeID in route_iter:
         current_route_time, best_alternative_time, best_alternative_route = (
             extract_current_and_best_alternative_time(
@@ -292,14 +291,16 @@ def find_alternative_route_calculated_time(
                 current_route=tuple(edges_for_routeID),
             )
         )
-
+        print(f"{agent.get_vehID()}routeID={routeID}, current_route_time={current_route_time}, best_alternative_time={best_alternative_time}, threshold={agent.get_route_change_threshold()}")
+        print(f"vehInfo.get_avg_evac_time_by_route_by_recive_time()={vehInfo.get_avg_evac_time_by_route_by_recive_time()}")
         if current_route_time is not None and best_alternative_time is not None:
             if (
                 current_route_time - best_alternative_time
                 > agent.get_route_change_threshold()
             ):
                 return routeID
-
+            # else:
+                # print(f"current_route_time={current_route_time}, best_alternative_time={best_alternative_time}, threshold={agent.get_route_change_threshold()}")
     return None
 
 

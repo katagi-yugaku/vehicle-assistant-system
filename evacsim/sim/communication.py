@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-
+from copy import deepcopy
 from evacsim.sim.sumo_env import ensure_sumo_tools_on_path
 
 ensure_sumo_tools_on_path()
@@ -245,7 +245,9 @@ def v2v_communication(
                     )
 
                     info_target.set_shelter_congestion_info(
+                        deepcopy(
                         info_source.get_shelter_congestion_info()
+                        )
                     )
 
             target_of_route_info_tuple, = (
@@ -282,7 +284,7 @@ def v2v_communication(
                 )
 
                 info_target.set_avg_evac_time_by_route_by_recive_time(
-                    info_source.get_avg_evac_time_by_route_by_recive_time()
+                    deepcopy(info_source.get_avg_evac_time_by_route_by_recive_time())
                 )
 
 

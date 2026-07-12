@@ -231,7 +231,7 @@ def control_vehicles():
                                                             vehID=current_vehID,
                                                             local_density=local_density,
                                                             v_free=4.0,     # 自由流速度
-                                                            v_min=2.0,      # 最低速度
+                                                            v_min=2.5,      # 最低速度
                                                             gap_min=7.0,    # 強い減速を始めるギャップ
                                                             tau=1.8,        # ギャップ→速度変換の傾き
                                                             alpha=0.5,      # 平滑化

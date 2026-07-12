@@ -271,7 +271,7 @@ class RouteChangeEvent:
 # 原則として1台1回だけ経路変更する現行モデル。
 # 複数回を許可する場合も、イベント数とユニーク車両数は別集計される。
 ALLOW_MULTIPLE_ROUTE_CHANGES_PER_LOGICAL_VEHICLE = False
-ROUTE_CHANGE_PROHIBITED_EDGES = {"E13", "E15", "E150", "E16", "E12", "E5"}
+ROUTE_CHANGE_PROHIBITED_EDGES = {"E13", "E150", "E16", "E12", "E5"}
 
 route_change_events: list[RouteChangeEvent] = []
 route_change_state_by_logical_vehicle_id: dict[str, RouteChangeState] = {}
@@ -299,6 +299,53 @@ observed_route_change_event_ids_by_logical_vehicle_id: dict[
 majority_bias_evaluation_count_by_logical_vehicle_id: dict[str, int] = defaultdict(int)
 majority_bias_rejection_count_by_logical_vehicle_id: dict[str, int] = defaultdict(int)
 
+
+def get_avg_time_by_route(
+    route_info_with_receive_time: dict,
+    target_route,
+) -> float | None:
+    """
+    指定した経路に対応する平均所要時間を取得する。
+
+    Args:
+        route_info_with_receive_time:
+            {
+                receive_time: {
+                    route_tuple: {
+                        "avg_time": float,
+                        "vehicles": int,
+                    }
+                }
+            }
+
+        target_route:
+            検索対象の経路。listまたはtuple。
+
+    Returns:
+        対応するavg_time。
+        経路が存在しない場合はNone。
+    """
+    if not route_info_with_receive_time:
+        return None
+
+    latest_time = max(route_info_with_receive_time)
+    route_info_dict = route_info_with_receive_time.get(
+        latest_time,
+        {},
+    )
+
+    target_route = tuple(target_route)
+    route_info = route_info_dict.get(target_route)
+
+    if route_info is None:
+        return None
+
+    avg_time = route_info.get("avg_time")
+
+    if avg_time is None:
+        return None
+
+    return float(avg_time)
 
 def _is_interval_step(current_time: float, interval: float) -> bool:
     """浮動小数点誤差を許容して、interval 秒境界かを判定する。"""
@@ -562,9 +609,19 @@ def _execute_set_route_edges(
     remaining_route = route_edges[route_edges.index(current_edgeID):]
     if not remaining_route or remaining_route[0] != current_edgeID:
         return False, route_before, route_before, "candidate route does not start at current edge"
-
+    if remaining_route[-1] == "E16":
+        shelterID = "ShelterA_1"
+    elif remaining_route[-1] == "E13":
+        shelterID = "ShelterA_2"
+    else:
+        return False, route_before, route_before, "candidate route does not end at a known shelter"
     try:
         traci.vehicle.setRoute(vehID, remaining_route)
+        traci.vehicle.setParkingAreaStop(
+                vehID=vehID,
+                stopID=shelterID,
+                duration=100000,
+        )
     except traci.exceptions.TraCIException as exc:
         return False, route_before, route_before, str(exc)
 
@@ -800,94 +857,221 @@ def control_vehicles():
         if not is_step_10:
             continue
 
-        # ============================================================
-        # 1. 避難所満杯情報による変更（正常性・同調性とは排他的）
-        # ============================================================
-        if (
-            has_multiple_shelters(edgeID_by_shelterID)
-            and agent_by_current_vehID.get_shelter_full_info_obtained_flg()
-        ):
-            route_change_state_by_logical_vehicle_id[logical_vehicle_id] = RouteChangeState.DECIDED
-            route_before = _safe_get_route(current_vehID)
-            from_edgeID, shelterID, to_edge_list = find_alternative_shelter_choice(
-                current_target_shelterID=agent_by_current_vehID.get_target_shelter(),
-                vehID=current_vehID,
-                current_edgeID=current_edgeID,
-                vehInfo=vehInfo_by_current_vehID,
-                shelter_list=shelter_list,
-                agent=agent_by_current_vehID,
+        if  len(next(iter(
+                    vehInfo_by_current_vehID
+                    .get_avg_evac_time_by_route_by_recive_time()
+                    .values()
+                    )
+                )
+            )<2:
+                    
+            continue
+        if current_edgeID in {"E1"}:
+
+            route_info_with_receive_time = (
+                vehInfo_by_current_vehID
+                .get_avg_evac_time_by_route_by_recive_time()
             )
 
-            if not (from_edgeID and shelterID and to_edge_list):
-                _mark_failed_route_change(
-                    logical_vehicle_id=logical_vehicle_id,
-                    sumo_vehicle_id=current_vehID,
-                    decision_time=current_time,
-                    reason="shelter_full",
-                    from_edge_id=current_edgeID,
-                    target_shelter_id=shelterID or "",
-                    route_before=route_before,
-                    failure_reason="no valid alternative shelter route",
-                )
+            # 経路情報がない場合
+            if not route_info_with_receive_time:
+                    continue
+
+            # 最新時刻の経路情報を取得
+            latest_receive_time = max(route_info_with_receive_time)
+            latest_route_info = route_info_with_receive_time.get(
+                latest_receive_time,
+                {},
+            )
+
+            # 現在経路と代替経路の2経路分が必要
+            if len(latest_route_info) < 2:
                 continue
 
-            route_change_state_by_logical_vehicle_id[logical_vehicle_id] = RouteChangeState.EXECUTING
-            (
-                NEW_VEHICLE_COUNT,
-                success,
-                new_vehID,
-                route_before,
-                route_after,
-                error,
-            ) = _execute_generated_vehicle_route_change(
-                target_vehID=current_vehID,
-                current_new_vehicle_count=NEW_VEHICLE_COUNT,
-                vehInfo_by_target_vehID=vehInfo_by_current_vehID,
-                agent_by_target_vehID=agent_by_current_vehID,
-                from_edgeID=from_edgeID,
-                new_shelterID=shelterID,
-                to_edgeID=to_edge_list[0],
-            )
-            if success:
-                _mark_successful_route_change(
-                    logical_vehicle_id=logical_vehicle_id,
-                    sumo_vehicle_id_before=current_vehID,
-                    sumo_vehicle_id_after=new_vehID,
-                    agent=agent_by_current_vehID,
-                    decision_time=current_time,
-                    execution_time=current_time,
-                    reason="shelter_full",
-                    change_type="uturn",
-                    from_edge_id=current_edgeID,
-                    target_shelter_id=shelterID,
-                    route_before=route_before,
-                    route_after=route_after,
+            # 分岐前のE1でのみ、受信した平均所要時間を使って判断
+            if current_edgeID == "E1":
+                current_route = tuple(
+                    traci.vehicle.getRoute(current_vehID)
                 )
-            else:
-                _mark_failed_route_change(
-                    logical_vehicle_id=logical_vehicle_id,
-                    sumo_vehicle_id=current_vehID,
-                    decision_time=current_time,
-                    reason="shelter_full",
-                    from_edge_id=current_edgeID,
-                    target_shelter_id=shelterID,
-                    route_before=route_before,
-                    change_type="uturn",
-                    failure_reason=error or "vehicle regeneration failed",
-                )
-            continue
 
-        # 正常性・同調性は現在の実装方針どおり、渋滞中のみ評価する。
-        if not is_vehID_in_congested_edge(
-            vehID=current_vehID,
-            threshold_speed=THRESHOLD_SPEED,
-        ):
-            continue
+                target_shelterID = (
+                    agent_by_current_vehID.get_target_shelter()
+                )
+
+                if target_shelterID == "ShelterA_1":
+                    alternative_route_id = "E0_E13_0"
+                    alternative_shelter_id = "ShelterA_2"
+                elif target_shelterID == "ShelterA_2":
+                    alternative_route_id = "E0_E16_0"
+                    alternative_shelter_id = "ShelterA_1"
+                else:
+                    continue
+
+                alternative_route_edges = tuple(
+                    traci.route.getEdges(
+                        alternative_route_id
+                    )
+                )
+
+                current_route_avg_time = get_avg_time_by_route(
+                    route_info_with_receive_time=(
+                        route_info_with_receive_time
+                    ),
+                    target_route=current_route,
+                )
+
+                alternative_route_avg_time = get_avg_time_by_route(
+                    route_info_with_receive_time=(
+                        route_info_with_receive_time
+                    ),
+                    target_route=alternative_route_edges,
+                )
+
+                # どちらかの平均所要時間を取得できない場合
+                if (
+                    current_route_avg_time is None
+                    or alternative_route_avg_time is None
+                ):
+                    continue
+
+                time_gap = (
+                    current_route_avg_time
+                    - alternative_route_avg_time
+                )
+
+                route_change_threshold = float(
+                    agent_by_current_vehID
+                    .get_route_change_threshold()
+                )
+
+                # 代替経路の時間短縮量が閾値以下なら変更しない
+                if time_gap <= route_change_threshold:
+                    continue
+
+                # 経路変更を決意
+                route_change_state_by_logical_vehicle_id[
+                    logical_vehicle_id
+                ] = RouteChangeState.DECIDED
+
+                # 代替経路に現在エッジが含まれない場合
+                if current_edgeID not in alternative_route_edges:
+                    _mark_failed_route_change(
+                        logical_vehicle_id=logical_vehicle_id,
+                        sumo_vehicle_id=current_vehID,
+                        decision_time=current_time,
+                        reason="normalcy",
+                        change_type="route_change",
+                        from_edge_id=current_edgeID,
+                        target_shelter_id=alternative_shelter_id,
+                        route_before=current_route,
+                        failure_reason=(
+                            "current edge is not included "
+                            "in alternative route"
+                        ),
+                    )
+                    continue
+
+                current_edge_index = (
+                    alternative_route_edges.index(
+                        current_edgeID
+                    )
+                )
+
+                route_edges_for_sumo = (
+                    alternative_route_edges[
+                        current_edge_index:
+                    ]
+                )
+
+                if not route_edges_for_sumo:
+                    _mark_failed_route_change(
+                        logical_vehicle_id=logical_vehicle_id,
+                        sumo_vehicle_id=current_vehID,
+                        decision_time=current_time,
+                        reason="normalcy",
+                        change_type="route_change",
+                        from_edge_id=current_edgeID,
+                        target_shelter_id=alternative_shelter_id,
+                        route_before=current_route,
+                        failure_reason=(
+                            "route_edges_for_sumo is empty"
+                        ),
+                    )
+                    continue
+
+                route_change_state_by_logical_vehicle_id[
+                    logical_vehicle_id
+                ] = RouteChangeState.EXECUTING
+
+                # 既存の共通関数を使って経路変更
+                (
+                    success,
+                    route_before,
+                    route_after,
+                    error,
+                ) = _execute_set_route_edges(
+                    vehID=current_vehID,
+                    current_edgeID=current_edgeID,
+                    route_edges_for_sumo=route_edges_for_sumo,
+                )
+
+                if success:
+                    # Agent側の目的避難所を更新
+                    set_target_shelter = getattr(
+                        agent_by_current_vehID,
+                        "set_target_shelter",
+                        None,
+                    )
+
+                    if callable(set_target_shelter):
+                        set_target_shelter(
+                            alternative_shelter_id
+                        )
+
+                    # 成功イベントとして記録
+                    # この中でカウンタが自動更新される
+                    _mark_successful_route_change(
+                        logical_vehicle_id=logical_vehicle_id,
+                        sumo_vehicle_id_before=current_vehID,
+                        sumo_vehicle_id_after=current_vehID,
+                        agent=agent_by_current_vehID,
+                        decision_time=current_time,
+                        execution_time=current_time,
+                        reason="normalcy",
+                        change_type="route_change",
+                        from_edge_id=current_edgeID,
+                        target_shelter_id=(
+                            alternative_shelter_id
+                        ),
+                        route_before=route_before,
+                        route_after=route_after,
+                    )
+
+                else:
+                    _mark_failed_route_change(
+                        logical_vehicle_id=logical_vehicle_id,
+                        sumo_vehicle_id=current_vehID,
+                        decision_time=current_time,
+                        reason="normalcy",
+                        change_type="route_change",
+                        from_edge_id=current_edgeID,
+                        target_shelter_id=(
+                            alternative_shelter_id
+                        ),
+                        route_before=route_before,
+                        failure_reason=(
+                            error or "setRoute failed"
+                        ),
+                    )
+
+                # 同じステップで正常性・同調性を再評価しない
+                continue
 
         if not agent_by_current_vehID.get_encounted_congestion_flg():
             agent_by_current_vehID.set_encounted_congestion_time(current_time)
             agent_by_current_vehID.set_encounted_congestion_flg(True)
-
+        if current_edgeID in ["E1", "E20"]:
+            continue
         # ============================================================
         # 2. 正常性バイアス
         # ============================================================
@@ -919,6 +1103,13 @@ def control_vehicles():
                 failure_reason=f"route evaluation failed: {exc}",
             )
             continue
+        
+        # 正常性・同調性は現在の実装方針どおり、渋滞中のみ評価する。
+        # if not is_vehID_in_congested_edge(
+        #     vehID=current_vehID,
+        #     threshold_speed=THRESHOLD_SPEED,
+        # ):
+        #     continue
 
         # 「情報を取得した」と「閾値を超えた」を分離する。
         agent_by_current_vehID.set_route_congestion_info_obtained_time(current_time)
@@ -938,61 +1129,6 @@ def control_vehicles():
                     route_before=_safe_get_route(current_vehID),
                     failure_reason="route change prohibited on current edge",
                 )
-                continue
-
-            # 分岐点では既存routeIDを利用する。
-            if current_edgeID in {"E1", "E20"}:
-                routeID = find_alternative_route_calculated_time(
-                    current_edgeID=current_edgeID,
-                    vehInfo=vehInfo_by_current_vehID,
-                    agent=agent_by_current_vehID,
-                    shelter_list=shelter_list,
-                    custome_edge_list=custome_edge_list,
-                )
-                if routeID is None:
-                    _mark_failed_route_change(
-                        logical_vehicle_id=logical_vehicle_id,
-                        sumo_vehicle_id=current_vehID,
-                        decision_time=current_time,
-                        reason="normalcy",
-                        from_edge_id=current_edgeID,
-                        target_shelter_id=shelterID or "",
-                        route_before=_safe_get_route(current_vehID),
-                        failure_reason=f"no routeID despite threshold exceeded; time_gain={time_gain}",
-                    )
-                    continue
-
-                route_change_state_by_logical_vehicle_id[logical_vehicle_id] = RouteChangeState.EXECUTING
-                success, route_before, route_after, error = _execute_set_route_id(
-                    current_vehID,
-                    routeID,
-                )
-                if success:
-                    _mark_successful_route_change(
-                        logical_vehicle_id=logical_vehicle_id,
-                        sumo_vehicle_id_before=current_vehID,
-                        sumo_vehicle_id_after=current_vehID,
-                        agent=agent_by_current_vehID,
-                        decision_time=current_time,
-                        execution_time=current_time,
-                        reason="normalcy",
-                        from_edge_id=current_edgeID,
-                        target_shelter_id=shelterID or agent_by_current_vehID.get_target_shelter(),
-                        route_before=route_before,
-                        route_after=route_after,
-                    )
-                else:
-                    _mark_failed_route_change(
-                        logical_vehicle_id=logical_vehicle_id,
-                        sumo_vehicle_id=current_vehID,
-                        decision_time=current_time,
-                        reason="normalcy",
-                        from_edge_id=current_edgeID,
-                        target_shelter_id=shelterID or "",
-                        route_before=route_before,
-                        failure_reason=error or "setRouteID failed",
-                    )
-                # 正常性条件成立後の実行失敗を、同じstepで同調性へフォールバックしない。
                 continue
 
             if not (from_edgeID and shelterID and to_edge_list):
@@ -1150,24 +1286,24 @@ def control_vehicles():
             < observation.effective_probability
         )
 
-        # if observation.uturn_change_count > 0:
-        #     print(
-        #         "[MAJORITY_BIAS_EVALUATION]",
-        #         f"logical_vehicle_id={logical_vehicle_id}",
-        #         f"sumo_vehicle_id={current_vehID}",
-        #         f"time={current_time}",
-        #         f"rc_change_count={observation.rc_change_count}",
-        #         f"uturn_change_count={observation.uturn_change_count}",
-        #         f"new_event_ids={new_event_ids}",
-        #         f"new_event_count={len(new_event_ids)}",
-        #         f"effective_observation_count="
-        #         f"{observation.effective_observation_count:.3f}",
-        #         f"p_follow={P_FOLLOW:.3f}",
-        #         f"effective_probability="
-        #         f"{observation.effective_probability:.6f}",
-        #         f"random_value={follow_random_value:.6f}",
-        #         f"should_follow={should_follow}",
-        #     )
+        if observation.uturn_change_count > 0:
+            print(
+                "[MAJORITY_BIAS_EVALUATION]",
+                f"logical_vehicle_id={logical_vehicle_id}",
+                f"sumo_vehicle_id={current_vehID}",
+                f"time={current_time}",
+                f"rc_change_count={observation.rc_change_count}",
+                f"uturn_change_count={observation.uturn_change_count}",
+                f"new_event_ids={new_event_ids}",
+                f"new_event_count={len(new_event_ids)}",
+                f"effective_observation_count="
+                f"{observation.effective_observation_count:.3f}",
+                f"p_follow={P_FOLLOW:.3f}",
+                f"effective_probability="
+                f"{observation.effective_probability:.6f}",
+                f"random_value={follow_random_value:.6f}",
+                f"should_follow={should_follow}",
+            )
 
         if not should_follow:
             majority_bias_rejection_count_by_logical_vehicle_id[
@@ -1447,10 +1583,10 @@ if __name__ == "__main__":
 
     # 実行ごとに異なる32bitのseedを生成する。
     # 固定ではないが、出力されたseedを再設定すれば結果を再現できる。
-    RANDOM_SEED: int = secrets.randbits(31)
 
-    random.seed(RANDOM_SEED)
-    np.random.seed(RANDOM_SEED)
+
+    random.seed()
+    np.random.seed()
 
 
     COMM_RANGE: float = _req(cfg, "comm_range", float)
@@ -1509,9 +1645,9 @@ if __name__ == "__main__":
                 [sumoBinary,
                     "-c", str(SUMO_CFG),
                     "--tripinfo-output", "tripinfo.xml",
-                    "--tls.all-off", "true" ,
+                    "--tls.all-off", "false" ,
                     "--time-to-teleport", "1000",
-                    "--seed", str(RANDOM_SEED),
+                    # "--seed", str(RANDOM_SEED),
                 ],
                 # traceFile="traci_log.txt",
                 # traceGetters=False,
@@ -1710,7 +1846,6 @@ if __name__ == "__main__":
 
     vehInfo_by_vehID_dict = {vehInfo.get_vehID(): vehInfo for vehInfo in vehInfo_list}
     agent_by_vehID_dict = {agent.get_vehID(): agent for agent in agent_list}
-
     run()
 
     print(f"mean elapsed_time: {np.mean(elapsed_time_list)}")
