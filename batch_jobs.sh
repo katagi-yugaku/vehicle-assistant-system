@@ -107,17 +107,16 @@ for ((
     for ((run_id = 1; run_id <= n; run_id++)); do
       job_name="va_s${scenarioID}_e${early_rate}_v${v2v_rate}_r${run_id}"
 
-      sbatch \
-        --partition=ubuntu \
-        --nodes=1 \
-        --ntasks=1 \
-        --nodelist="${ALIVE_NODES}" \
-        --job-name="${job_name}" \
-        "${SLURM_SCRIPT}" \
-        "${scenarioID}" \
-        "${v2v_rate}" \
-        "${run_id}" \
-        "${TARGET_SCENARIO_DIR}"
+    sbatch \
+      --partition=ubuntu \
+      --nodes=1 \
+      --ntasks=1 \
+      --job-name="${job_name}" \
+      "${SLURM_SCRIPT}" \
+      "${scenarioID}" \
+      "${v2v_rate}" \
+      "${run_id}" \
+      "${TARGET_SCENARIO_DIR}"
     done
   done
 done
