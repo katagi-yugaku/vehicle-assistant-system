@@ -106,11 +106,7 @@ for ((
   scenarioID <= SCENARIO_TO;
   scenarioID++
 )); do
-  config_path="${
-    SCRIPT_DIR
-  }/scenarios/JIP/configs/config_scenario_${
-    scenarioID
-  }.toml"
+  config_path="${SCRIPT_DIR}/scenarios/JIP/configs/config_scenario_${scenarioID}.toml"
 
   if [[ ! -f "${config_path}" ]]; then
     echo "ERROR: config file was not found: ${config_path}" >&2
