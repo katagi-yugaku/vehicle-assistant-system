@@ -1,0 +1,52 @@
+{
+  "log_root": "/home/katagi/vehicle-assistant-system/schubert_logs",
+  "output_dir": "/home/katagi/vehicle-assistant-system/schubert_logs/aggregate",
+  "overall": {
+    "total_runs": 50,
+    "success_runs": 50,
+    "failed_runs": 0,
+    "running_runs": 0,
+    "missing_status_runs": 0,
+    "success_rate": 1.0,
+    "completion_time": {
+      "count": 50,
+      "mean": 1806.2,
+      "std_population": 60.65937685139866,
+      "median": 1790.0,
+      "min": 1700.0,
+      "max": 1890.0,
+      "p95": 1880.0
+    },
+    "vehicle_count_mean": 126.26,
+    "duration_mean_across_runs": 56.242474679999994,
+    "waiting_time_mean_across_runs": 18.09110174,
+    "time_loss_mean_across_runs": 34.62908266,
+    "failed_jobs": [],
+    "tripinfo_error_jobs": []
+  },
+  "conditions": {
+    "scenario=1,early_rate=1.0,v2v_rate=1.0": {
+      "total_runs": 50,
+      "success_runs": 50,
+      "failed_runs": 0,
+      "running_runs": 0,
+      "missing_status_runs": 0,
+      "success_rate": 1.0,
+      "completion_time": {
+        "count": 50,
+        "mean": 1806.2,
+        "std_population": 60.65937685139866,
+        "median": 1790.0,
+        "min": 1700.0,
+        "max": 1890.0,
+        "p95": 1880.0
+      },
+      "vehicle_count_mean": 126.26,
+      "duration_mean_across_runs": 56.242474679999994,
+      "waiting_time_mean_across_runs": 18.09110174,
+      "time_loss_mean_across_runs": 34.62908266,
+      "failed_jobs": [],
+      "tripinfo_error_jobs": []
+    }
+  }
+}

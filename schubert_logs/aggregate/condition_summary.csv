@@ -1,0 +1,2 @@
+scenario_id,early_rate,v2v_rate,total_runs,success_runs,failed_runs,running_runs,success_rate,completion_time_count,completion_time_mean,completion_time_std_population,completion_time_median,completion_time_min,completion_time_max,completion_time_p95,vehicle_count_mean,duration_mean_across_runs,waiting_time_mean_across_runs,time_loss_mean_across_runs
+1,1.0,1.0,50,50,0,0,1.0,50,1806.2,60.659377,1790.0,1700.0,1890.0,1880.0,126.26,56.242475,18.091102,34.629083
