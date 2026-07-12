@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-03-30 20:58:39 by Eclipse SUMO duarouter Version 1.20.0
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="ishinomaki_simplemap.net.xml"/>
+        <route-files value="trip.xml"/>
+    </input>
+
+    <output>
+        <output-file value="routes.rou.xml"/>
+    </output>
+
+    <processing>
+        <max-alternatives value="3"/>
+        <remove-loops value="true"/>
+        <repair value="true"/>
+        <routing-threads value="8"/>
+        <routing-algorithm value="astar"/>
+    </processing>
+
+</configuration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vehicle id="veh0" depart="0.00">
+        <route edges="E0 E1 E20 E43 E25 E26 E7 E42 E41 E14 E15 E16"/>
+    </vehicle>
+    <vehicle id="veh1" depart="0.00">
+        <route edges="E0 E1 E20 E43 E25 E26 E7 E42 E41 -E40 -E39 -E38 E19 E33 E34 E35 E36 E6 E10 E11 E28"/>
+    </vehicle>
+</routes>
