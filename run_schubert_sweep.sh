@@ -186,7 +186,7 @@ fi
 
 SCENARIO_FROM="$1"
 SCENARIO_TO="$2"
-MAX_PARALLEL="${3:-${MAX_PARALLEL:-20}}"
+MAX_PARALLEL="${3:-${MAX_PARALLEL:-25}}"
 n="${N:-50}"
 
 if ! is_integer "${SCENARIO_FROM}"; then
