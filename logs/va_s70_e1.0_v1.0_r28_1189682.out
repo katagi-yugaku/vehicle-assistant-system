@@ -1,14 +1,0 @@
-=== Job Info ===
-host            : chopin
-jobid           : 1189682
-project_root    : /home/katagi/vehicle-assistant-system
-scenario        : 70
-early_rate      : 1.0
-v2v_rate        : 1.0
-run_id          : 28
-config          : scenarios/JIP/configs/config_scenario_70.toml
-target_directory: 1-1-2-v2vonly
-runner_path     : scenarios/JIP/1-1-2-v2vonly/simulation/runner_simulator.py
-runner_module   : scenarios.JIP.1-1-2-v2vonly.simulation.runner_simulator
-start           : 2026-07-13 06:48:45
-Step #0.00 (0ms ?*RT. ?UPS, TraCI: 362ms, vehicles TOT 1 ACT 1 BUF 0)                     Step #100.00 (0ms ?*RT. ?UPS, TraCI: 19ms, vehicles TOT 26 ACT 26 BUF 0)                  Step #200.00 (1ms ~= 1000.00*RT, ~51000.00UPS, TraCI: 41ms, vehicles TOT 51 ACT 51 BUF 0) Step #300.00 (0ms ?*RT. ?UPS, TraCI: 60ms, vehicles TOT 77 ACT 77 BUF 0)                  Step #400.00 (0ms ?*RT. ?UPS, TraCI: 1328ms, vehicles TOT 104 ACT 104 BUF 0)              Step #500.00 (0ms ?*RT. ?UPS, TraCI: 2308ms, vehicles TOT 131 ACT 131 BUF 0)              Step #600.00 (0ms ?*RT. ?UPS, TraCI: 2572ms, vehicles TOT 158 ACT 158 BUF 0)              Step #700.00 (1ms ~= 1000.00*RT, ~186000.00UPS, TraCI: 2836ms, vehicles TOT 186 ACT 186 BUStep #800.00 (1ms ~= 1000.00*RT, ~206000.00UPS, TraCI: 4250ms, vehicles TOT 219 ACT 206 BUStep #900.00 (1ms ~= 1000.00*RT, ~232000.00UPS, TraCI: 4421ms, vehicles TOT 261 ACT 232 BU
