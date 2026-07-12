@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-07-11 05:44:26 by Eclipse SUMO netedit Version 1.20.0
+<!-- generated on 2026-07-12 22:29:02 by Eclipse SUMO netedit Version 1.20.0
 <configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/neteditConfiguration.xsd">
 
     <input>
@@ -237,10 +237,7 @@
         <lane id=":918333600_0_0" index="0" disallow="tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" speed="18.05" length="13.77" shape="4566.80,2920.80 4553.03,2921.22"/>
     </edge>
     <edge id=":918333600_1" function="internal">
-        <lane id=":918333600_1_0" index="0" disallow="tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" speed="7.65" length="4.50" shape="4566.80,2920.80 4562.37,2921.59"/>
-    </edge>
-    <edge id=":918333600_6" function="internal">
-        <lane id=":918333600_6_0" index="0" disallow="tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" speed="7.65" length="12.07" shape="4562.37,2921.59 4562.25,2921.61 4559.67,2923.76 4559.05,2927.27 4560.38,2932.12"/>
+        <lane id=":918333600_1_0" index="0" disallow="tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" speed="7.65" length="16.57" shape="4566.80,2920.80 4562.25,2921.61 4559.67,2923.76 4559.05,2927.27 4560.38,2932.12"/>
     </edge>
     <edge id=":918333600_2" function="internal">
         <lane id=":918333600_2_0" index="0" disallow="tram rail_urban rail rail_electric rail_fast ship container cable_car subway aircraft wheelchair scooter drone" speed="6.03" length="9.81" shape="4563.37,2930.86 4562.52,2927.92 4562.82,2925.79 4564.28,2924.49 4566.88,2924.00"/>
@@ -589,10 +586,10 @@
         <phase duration="5"  state="rrr"/>
     </tlLogic>
     <tlLogic id="918333600" type="static" programID="0" offset="0">
-        <phase duration="40" state="GgrrGG"/>
-        <phase duration="5"  state="yyrrGy"/>
-        <phase duration="40" state="rrGGGr"/>
-        <phase duration="5"  state="rryyGr"/>
+        <phase duration="35" state="GrrrGG"/>
+        <phase duration="10" state="yGrryy"/>
+        <phase duration="35" state="rGGrrr"/>
+        <phase duration="5"  state="ryyyGr"/>
     </tlLogic>
 
     <junction id="10811285786" type="dead_end" x="11028.38" y="6227.14" incLanes="" intLanes="" shape="11028.38,6227.14"/>
@@ -717,9 +714,9 @@
         <request index="0" response="00" foes="00" cont="0"/>
         <request index="1" response="00" foes="00" cont="0"/>
     </junction>
-    <junction id="918333600" type="traffic_light" x="4558.13" y="2922.61" incLanes="-E43_0 -E22_0 E20_0 E20_1" intLanes=":918333600_0_0 :918333600_6_0 :918333600_2_0 :918333600_3_0 :918333600_4_0 :918333600_5_0" shape="4566.76,2919.20 4566.92,2925.60 4564.91,2926.16 4564.40,2926.81 4564.22,2927.71 4564.37,2928.85 4564.85,2930.24 4558.91,2932.74 4557.60,2930.70 4556.75,2930.01 4555.76,2929.53 4554.63,2929.26 4553.36,2929.21 4552.97,2919.62">
+    <junction id="918333600" type="traffic_light" x="4558.13" y="2922.61" incLanes="-E43_0 -E22_0 E20_0 E20_1" intLanes=":918333600_0_0 :918333600_1_0 :918333600_2_0 :918333600_3_0 :918333600_4_0 :918333600_5_0" shape="4566.76,2919.20 4566.92,2925.60 4564.91,2926.16 4564.40,2926.81 4564.22,2927.71 4564.37,2928.85 4564.85,2930.24 4558.91,2932.74 4557.60,2930.70 4556.75,2930.01 4555.76,2929.53 4554.63,2929.26 4553.36,2929.21 4552.97,2919.62">
         <request index="0" response="000000" foes="001000" cont="0"/>
-        <request index="1" response="110000" foes="111000" cont="1"/>
+        <request index="1" response="110000" foes="111000" cont="0"/>
         <request index="2" response="100000" foes="100000" cont="0"/>
         <request index="3" response="100011" foes="100011" cont="0"/>
         <request index="4" response="000000" foes="000010" cont="0"/>
@@ -759,7 +756,6 @@
     </junction>
 
     <junction id=":2223514512_6_0" type="internal" x="5511.50" y="3063.39" incLanes=":2223514512_3_0 -E14_0" intLanes=":2223514512_0_0 :2223514512_1_0 :2223514512_5_0"/>
-    <junction id=":918333600_6_0" type="internal" x="4562.37" y="2921.59" incLanes=":918333600_1_0 E20_0 E20_1" intLanes=":918333600_3_0 :918333600_4_0 :918333600_5_0"/>
 
     <connection from="-E10" to="-E6" fromLane="0" toLane="0" via=":1795394528_1_0" dir="s" state="M"/>
     <connection from="-E11" to="-E10" fromLane="0" toLane="0" via=":2187670674_1_0" dir="s" state="M"/>
@@ -912,8 +908,7 @@
     <connection from=":918333525_0" to="-E9" fromLane="0" toLane="0" dir="s" state="M"/>
     <connection from=":918333525_1" to="E17" fromLane="0" toLane="0" dir="s" state="M"/>
     <connection from=":918333600_0" to="-E20" fromLane="0" toLane="0" dir="s" state="M"/>
-    <connection from=":918333600_1" to="E22" fromLane="0" toLane="0" via=":918333600_6_0" dir="r" state="m"/>
-    <connection from=":918333600_6" to="E22" fromLane="0" toLane="0" dir="r" state="M"/>
+    <connection from=":918333600_1" to="E22" fromLane="0" toLane="0" dir="r" state="M"/>
     <connection from=":918333600_2" to="E43" fromLane="0" toLane="0" dir="l" state="M"/>
     <connection from=":918333600_3" to="-E20" fromLane="0" toLane="0" dir="r" state="M"/>
     <connection from=":918333600_4" to="E22" fromLane="0" toLane="0" dir="l" state="M"/>
