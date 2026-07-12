@@ -4,13 +4,25 @@ set -uo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  run_schubert_single.sh SCENARIO_ID EARLY_RATE V2V_RATE RUN_ID
+  run_schubert_single.sh \
+    SCENARIO_ID EARLY_RATE V2V_RATE RUN_ID \
+    TARGET_SCENARIO LOG_ROOT COMMUNICATION_MODE
 
-Environment variables:
-  PROJECT_ROOT        Override the detected Git/project root.
-  ALLOW_NON_SCHUBERT  Set to 1 to allow execution on hosts other than schubert.
-  FORCE_RERUN         Set to 1 to rerun an already successful job.
+Example:
+  ./run_schubert_single.sh \
+    70 1.0 1.0 1 \
+    JIP/1-1-4-v2vonly \
+    /home/katagi/vehicle-assistant-system/schubert_logs_1-1-4-v2vonly \
+    none
+
+COMMUNICATION_MODE:
+  none       runnerへ--communication-modeを渡さない。
+  v2v_only   runnerへ--communication-mode v2v_onlyを渡す。
 USAGE
+}
+
+is_integer() {
+  [[ "$1" =~ ^[0-9]+$ ]]
 }
 
 is_positive_integer() {
@@ -21,13 +33,32 @@ is_number() {
   [[ "$1" =~ ^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$ ]]
 }
 
+normalize_target_scenario() {
+  local value="$1"
+
+  value="${value#./}"
+  value="${value#scenarios/}"
+  value="${value%/}"
+
+  if [[ "${value}" != JIP/* ]]; then
+    value="JIP/${value}"
+  fi
+
+  if [[ ! "${value}" =~ ^JIP/[A-Za-z0-9._-]+$ ]]; then
+    return 1
+  fi
+
+  printf '%s\n' "${value}"
+}
+
 find_project_root() {
+  local script_dir="$1"
   local candidate=""
   local current=""
 
   if [[ -n "${PROJECT_ROOT:-}" ]]; then
     candidate="$(cd -- "${PROJECT_ROOT}" 2>/dev/null && pwd -P)" || return 1
-    if [[ -d "${candidate}/scenarios/JIP/1-1-4/simulation" ]]; then
+    if [[ -d "${candidate}/scenarios/JIP/configs" ]]; then
       printf '%s\n' "${candidate}"
       return 0
     fi
@@ -35,16 +66,16 @@ find_project_root() {
   fi
 
   if command -v git >/dev/null 2>&1; then
-    candidate="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel 2>/dev/null || true)"
-    if [[ -n "${candidate}" && -d "${candidate}/scenarios/JIP/1-1-4/simulation" ]]; then
+    candidate="$(git -C "${script_dir}" rev-parse --show-toplevel 2>/dev/null || true)"
+    if [[ -n "${candidate}" && -d "${candidate}/scenarios/JIP/configs" ]]; then
       printf '%s\n' "${candidate}"
       return 0
     fi
   fi
 
-  current="${SCRIPT_DIR}"
+  current="${script_dir}"
   while [[ "${current}" != "/" ]]; do
-    if [[ -d "${current}/scenarios/JIP/1-1-4/simulation" ]]; then
+    if [[ -d "${current}/scenarios/JIP/configs" ]]; then
       printf '%s\n' "${current}"
       return 0
     fi
@@ -54,114 +85,64 @@ find_project_root() {
   return 1
 }
 
-make_backup_path() {
-  local source_dir="$1"
-  local timestamp=""
-  local base=""
-  local candidate=""
-  local suffix=1
-
-  timestamp="$(date '+%Y%m%d_%H%M%S')"
-  base="${source_dir}.backup_${timestamp}"
-  candidate="${base}"
-
-  while [[ -e "${candidate}" ]]; do
-    candidate="${base}_${suffix}"
-    ((suffix += 1))
-  done
-
-  printf '%s\n' "${candidate}"
-}
-
-write_status_file() {
-  local exit_code="$1"
-  local status="$2"
+write_status() {
+  local state="$1"
+  local exit_code="$2"
   local end_time="$3"
-  local reason="${4:-}"
-  local tmp_file="${STATUS_FILE}.tmp.$$"
+  local temp_status="${STATUS_FILE}.tmp.$$"
 
   {
+    printf 'status=%s\n' "${state}"
+    printf 'exit_code=%s\n' "${exit_code}"
     printf 'job_name=%s\n' "${JOB_NAME}"
-    printf 'hostname=%s\n' "${HOST_FQDN}"
     printf 'scenario_id=%s\n' "${SCENARIO_ID}"
     printf 'early_rate=%s\n' "${EARLY_RATE}"
     printf 'v2v_rate=%s\n' "${V2V_RATE}"
     printf 'run_id=%s\n' "${RUN_ID}"
-    printf 'config=%s\n' "${CONFIG_PATH}"
+    printf 'target_scenario=%s\n' "${TARGET_SCENARIO}"
+    printf 'runner_module=%s\n' "${RUNNER_MODULE}"
+    printf 'communication_mode=%s\n' "${COMMUNICATION_MODE}"
+    printf 'host=%s\n' "${HOST_NAME}"
+    printf 'pid=%s\n' "$$"
     printf 'start_time=%s\n' "${START_TIME}"
     printf 'end_time=%s\n' "${end_time}"
-    printf 'exit_code=%s\n' "${exit_code}"
-    printf 'status=%s\n' "${status}"
-    if [[ -n "${reason}" ]]; then
-      printf 'reason=%s\n' "${reason}"
-    fi
-  } > "${tmp_file}"
+  } > "${temp_status}"
 
-  mv -f -- "${tmp_file}" "${STATUS_FILE}"
+  mv -f -- "${temp_status}" "${STATUS_FILE}"
 }
 
-finish_job() {
-  local exit_code="$1"
-  local status="$2"
-  local reason="${3:-}"
+cleanup() {
+  local shell_exit=$?
   local end_time=""
-  local end_epoch=0
-  local elapsed=0
 
-  end_time="$(date '+%Y-%m-%dT%H:%M:%S%z')"
-  end_epoch="$(date +%s)"
-  elapsed=$((end_epoch - START_EPOCH))
+  trap - EXIT INT TERM HUP
 
-  write_status_file "${exit_code}" "${status}" "${end_time}" "${reason}"
-
-  printf '\n=== Job Result ===\n'
-  printf 'end=%s\n' "${end_time}"
-  printf 'elapsed_seconds=%s\n' "${elapsed}"
-  printf 'exit_code=%s\n' "${exit_code}"
-  printf 'status=%s\n' "${status}"
-  if [[ -n "${reason}" ]]; then
-    printf 'reason=%s\n' "${reason}"
-  fi
-}
-
-terminate_simulation() {
-  local signal_name="${1:-TERM}"
-
-  if [[ -z "${SIM_PID:-}" ]]; then
-    return 0
+  if (( FINALIZED == 0 )); then
+    end_time="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    write_status "FAILED" "${shell_exit}" "${end_time}" 2>/dev/null || true
   fi
 
-  if [[ "${SIM_USES_SETSID:-0}" == "1" ]]; then
-    kill -s "${signal_name}" -- "-${SIM_PID}" 2>/dev/null || true
-  else
-    pkill -s "${signal_name}" -P "${SIM_PID}" 2>/dev/null || true
-    kill -s "${signal_name}" "${SIM_PID}" 2>/dev/null || true
-  fi
+  rm -rf -- "${LOCK_DIR}" 2>/dev/null || true
+  exit "${shell_exit}"
 }
 
 handle_signal() {
   local signal_name="$1"
-  local exit_code=143
-
-  trap - INT TERM
+  local signal_exit=143
 
   if [[ "${signal_name}" == "INT" ]]; then
-    exit_code=130
+    signal_exit=130
   fi
 
-  printf 'Received %s; terminating simulation.\n' "${signal_name}" >&2
-  terminate_simulation TERM
-
-  if [[ -n "${SIM_PID:-}" ]]; then
-    wait "${SIM_PID}" 2>/dev/null || true
-    SIM_PID=""
+  if [[ -n "${SIMULATION_PID:-}" ]]; then
+    kill -TERM "${SIMULATION_PID}" 2>/dev/null || true
+    pkill -TERM -P "${SIMULATION_PID}" 2>/dev/null || true
   fi
 
-  finish_job "${exit_code}" "FAILED" "interrupted_by_${signal_name}"
-  exit "${exit_code}"
+  exit "${signal_exit}"
 }
 
-if (( $# != 4 )); then
+if (( $# != 7 )); then
   usage >&2
   exit 2
 fi
@@ -170,9 +151,12 @@ SCENARIO_ID="$1"
 EARLY_RATE="$2"
 V2V_RATE="$3"
 RUN_ID="$4"
+TARGET_SCENARIO_RAW="$5"
+LOG_ROOT="$6"
+COMMUNICATION_MODE="$7"
 
-if ! is_positive_integer "${SCENARIO_ID}"; then
-  echo "ERROR: SCENARIO_ID must be a positive integer: ${SCENARIO_ID}" >&2
+if ! is_integer "${SCENARIO_ID}"; then
+  echo "ERROR: SCENARIO_ID must be an integer: ${SCENARIO_ID}" >&2
   exit 2
 fi
 if ! is_number "${EARLY_RATE}"; then
@@ -184,197 +168,181 @@ if ! is_number "${V2V_RATE}"; then
   exit 2
 fi
 if ! is_positive_integer "${RUN_ID}"; then
-  echo "ERROR: RUN_ID must be a positive integer: ${RUN_ID}" >&2
+  echo "ERROR: RUN_ID must be an integer >= 1: ${RUN_ID}" >&2
+  exit 2
+fi
+if ! TARGET_SCENARIO="$(normalize_target_scenario "${TARGET_SCENARIO_RAW}")"; then
+  echo "ERROR: Invalid target scenario: ${TARGET_SCENARIO_RAW}" >&2
+  exit 2
+fi
+if [[ "${COMMUNICATION_MODE}" != "none" ]] && \
+   [[ ! "${COMMUNICATION_MODE}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  echo "ERROR: Invalid communication mode: ${COMMUNICATION_MODE}" >&2
   exit 2
 fi
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
-if ! PROJECT_ROOT="$(find_project_root)"; then
+if ! PROJECT_ROOT="$(find_project_root "${SCRIPT_DIR}")"; then
   echo "ERROR: Could not locate the vehicle-assistant-system project root." >&2
-  echo "Set PROJECT_ROOT explicitly if the scripts are stored outside the repository." >&2
   exit 2
 fi
 
-HOST_FQDN="$(hostname 2>/dev/null || printf 'unknown')"
-HOST_SHORT="$(hostname -s 2>/dev/null || printf '%s' "${HOST_FQDN%%.*}")"
-if [[ "${HOST_SHORT%%.*}" != "schubert" && "${ALLOW_NON_SCHUBERT:-0}" != "1" ]]; then
-  echo "ERROR: This script is intended for schubert; current host is ${HOST_FQDN}." >&2
-  echo "Set ALLOW_NON_SCHUBERT=1 only for a deliberate test run." >&2
-  exit 69
+if [[ "${LOG_ROOT}" != /* ]]; then
+  LOG_ROOT="${PROJECT_ROOT}/${LOG_ROOT}"
 fi
 
-MODULE_DIR="${PROJECT_ROOT}/scenarios/JIP/1-1-4/simulation"
-CONFIG_PATH="${PROJECT_ROOT}/scenarios/JIP/configs/config_scenario_${SCENARIO_ID}.toml"
-LOG_ROOT="${PROJECT_ROOT}/schubert_logs"
+CONFIG="${PROJECT_ROOT}/scenarios/JIP/configs/config_scenario_${SCENARIO_ID}.toml"
+RUNNER_PATH="${PROJECT_ROOT}/scenarios/${TARGET_SCENARIO}/simulation/runner_simulator.py"
+RUNNER_MODULE="scenarios.${TARGET_SCENARIO//\//.}.simulation.runner_simulator"
 JOB_NAME="va_s${SCENARIO_ID}_e${EARLY_RATE}_v${V2V_RATE}_r${RUN_ID}"
 RUN_DIR="${LOG_ROOT}/${JOB_NAME}"
-STATUS_FILE="${RUN_DIR}/status.txt"
+LOCK_DIR="${LOG_ROOT}/.${JOB_NAME}.lock"
 OUT_FILE="${RUN_DIR}/${JOB_NAME}.out"
 ERR_FILE="${RUN_DIR}/${JOB_NAME}.err"
-TRIPINFO_FILE="${RUN_DIR}/tripinfo.xml"
-
-if ! mkdir -p -- "${LOG_ROOT}"; then
-  echo "ERROR: Cannot create log root: ${LOG_ROOT}" >&2
-  exit 73
-fi
-if [[ ! -w "${LOG_ROOT}" ]]; then
-  echo "ERROR: Log root is not writable: ${LOG_ROOT}" >&2
-  exit 73
-fi
-
-if [[ -f "${STATUS_FILE}" ]] && grep -Eq '^status=SUCCESS$' "${STATUS_FILE}" && [[ "${FORCE_RERUN:-0}" != "1" ]]; then
-  echo "SKIP: ${JOB_NAME} already completed successfully."
-  exit 0
-fi
-
-if [[ -e "${RUN_DIR}" ]]; then
-  BACKUP_DIR="$(make_backup_path "${RUN_DIR}")"
-  if ! mv -- "${RUN_DIR}" "${BACKUP_DIR}"; then
-    echo "ERROR: Could not back up existing run directory: ${RUN_DIR}" >&2
-    exit 73
-  fi
-  echo "Existing result moved to: ${BACKUP_DIR}"
-fi
-
-if ! mkdir -p -- "${RUN_DIR}"; then
-  echo "ERROR: Cannot create run directory: ${RUN_DIR}" >&2
-  exit 73
-fi
-if [[ ! -w "${RUN_DIR}" ]]; then
-  echo "ERROR: Run directory is not writable: ${RUN_DIR}" >&2
-  exit 73
-fi
-
-# Create all required per-job files immediately. SUMO overwrites tripinfo.xml.
-: > "${OUT_FILE}"
-: > "${ERR_FILE}"
-: > "${TRIPINFO_FILE}"
-
-exec > "${OUT_FILE}" 2> "${ERR_FILE}"
-
+STATUS_FILE="${RUN_DIR}/status.txt"
+COMMAND_FILE="${RUN_DIR}/command.txt"
+HOST_NAME="$(hostname 2>/dev/null || printf 'unknown')"
 START_TIME="$(date '+%Y-%m-%dT%H:%M:%S%z')"
-START_EPOCH="$(date +%s)"
-SIM_PID=""
-SIM_USES_SETSID=0
+FINALIZED=0
+SIMULATION_PID=""
 
-trap 'handle_signal INT' INT
-trap 'handle_signal TERM' TERM
-
-write_status_file "-1" "RUNNING" "" ""
-
-printf '=== Job Info ===\n'
-printf 'job_name=%s\n' "${JOB_NAME}"
-printf 'host=%s\n' "${HOST_FQDN}"
-printf 'pid=%s\n' "$$"
-printf 'scenario=%s\n' "${SCENARIO_ID}"
-printf 'early_rate=%s\n' "${EARLY_RATE}"
-printf 'v2v_rate=%s\n' "${V2V_RATE}"
-printf 'run_id=%s\n' "${RUN_ID}"
-printf 'config=%s\n' "${CONFIG_PATH}"
-printf 'output_dir=%s\n' "${RUN_DIR}"
-printf 'start=%s\n' "${START_TIME}"
-
+if [[ ! -f "${CONFIG}" ]]; then
+  echo "ERROR: Config file does not exist: ${CONFIG}" >&2
+  exit 72
+fi
+if [[ ! -f "${RUNNER_PATH}" ]]; then
+  echo "ERROR: runner_simulator.py does not exist: ${RUNNER_PATH}" >&2
+  exit 72
+fi
 if ! command -v python3 >/dev/null 2>&1; then
   echo "ERROR: python3 is not available in PATH." >&2
-  finish_job 127 "FAILED" "python3_not_found"
   exit 127
 fi
 if ! command -v sumo >/dev/null 2>&1; then
   echo "ERROR: sumo is not available in PATH." >&2
-  finish_job 127 "FAILED" "sumo_not_found"
   exit 127
 fi
 
-PYTHON_VERSION="$(python3 --version 2>&1)"
-SUMO_VERSION="$(sumo --version 2>&1 | sed -n '1p')"
-printf 'python_version=%s\n' "${PYTHON_VERSION}"
-printf 'sumo_version=%s\n' "${SUMO_VERSION}"
+mkdir -p -- "${LOG_ROOT}"
 
-if [[ ! -d "${PROJECT_ROOT}" ]]; then
-  echo "ERROR: Project root does not exist: ${PROJECT_ROOT}" >&2
-  finish_job 72 "FAILED" "project_root_missing"
-  exit 72
-fi
-if [[ ! -d "${MODULE_DIR}" ]]; then
-  echo "ERROR: Python module directory does not exist: ${MODULE_DIR}" >&2
-  finish_job 72 "FAILED" "module_directory_missing"
-  exit 72
-fi
-if [[ ! -f "${CONFIG_PATH}" ]]; then
-  echo "ERROR: Config file does not exist: ${CONFIG_PATH}" >&2
-  finish_job 66 "FAILED" "config_missing"
-  exit 66
-fi
-
-export RUN_ID
-export SCENARIO_ID
-export EARLY_RATE
-export V2V_RATE
-export JOB_NAME
-export RUN_OUTPUT_DIR="${RUN_DIR}"
-
-PYTHONPATH_VALUE="${PROJECT_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
-
-printf '\n=== Command ===\n'
-printf 'cd %q\n' "${RUN_DIR}"
-printf 'PYTHONPATH=%q python3 -W ignore::UserWarning -m scenarios.JIP.1-1-4.simulation.runner_simulator --nogui %q %q %q\n' \
-  "${PYTHONPATH_VALUE}" "${CONFIG_PATH}" "${EARLY_RATE}" "${V2V_RATE}"
-
-if command -v setsid >/dev/null 2>&1; then
-  SIM_USES_SETSID=1
-fi
-
-(
-  cd -- "${RUN_DIR}" || exit 111
-
-  if [[ "${SIM_USES_SETSID}" == "1" ]]; then
-    exec setsid env \
-      "PYTHONPATH=${PYTHONPATH_VALUE}" \
-      "RUN_ID=${RUN_ID}" \
-      "SCENARIO_ID=${SCENARIO_ID}" \
-      "EARLY_RATE=${EARLY_RATE}" \
-      "V2V_RATE=${V2V_RATE}" \
-      "JOB_NAME=${JOB_NAME}" \
-      "RUN_OUTPUT_DIR=${RUN_OUTPUT_DIR}" \
-      python3 -W ignore::UserWarning \
-        -m scenarios.JIP.1-1-4.simulation.runner_simulator \
-        --nogui \
-        "${CONFIG_PATH}" \
-        "${EARLY_RATE}" \
-        "${V2V_RATE}"
+if ! mkdir -- "${LOCK_DIR}" 2>/dev/null; then
+  if [[ "${FORCE_UNLOCK:-0}" == "1" ]]; then
+    echo "WARNING: Removing an existing lock: ${LOCK_DIR}" >&2
+    rm -rf -- "${LOCK_DIR}"
+    if ! mkdir -- "${LOCK_DIR}" 2>/dev/null; then
+      echo "ERROR: Could not acquire lock after FORCE_UNLOCK: ${LOCK_DIR}" >&2
+      exit 75
+    fi
   else
-    exec env \
-      "PYTHONPATH=${PYTHONPATH_VALUE}" \
-      "RUN_ID=${RUN_ID}" \
-      "SCENARIO_ID=${SCENARIO_ID}" \
-      "EARLY_RATE=${EARLY_RATE}" \
-      "V2V_RATE=${V2V_RATE}" \
-      "JOB_NAME=${JOB_NAME}" \
-      "RUN_OUTPUT_DIR=${RUN_OUTPUT_DIR}" \
-      python3 -W ignore::UserWarning \
-        -m scenarios.JIP.1-1-4.simulation.runner_simulator \
-        --nogui \
-        "${CONFIG_PATH}" \
-        "${EARLY_RATE}" \
-        "${V2V_RATE}"
+    echo "ERROR: Another process may be running this job: ${LOCK_DIR}" >&2
+    echo "Set FORCE_UNLOCK=1 only after confirming that no process is active." >&2
+    exit 75
   fi
-) &
-SIM_PID=$!
-printf 'simulation_pid=%s\n' "${SIM_PID}"
-
-wait "${SIM_PID}"
-EXIT_CODE=$?
-SIM_PID=""
-
-if (( EXIT_CODE == 0 )) && [[ ! -s "${TRIPINFO_FILE}" ]]; then
-  echo "ERROR: Simulation returned 0, but tripinfo.xml is missing or empty." >&2
-  EXIT_CODE=65
 fi
 
-if (( EXIT_CODE == 0 )); then
-  finish_job 0 "SUCCESS"
-else
-  finish_job "${EXIT_CODE}" "FAILED" "simulation_failed"
+trap cleanup EXIT
+trap 'handle_signal INT' INT
+trap 'handle_signal TERM' TERM
+trap 'handle_signal HUP' HUP
+
+# 既存結果を上書きせず、再実行時にはバックアップする。
+if [[ -d "${RUN_DIR}" ]]; then
+  if [[ "${FORCE_RERUN:-0}" != "1" ]] && \
+     [[ -f "${STATUS_FILE}" ]] && \
+     grep -Eq '^status=SUCCESS$' "${STATUS_FILE}"; then
+    echo "SKIP: Successful result already exists: ${RUN_DIR}"
+    FINALIZED=1
+    rm -rf -- "${LOCK_DIR}"
+    trap - EXIT INT TERM HUP
+    exit 0
+  fi
+
+  backup_suffix="$(date '+%Y%m%d_%H%M%S')_$$"
+  backup_dir="${RUN_DIR}.backup_${backup_suffix}"
+  mv -- "${RUN_DIR}" "${backup_dir}"
+  echo "INFO: Existing result moved to: ${backup_dir}"
 fi
 
-exit "${EXIT_CODE}"
+mkdir -p -- "${RUN_DIR}"
+write_status "RUNNING" "-1" ""
+
+command=(
+  python3
+  -W ignore::UserWarning
+  -m "${RUNNER_MODULE}"
+  --nogui
+)
+
+if [[ "${COMMUNICATION_MODE}" != "none" ]]; then
+  command+=(--communication-mode "${COMMUNICATION_MODE}")
+fi
+
+command+=(
+  "${CONFIG}"
+  "${EARLY_RATE}"
+  "${V2V_RATE}"
+)
+
+{
+  printf 'cd %q\n' "${RUN_DIR}"
+  printf 'PYTHONPATH=%q ' "${PROJECT_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
+  printf '%q ' "${command[@]}"
+  printf '\n'
+} > "${COMMAND_FILE}"
+
+# runnerが相対パスで出力するtripinfo.xml等をジョブごとに分離する。
+cd "${RUN_DIR}"
+export RUN_ID
+export PYTHONPATH="${PROJECT_ROOT}${PYTHONPATH:+:${PYTHONPATH}}"
+
+{
+  echo "=== Job Info ==="
+  echo "host              : ${HOST_NAME}"
+  echo "pid               : $$"
+  echo "job_name          : ${JOB_NAME}"
+  echo "scenario          : ${SCENARIO_ID}"
+  echo "early_rate        : ${EARLY_RATE}"
+  echo "v2v_rate          : ${V2V_RATE}"
+  echo "run_id            : ${RUN_ID}"
+  echo "target_scenario   : ${TARGET_SCENARIO}"
+  echo "runner_module     : ${RUNNER_MODULE}"
+  echo "communication_mode: ${COMMUNICATION_MODE}"
+  echo "config            : ${CONFIG}"
+  echo "run_dir           : ${RUN_DIR}"
+  echo "start             : ${START_TIME}"
+  echo
+
+  "${command[@]}" &
+  SIMULATION_PID=$!
+  wait "${SIMULATION_PID}"
+} > "${OUT_FILE}" 2> "${ERR_FILE}"
+SIMULATION_EXIT=$?
+SIMULATION_PID=""
+
+END_TIME="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+
+if (( SIMULATION_EXIT == 0 )); then
+  {
+    echo
+    echo "end               : ${END_TIME}"
+    echo "exit_code         : ${SIMULATION_EXIT}"
+  } >> "${OUT_FILE}"
+
+  write_status "SUCCESS" "${SIMULATION_EXIT}" "${END_TIME}"
+  FINALIZED=1
+  rm -rf -- "${LOCK_DIR}"
+  trap - EXIT INT TERM HUP
+  exit 0
+fi
+
+{
+  echo
+  echo "end               : ${END_TIME}"
+  echo "exit_code         : ${SIMULATION_EXIT}"
+} >> "${ERR_FILE}"
+
+write_status "FAILED" "${SIMULATION_EXIT}" "${END_TIME}"
+FINALIZED=1
+rm -rf -- "${LOCK_DIR}"
+trap - EXIT INT TERM HUP
+exit "${SIMULATION_EXIT}"
