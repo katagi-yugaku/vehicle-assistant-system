@@ -1,0 +1,11 @@
+job_name=va_s19_e1.0_v1.0_r25
+hostname=schubert
+scenario_id=19
+early_rate=1.0
+v2v_rate=1.0
+run_id=25
+config=/home/katagi/vehicle-assistant-system/scenarios/JIP/configs/config_scenario_19.toml
+start_time=2026-07-13T05:38:34+0900
+end_time=2026-07-13T05:44:45+0900
+exit_code=0
+status=SUCCESS

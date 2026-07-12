@@ -1,0 +1,18 @@
+=== Job Info ===
+job_name=va_s20_e1.0_v1.0_r27
+host=schubert
+pid=194341
+scenario=20
+early_rate=1.0
+v2v_rate=1.0
+run_id=27
+config=/home/katagi/vehicle-assistant-system/scenarios/JIP/configs/config_scenario_20.toml
+output_dir=/home/katagi/vehicle-assistant-system/schubert_logs/va_s20_e1.0_v1.0_r27
+start=2026-07-13T05:53:28+0900
+python_version=Python 3.12.3
+sumo_version=Warning: Could not set locale to 'C'.
+
+=== Command ===
+cd /home/katagi/vehicle-assistant-system/schubert_logs/va_s20_e1.0_v1.0_r27
+PYTHONPATH=/home/katagi/vehicle-assistant-system:/home/katagi/tmp/sumo/tools:/home/katagi/local/sumo/tools:/home/katagi/tmp/sumo/tools:/home/katagi/local/sumo/tools: python3 -W ignore::UserWarning -m scenarios.JIP.1-1-4.simulation.runner_simulator --nogui /home/katagi/vehicle-assistant-system/scenarios/JIP/configs/config_scenario_20.toml 1.0 1.0
+simulation_pid=194361
