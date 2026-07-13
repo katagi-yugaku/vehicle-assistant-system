@@ -1,0 +1,74 @@
+=== Job Info ===
+host            : chopin
+jobid           : 1190611
+project_root    : /home/katagi/vehicle-assistant-system
+scenario        : 73
+early_rate      : 1.0
+v2v_rate        : 1.0
+run_id          : 7
+config          : scenarios/JIP/configs/config_scenario_73.toml
+target_directory: 1-1-2-v2vonly
+runner_path     : scenarios/JIP/1-1-2-v2vonly/simulation/runner_simulator.py
+runner_module   : scenarios.JIP.1-1-2-v2vonly.simulation.runner_simulator
+start           : 2026-07-13 09:38:47
+[RUN_CONFIG] config=/home/katagi/vehicle-assistant-system/scenarios/JIP/configs/config_scenario_73.toml seed=2956852618 communication_mode=v2v_only communication_interval=10.0 decision_interval=10.0 early_rate=1.0 v2v_capable_vehicle_rate=1.0
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
+ Retrying in 1 seconds
