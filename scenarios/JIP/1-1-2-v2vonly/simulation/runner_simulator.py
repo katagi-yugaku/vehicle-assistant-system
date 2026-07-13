@@ -1824,14 +1824,18 @@ if __name__ == "__main__":
             f"expected one of: {valid_modes}"
         ) from exc
 
+    SUMO_SEED_MAX = (2**31) - 1
+
     random_seed = (
-        secrets.randbits(32)
+        secrets.randbelow(SUMO_SEED_MAX + 1)
         if args.seed is None
         else int(args.seed)
     )
-    if not 0 <= random_seed <= 0xFFFFFFFF:
+
+    if not 0 <= random_seed <= SUMO_SEED_MAX:
         raise ValueError(
-            f"seed must be a 32-bit unsigned integer: {random_seed}"
+            "seed must be within the range supported by SUMO: "
+            f"0 <= seed <= {SUMO_SEED_MAX}, received={random_seed}"
         )
     random.seed(random_seed)
     np.random.seed(random_seed)
