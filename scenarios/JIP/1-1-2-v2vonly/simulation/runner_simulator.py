@@ -1425,24 +1425,24 @@ def control_vehicles() -> None:
             < observation.effective_probability
         )
 
-        if observation.uturn_change_count > 0:
-            print(
-                "[MAJORITY_BIAS_EVALUATION]",
-                f"logical_vehicle_id={logical_vehicle_id}",
-                f"sumo_vehicle_id={current_vehID}",
-                f"time={current_time}",
-                f"rc_change_count={observation.rc_change_count}",
-                f"uturn_change_count={observation.uturn_change_count}",
-                f"new_event_ids={new_event_ids}",
-                f"new_event_count={len(new_event_ids)}",
-                f"effective_observation_count="
-                f"{observation.effective_observation_count:.3f}",
-                f"p_follow={P_FOLLOW:.3f}",
-                f"effective_probability="
-                f"{observation.effective_probability:.6f}",
-                f"random_value={follow_random_value:.6f}",
-                f"should_follow={should_follow}",
-            )
+        # if observation.uturn_change_count > 0:
+        #     print(
+        #         "[MAJORITY_BIAS_EVALUATION]",
+        #         f"logical_vehicle_id={logical_vehicle_id}",
+        #         f"sumo_vehicle_id={current_vehID}",
+        #         f"time={current_time}",
+        #         f"rc_change_count={observation.rc_change_count}",
+        #         f"uturn_change_count={observation.uturn_change_count}",
+        #         f"new_event_ids={new_event_ids}",
+        #         f"new_event_count={len(new_event_ids)}",
+        #         f"effective_observation_count="
+        #         f"{observation.effective_observation_count:.3f}",
+        #         f"p_follow={P_FOLLOW:.3f}",
+        #         f"effective_probability="
+        #         f"{observation.effective_probability:.6f}",
+        #         f"random_value={follow_random_value:.6f}",
+        #         f"should_follow={should_follow}",
+        #     )
 
         if not should_follow:
             majority_bias_rejection_count_by_logical_vehicle_id[
@@ -1761,11 +1761,20 @@ def parse_runner_args(argv=None):
         type=float,
         help="Rate of communication-capable vehicles in [0.0, 1.0].",
     )
-    parser.add_argument(
+    gui_group = parser.add_mutually_exclusive_group()
+    gui_group.add_argument(
         "--nogui",
+        dest="nogui",
         action="store_true",
-        help="Use the command-line SUMO binary.",
+        help="Use the command-line SUMO binary (default).",
     )
+    gui_group.add_argument(
+        "--gui",
+        dest="nogui",
+        action="store_false",
+        help="Use the SUMO GUI binary.",
+    )
+    parser.set_defaults(nogui=True)
     parser.add_argument(
         "--communication-mode",
         choices=[mode.value for mode in CommunicationMode],
