@@ -20,7 +20,7 @@ DEFAULT_XLABEL = "p_follow"
 DEFAULT_YLABEL = "active_route_change_threshold_center"
 DEFAULT_COLORBAR_LABEL = "Completion Time [s]"
 
-DEFAULT_CMAP = "Reds_r"
+DEFAULT_CMAP = "Reds"
 
 FIG_WIDTH = 10.0
 FIG_HEIGHT = 7.0
@@ -265,7 +265,7 @@ def create_heatmap(
         orientation="vertical",
         pad=0.05,
     )
-    colorbar.ax.invert_yaxis()
+    # colorbar.ax.invert_yaxis()
     # colorbar.set_label(colorbar_label, fontsize=COLORBAR_LABEL_FONT_SIZE)
     colorbar.ax.tick_params(labelsize=TICK_LABEL_FONT_SIZE)
 

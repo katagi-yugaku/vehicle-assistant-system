@@ -218,7 +218,7 @@ def plot_compare_arrival_time_cdfs(
     if plotted_count == 0:
         raise ValueError("プロット対象の arrival_time_list がありません。")
 
-    max_time = 2200
+    max_time = 2500
     min_time = 100
     y_min = 0.0
 
@@ -236,8 +236,8 @@ def plot_compare_arrival_time_cdfs(
         fontweight="semibold",
     )
 
-    # if not no_legend:
-    #     plt.legend(fontsize=12)
+    if not no_legend:
+        plt.legend(fontsize=12)
 
     plt.savefig(save_path, bbox_inches="tight")
     print(f"✅ Saved figure as: {save_path}")
