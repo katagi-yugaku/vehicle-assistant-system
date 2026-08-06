@@ -11,10 +11,10 @@ DEFAULT_CONDITION_KEY = "1.0"
 # 実線で描画するシナリオ
 SOLID_SCENARIO_NUMBERS = {1, 5, 21, 25}
 
-# 点線で描画するシナリオ
-DOTTED_SCENARIO_NUMBERS = {70, 71, 72, 73}
+# 破線で描画するシナリオ
+DASHED_SCENARIO_NUMBERS = {70, 71, 72, 73}
 
-# 対応するシナリオ同士で同じ色を使用する。
+# 対応するシナリオを同じ固定色で描画する。
 # scenario1  と scenario70
 # scenario5  と scenario71
 # scenario21 と scenario72
@@ -70,16 +70,13 @@ def extract_scenario_number(scenario_id: str) -> int | None:
 
 def get_color(scenario_id: str) -> str | None:
     """
-    シナリオ番号に対応する色コードを返す。
+    シナリオ番号に対応する固定色を返す。
 
     対応:
         scenario1  / scenario70 -> #1f77b4
         scenario5  / scenario71 -> #ff7f0e
         scenario21 / scenario72 -> #2ca02c
         scenario25 / scenario73 -> #d62728
-
-    対応表にないシナリオではNoneを返し、
-    Matplotlibのデフォルト色を使用する。
     """
     scenario_number = extract_scenario_number(scenario_id)
     return SCENARIO_COLOR_MAP.get(scenario_number)
@@ -89,18 +86,18 @@ def get_linestyle(scenario_id: str) -> str:
     """
     シナリオ番号に応じて線種を返す。
 
-    scenario1, 5, 21, 25:
+    scenario1, scenario5, scenario21, scenario25:
         実線 "-"
 
-    scenario70, 71, 72, 73:
-        点線 ":"
+    scenario70, scenario71, scenario72, scenario73:
+        破線 "--"
 
     それ以外:
         実線 "-"
     """
     scenario_number = extract_scenario_number(scenario_id)
 
-    if scenario_number in DOTTED_SCENARIO_NUMBERS:
+    if scenario_number in DASHED_SCENARIO_NUMBERS:
         return "--"
 
     return "-"
@@ -230,7 +227,7 @@ def plot_compare_arrival_time_cdfs(
         実線
 
     scenario70, scenario71, scenario72, scenario73:
-        点線
+        破線
     """
     plt.figure(figsize=(10, 6))
 
@@ -266,8 +263,8 @@ def plot_compare_arrival_time_cdfs(
     if plotted_count == 0:
         raise ValueError("プロット対象のarrival_time_listがありません。")
 
-    min_time = 100
-    max_time = 2500
+    min_time = 200
+    max_time = 2950
     y_min = 0.0
 
     plt.xlim(min_time, max_time)
@@ -275,7 +272,7 @@ def plot_compare_arrival_time_cdfs(
 
     plt.xticks(
         np.arange(min_time, max_time + 1, 200),
-        fontsize=14,
+        fontsize=12,
         fontweight="semibold",
     )
     plt.yticks(
@@ -284,8 +281,8 @@ def plot_compare_arrival_time_cdfs(
         fontweight="semibold",
     )
 
-    plt.xlabel("Arrival time (s)", fontsize=14)
-    plt.ylabel("CDF", fontsize=14)
+    # plt.xlabel("Arrival time (s)", fontsize=14)
+    # plt.ylabel("CDF", fontsize=14)
     # plt.grid(True, linestyle="--", linewidth=0.5, alpha=0.5)
 
     if not no_legend:
@@ -400,8 +397,8 @@ def main() -> None:
         evacuation_completion_time = max(values) if values else float("nan")
 
         linestyle_name = (
-            "dotted"
-            if get_linestyle(scenario_id) == ":"
+            "dashed"
+            if get_linestyle(scenario_id) == "--"
             else "solid"
         )
 
