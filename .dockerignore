@@ -1,0 +1,13 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.DS_Store
+
+results/
+outputs/
+logs/
+
+sumo/

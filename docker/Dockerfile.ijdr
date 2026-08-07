@@ -1,0 +1,175 @@
+FROM python:3.11.9-bookworm
+
+ARG SUMO_VERSION=1.20.0
+ARG USERNAME=researcher
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# ============================================================
+# System / build dependencies + research CLI environment
+# ============================================================
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    swig \
+    curl \
+    ca-certificates \
+    git \
+    libxerces-c-dev \
+    zlib1g-dev \
+    zsh \
+    fzf \
+    ripgrep \
+    fd-find \
+    bat \
+    jq \
+    tree \
+    htop \
+    tmux \
+    less \
+    vim \
+    time \
+    procps \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/fdfind /usr/local/bin/fd \
+    && ln -sf /usr/bin/batcat /usr/local/bin/bat
+
+# ============================================================
+# Build SUMO 1.20.0 + libsumo from source
+#
+# Build inside Linux rather than copying a macOS-built .so.
+# This makes the image portable across linux/amd64 and
+# linux/arm64 when built natively on the target machine.
+# ============================================================
+WORKDIR /opt
+
+RUN curl -fsSLO \
+    "https://sumo.dlr.de/releases/${SUMO_VERSION}/sumo-src-${SUMO_VERSION}.tar.gz" \
+    && tar -xzf "sumo-src-${SUMO_VERSION}.tar.gz" \
+    && rm "sumo-src-${SUMO_VERSION}.tar.gz"
+
+WORKDIR /opt/sumo-${SUMO_VERSION}
+
+# SUMO 1.20.0 compatibility patch for modern Python/SWIG builds.
+RUN sed -i \
+    's/PyInt_FromLong/PyLong_FromLong/g' \
+    src/libsumo/libsumo_typemap.i
+
+# Keep the build minimal and avoid optional GDAL/GUI dependencies.
+RUN cmake -S . -B build \
+    -DPython_EXECUTABLE=/usr/local/bin/python \
+    -DPython_ROOT_DIR=/usr/local \
+    -DENABLE_PYTHON_BINDINGS=ON \
+    -DCHECK_OPTIONAL_LIBS=OFF \
+    -DENABLE_FOX=OFF \
+    -DENABLE_PROJ=OFF \
+    -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build build \
+        --target sumo libsumo \
+        --parallel "$(nproc)"
+
+ENV SUMO_HOME=/opt/sumo-1.20.0 \
+    PATH="/opt/sumo-1.20.0/bin:${PATH}" \
+    PYTHONPATH="/opt/sumo-1.20.0/tools:/workspace"
+
+# Fail the image build immediately if SUMO/libsumo is unusable.
+RUN python --version \
+    && sumo --version \
+    && python -c "import libsumo; print('libsumo OK:', libsumo.__file__)"
+
+# ============================================================
+# Non-root research user
+#
+# Override USER_UID / USER_GID at build time when the Linux
+# workstation uses a different UID/GID:
+#
+#   docker build \
+#     --build-arg USER_UID=$(id -u) \
+#     --build-arg USER_GID=$(id -g) \
+#     ...
+# ============================================================
+RUN groupadd --gid "${USER_GID}" "${USERNAME}" \
+    && useradd \
+        --uid "${USER_UID}" \
+        --gid "${USER_GID}" \
+        --create-home \
+        --shell /bin/zsh \
+        "${USERNAME}"
+
+# ============================================================
+# Oh My Zsh + useful plugins
+# ============================================================
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}
+
+RUN git clone --depth=1 \
+        https://github.com/ohmyzsh/ohmyzsh.git \
+        "/home/${USERNAME}/.oh-my-zsh" \
+    && git clone --depth=1 \
+        https://github.com/zsh-users/zsh-autosuggestions.git \
+        "/home/${USERNAME}/.oh-my-zsh/custom/plugins/zsh-autosuggestions" \
+    && git clone --depth=1 \
+        https://github.com/zsh-users/zsh-syntax-highlighting.git \
+        "/home/${USERNAME}/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
+
+RUN cat > "/home/${USERNAME}/.zshrc" <<'EOF'
+export ZSH="$HOME/.oh-my-zsh"
+
+ZSH_THEME="robbyrussell"
+
+plugins=(
+  git
+  python
+  pip
+  fzf
+  zsh-autosuggestions
+  zsh-syntax-highlighting
+)
+
+source "$ZSH/oh-my-zsh.sh"
+
+# Research environment
+export SUMO_HOME=/opt/sumo-1.20.0
+export PATH="$SUMO_HOME/bin:$PATH"
+export PYTHONPATH="$SUMO_HOME/tools:/workspace"
+
+# Convenient aliases
+alias ll='ls -lah'
+alias grep='grep --color=auto'
+alias py='python'
+alias ipy='python -i'
+EOF
+
+# ============================================================
+# Research project
+# ============================================================
+USER root
+WORKDIR /workspace
+
+COPY --chown=${USERNAME}:${USERNAME} . /workspace
+
+# Install project-specific Python dependencies when present.
+RUN if [ -f requirements.txt ]; then \
+        python -m pip install --no-cache-dir -r requirements.txt; \
+    fi
+
+USER ${USERNAME}
+
+# Final smoke test as the same non-root user used at runtime.
+RUN python -c "import libsumo; print('runtime libsumo OK:', libsumo.__file__)" \
+    && command -v rg \
+    && command -v fd \
+    && command -v bat \
+    && command -v fzf \
+    && command -v tmux
+
+WORKDIR /workspace
+
+CMD ["zsh"]

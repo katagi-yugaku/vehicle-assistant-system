@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2025-01-06 21:21:31 by Eclipse SUMO netedit Version v1_21_0+0879-92336f44d2b
+-->
+
+<additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
+    <!-- <parkingArea    id="ShelterA_1" 
+                    lane="E16_1" 
+                    startPos="5" 
+                    endPos="700" 
+                    roadsideCapacity="300" 
+                    width="3" 
+                    length="6" 
+                    angle ="120">
+    </parkingArea> -->
+    <parkingArea    id="ShelterA_1" 
+                    lane="E16_1" 
+                    startPos="5" 
+                    endPos="700"
+                    roadsideCapacity="0" 
+                    width="5" 
+                    length="10" 
+                    angle="30">
+        <space x="5490" y="2805" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5510" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5513" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5516" y="2802" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5519" y="2802" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5522" y="2802" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5525" y="2801" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5528" y="2801" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5531" y="2801" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5534" y="2800" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5537" y="2800" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5540" y="2800" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5543" y="2799" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5546" y="2799" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5549" y="2799" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5552" y="2798" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5555" y="2798" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5558" y="2798" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5561" y="2797" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5564" y="2797" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5567" y="2797" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5570" y="2797" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5573" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5576" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5579" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5582" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5585" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5588" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5591" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+        <space x="5594" y="2803" z="0" width="3" length="6" angle="175" slope="8"/>
+    </parkingArea>
+</additional>

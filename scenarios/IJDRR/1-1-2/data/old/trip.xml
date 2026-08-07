@@ -1,0 +1,4 @@
+<trips>
+    <trip id="veh0" from="E0" to="E16" depart="0"/>
+    <trip id="veh1" from="E0" to="E28" depart="0"/>
+</trips>
