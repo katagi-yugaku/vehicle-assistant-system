@@ -45,6 +45,11 @@ def sh(cmd: list[str], **kw) -> str:
     return subprocess.run(cmd, check=True, capture_output=True, text=True, **kw).stdout.strip()
 
 
+def git(*args: str, cwd) -> str:
+    """git を cwd で実行する(古い git 1.8 系は `git -C` に対応していないため cwd で渡す)。"""
+    return sh(["git", *args], cwd=str(cwd))
+
+
 def toml_value(v) -> str:
     if isinstance(v, bool):
         return "true" if v else "false"
@@ -78,22 +83,22 @@ def git_state(ref: str | None, allow_dirty: bool) -> tuple[str, str, bool, str, 
     --ref を省略した場合:HEAD に scenarios/jip_rev があれば HEAD を使い、
       jip_rev に未コミットの変更があれば止める(--allow-dirty なら作業ツリーをそのまま写す)。
     """
-    top = sh(["git", "-C", str(ROOT), "rev-parse", "--show-toplevel"])
+    top = git("rev-parse", "--show-toplevel", cwd=ROOT)
     prefix = os.path.relpath(ROOT, top)
     ref_name = ref or "HEAD"
     try:
-        commit = sh(["git", "-C", top, "rev-parse", "--verify", f"{ref_name}^{{commit}}"])
+        commit = git("rev-parse", "--verify", f"{ref_name}^{{commit}}", cwd=top)
     except subprocess.CalledProcessError:
         sys.exit(f"ERROR: git の参照 {ref_name!r} が見つかりません(git fetch origin を実行しましたか)")
     try:
-        sh(["git", "-C", top, "cat-file", "-e", f"{commit}:{prefix}/code"])
+        git("cat-file", "-e", f"{commit}:{prefix}/code", cwd=top)
     except subprocess.CalledProcessError:
         sys.exit(f"ERROR: {ref_name} ({commit[:7]}) に {prefix}/code がありません。"
                  "計算機では --ref origin/jip/revision-26S015f を指定してください。")
     dirty = False
     if ref is None:
-        dirty_lines = sh(["git", "-C", top, "status", "--porcelain", "--untracked-files=all", "--",
-                          *[f"{prefix}/{p}" for p in FROZEN_PATHS]])
+        dirty_lines = git("status", "--porcelain", "--untracked-files=all", "--",
+                          *[f"{prefix}/{p}" for p in FROZEN_PATHS], cwd=top)
         dirty = bool(dirty_lines)
         if dirty and not allow_dirty:
             sys.exit("ERROR: jip_rev に未コミットの変更があります。コミットしてから投入してください"
@@ -101,11 +106,11 @@ def git_state(ref: str | None, allow_dirty: bool) -> tuple[str, str, bool, str, 
     else:
         # 作業ツリーの投入スクリプトとコミットの内容が違えば知らせる(凍結はコミットから行う)
         differ = []
-        for line in sh(["git", "-C", top, "ls-tree", "-r", commit, "--", f"{prefix}/tools"]).splitlines():
+        for line in git("ls-tree", "-r", commit, "--", f"{prefix}/tools", cwd=top).splitlines():
             meta, path = line.split("\t", 1)
             blob = meta.split()[2]
             local = Path(top) / path
-            if not local.is_file() or sh(["git", "-C", top, "hash-object", str(local)]) != blob:
+            if not local.is_file() or git("hash-object", str(local), cwd=top) != blob:
                 differ.append(path)
         if differ:
             print(f"[warn] 作業ツリーの {prefix}/tools が {ref_name} と違います。"
@@ -116,11 +121,11 @@ def git_state(ref: str | None, allow_dirty: bool) -> tuple[str, str, bool, str, 
 def freeze(dest: Path, commit: str, dirty: bool, prefix: str) -> None:
     dest.mkdir(parents=True)
     if not dirty:
-        top = sh(["git", "-C", str(ROOT), "rev-parse", "--show-toplevel"])
+        top = git("rev-parse", "--show-toplevel", cwd=ROOT)
         # パス指定はリポジトリ直下から解釈させる(サブディレクトリで実行すると失敗するため)
         archive = subprocess.Popen(
-            ["git", "-C", top, "archive", f"{commit}:{prefix}", *FROZEN_PATHS],
-            stdout=subprocess.PIPE,
+            ["git", "archive", f"{commit}:{prefix}", *FROZEN_PATHS],
+            stdout=subprocess.PIPE, cwd=top,
         )
         subprocess.run(["tar", "-x", "-C", str(dest)], stdin=archive.stdout, check=True)
         if archive.wait() != 0:

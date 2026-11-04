@@ -46,7 +46,8 @@ elif [[ "${SUCCESS}" -gt 0 && -s "${RESULTS}/summary.csv" ]]; then OUTCOME=INCOM
 else OUTCOME=FAILED; fi
 
 # ---- 生データの保存 ----
-if command -v zstd >/dev/null 2>&1; then ARCHIVE="${ARCHIVE_DIR}/${EXP_ID}.tar.zst"; COMP=(--zstd)
+# tar が --zstd に対応している場合だけ zstd を使う(CentOS 7 の tar 1.26 は非対応)
+if command -v zstd >/dev/null 2>&1 && tar --zstd -cf /dev/null --files-from /dev/null >/dev/null 2>&1; then ARCHIVE="${ARCHIVE_DIR}/${EXP_ID}.tar.zst"; COMP=(--zstd)
 else ARCHIVE="${ARCHIVE_DIR}/${EXP_ID}.tar.gz"; COMP=(-z); fi
 ARCHIVE_NOTE="archive FAILED (tar)"
 if tar -C "$(dirname "${RUN_ROOT}")" "${COMP[@]}" -cf "${ARCHIVE}.part" "${EXP_ID}" \
