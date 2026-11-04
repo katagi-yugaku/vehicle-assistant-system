@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 import datetime as dt
 import json
 import math
@@ -81,6 +82,7 @@ def load_runs(run_root: Path, manifest: dict) -> list[dict]:
                 "status": st.get("status", "MISSING"),
                 "elapsed_s": float(st["elapsed_s"]) if st.get("elapsed_s") else None,
                 "host": st.get("host", ""),
+                "run_dir": t["run_dir"],
             }
             raw_path = run_dir / "raw.json"
             if row["status"] == "SUCCESS" and raw_path.exists():
@@ -110,8 +112,43 @@ def load_runs(run_root: Path, manifest: dict) -> list[dict]:
     return rows
 
 
+# 論文(aggregate_schubert_logs.py)と同じ車両 ID の正規化: init/newveh/ped の派生 ID を元の番号にまとめる
+ORIGINAL_VEH_ID_RE = re.compile(r"^(?:ped_)?(?:init|newveh)_Shelter[A-Za-z]+_\d+_(\d+)(?:_\d+)*$")
+
+
+def original_vehicle_id(raw_id: str) -> str:
+    m = ORIGINAL_VEH_ID_RE.match(str(raw_id).strip())
+    return m.group(1) if m else str(raw_id)
+
+
+def load_vehicle_arrivals(run_dir: Path) -> dict[str, list[float]]:
+    """1 回分の到着時刻を、元の車両番号ごとにまとめる(論文の集計と同じ扱い)。"""
+    raw = json.loads((run_dir / "raw.json").read_text())
+    out: dict[str, list[float]] = defaultdict(list)
+    for sumo_id, t in (raw.get("arrival_time_by_sumo_id") or {}).items():
+        out[original_vehicle_id(sumo_id)].append(float(t))
+    return out
+
+
 METRICS = ["completion_time", "mean_arrival_time", "route_changes", "rc_normalcy", "rc_majority",
            "rc_uturn", "rc_forward", "e0_regeneration", "rc_on_e0"]
+
+
+def paper_completion(rs) -> tuple[float | None, float | None]:
+    """
+    論文の Fig.8–11 と同じ定義:車両ごとに全回の到着時刻を平均し、その最大値(と平均)。
+    各回の最後の到着時刻の平均(completion_time)より小さくなる。
+    """
+    acc: dict[str, list[float]] = defaultdict(list)
+    for r in rs:
+        if r["status"] != "SUCCESS" or not r.get("run_dir"):
+            continue
+        for vid, vals in load_vehicle_arrivals(Path(r["run_dir"])).items():
+            acc[vid].extend(vals)
+    means = [statistics.fmean(v) for v in acc.values() if v]
+    if not means:
+        return None, None
+    return max(means), statistics.fmean(means)
 
 
 def summarize(rows):
@@ -124,6 +161,7 @@ def summarize(rows):
         rec = {"layout": layout, "condition": cond, "mu_theta": rs[0]["mu_theta"],
                "p_follow": rs[0]["p_follow"], "variant": variant, "n_planned": len(rs),
                "n_success": len(ok), "n_not_all_arrived": sum(1 for r in ok if r.get("note"))}
+        rec["completion_time_paperdef"], rec["mean_arrival_time_paperdef"] = paper_completion(ok)
         for key in METRICS:
             d = describe([r.get(key) for r in ok])
             rec[f"{key}_mean"] = d["mean"]
@@ -284,13 +322,15 @@ def main() -> int:
              f"- 成功 {n_ok} / 予定 {manifest['planned_runs']}",
              f"- コード {manifest['code_commit'][:7]}{' (dirty)' if manifest.get('code_dirty') else ''}", "",
              "## 完了時刻(平均 [95% CI]、s)と経路変更(平均回数)", "",
-             "| 構成 | 条件 | 版 | n | 完了時刻 | 平均到着 | 経路変更 | 同調 | U ターン | E0 再生成 |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
+             "完了時刻 = 各回の最後の到着時刻の平均。論文定義 = 車両ごとに到着時刻を平均した値の最大値"
+             "(論文の Fig.8–11 と同じ集計。各回の値がないので信頼区間は出せない)。", "",
+             "| 構成 | 条件 | 版 | n | 完了時刻 | 論文定義 | 平均到着 | 経路変更 | 同調 | U ターン | E0 再生成 |",
+             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for s in summary:
         lines.append(
             f"| {s['layout']} | μθ={s['mu_theta']:g}, P={s['p_follow']:g} | {s['variant']} | {s['n_success']} | "
             f"{fmt(s['completion_time_mean'])} [{fmt(s['completion_time_ci95_low'])}, {fmt(s['completion_time_ci95_high'])}] | "
-            f"{fmt(s['mean_arrival_time_mean'])} | {fmt(s['route_changes_mean'])} | {fmt(s['rc_majority_mean'])} | "
+            f"{fmt(s['completion_time_paperdef'])} | {fmt(s['mean_arrival_time_mean'])} | {fmt(s['route_changes_mean'])} | {fmt(s['rc_majority_mean'])} | "
             f"{fmt(s['rc_uturn_mean'])} | {fmt(s['e0_regeneration_mean'])} |")
     if decision is not None:
         lines += ["", f"## {comp['treatment']} − {comp['baseline']}(同じシードの組)", "",
@@ -300,6 +340,13 @@ def main() -> int:
                 f"| {r['layout']} | μθ={r['mu_theta']:g}, P={r['p_follow']:g} | {r['n_pairs']} | "
                 f"{fmt(r['diff_completion_time_mean'])} [{fmt(r['diff_completion_time_ci95_low'])}, "
                 f"{fmt(r['diff_completion_time_ci95_high'])}] | {'yes' if r['exceeds_e4_threshold'] else ''} |")
+        lines += ["", "論文定義の完了時刻の差(treatment − baseline):"]
+        pd = {(s["layout"], s["condition"], s["variant"]): s["completion_time_paperdef"] for s in summary}
+        for r in decision["paired"]:
+            a = pd.get((r["layout"], r["condition"], comp["baseline"]))
+            b = pd.get((r["layout"], r["condition"], comp["treatment"]))
+            if a is not None and b is not None:
+                lines.append(f"- {r['layout']} μθ={r['mu_theta']:g}, P={r['p_follow']:g}: {b - a:+.1f} s")
         lines += ["", "## E4(全条件の再実行)の判断材料(最終判断は著者)", ""]
         lines += [f"- {x}" for x in decision["reasons"]] or ["- 基準に当たった項目はなし"]
     if failed:
