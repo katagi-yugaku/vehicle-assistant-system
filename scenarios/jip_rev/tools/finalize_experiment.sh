@@ -14,7 +14,10 @@ RUN_ROOT="$(cd -- "${1:?RUN_ROOT is required}" && pwd -P)"; shift
 DRY_RUN_MAIL=0
 for a in "$@"; do [[ "$a" == --dry-run-mail ]] && DRY_RUN_MAIL=1; done
 
-TOOLS="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"     # 凍結した tools
+# sbatch はスクリプトを /var/spool/slurm/... にコピーして実行するので、自分の場所からは探さない。
+# 凍結した tools(RUN_ROOT/frozen/tools)を使う。
+TOOLS="${EVAC_TOOLS:-${RUN_ROOT}/frozen/tools}"
+[[ -f "${TOOLS}/aggregate_experiment.py" ]] || { echo "ERROR: ${TOOLS}/aggregate_experiment.py not found" >&2; exit 2; }
 JIP_REV="${EVAC_JIP_REV:-$(cd -- "${RUN_ROOT}/../.." && pwd -P)}"   # scenarios/jip_rev
 PY="${EVAC_PYTHON:-python3}"
 EXP_ID="$(basename "${RUN_ROOT}")"
