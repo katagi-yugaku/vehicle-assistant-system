@@ -1,0 +1,6 @@
+condition_id,scenario_id,config_file,choice_shortest_route_rate
+1,1,config_scenario_1.toml,0.1
+2,2,config_scenario_2.toml,0.3
+3,3,config_scenario_3.toml,0.5
+4,4,config_scenario_4.toml,0.7
+5,5,config_scenario_5.toml,0.9

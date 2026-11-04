@@ -1,0 +1,48 @@
+# E3:修正の影響の大きさを判断する(最優先)
+#   構成   : 2 経路 (1-1-2), 4 経路 (1-1-4)
+#   条件   : (μθ, P) = (150, 0.10), (350, 0.10), (150, 0.30), (350, 0.30)
+#   版     : before = 元の動作(フラグ off)/ after = 修正後(DTN, legacy 通信)
+#   回数   : シード 1–50。before と after は同じシードで組にする。
+#   合計   : 2 × 4 × 2 × 50 = 800 回
+name = "E3"
+description = "fix_origin_edge / fix_pre_x_alternatives の影響 (before vs after)"
+seed_start = 1
+seed_end = 50
+early_rate = 1.0
+v2v_rate = 1.0
+layouts = ["1-1-2", "1-1-4"]
+
+# 条件ラベル = 元にする設定ファイル(scenarios/jip_rev/code からの相対パス)
+# expect は設定の中身の確認用(違えば投入を止める)
+[conditions.mu150_p010]
+config = "scenarios/JIP/configs/config_scenario_1.toml"
+expect = { active_route_change_threshold_center = 150.0, p_follow = 0.1 }
+
+[conditions.mu350_p010]
+config = "scenarios/JIP/configs/config_scenario_5.toml"
+expect = { active_route_change_threshold_center = 350.0, p_follow = 0.1 }
+
+[conditions.mu150_p030]
+config = "scenarios/JIP/configs/config_scenario_21.toml"
+expect = { active_route_change_threshold_center = 150.0, p_follow = 0.3 }
+
+[conditions.mu350_p030]
+config = "scenarios/JIP/configs/config_scenario_25.toml"
+expect = { active_route_change_threshold_center = 350.0, p_follow = 0.3 }
+
+# 版ごとに設定へ追加するフラグ(code/evacsim/sim/revision_options.py)
+# save_raw は結果を変えないことを確認済み(revision/STEP0-2_REPORT.md)。
+[variants.before]
+save_raw = true
+
+[variants.after]
+save_raw = true
+fix_origin_edge = true
+fix_pre_x_alternatives = true   # 1-1-2 では効果なし(2 経路は代替経路が 1 本)
+
+# 修正前後の比較(aggregate_experiment.py が paired.csv と判定に使う)
+[compare]
+baseline = "before"
+treatment = "after"
+# E4(全条件の再実行)を検討する基準:完了時刻の平均が何 s 以上動いたか
+e4_threshold_s = 40.0

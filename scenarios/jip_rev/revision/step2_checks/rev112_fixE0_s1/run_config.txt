@@ -1,0 +1,1 @@
+[RUN_CONFIG] layout=1-1-2 config=/home/claude/cfg/fixE0.toml seed=1 fix_origin_edge=True fix_pre_x_alternatives=False travel_time_offset=100.0 communication_mode=legacy end_simulation_time=3000 save_raw=True log_sections=False

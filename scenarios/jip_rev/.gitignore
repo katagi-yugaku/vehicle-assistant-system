@@ -1,0 +1,5 @@
+# 改訂用ディレクトリ内の生成物
+runs/
+archive/
+__pycache__/
+*.pyc

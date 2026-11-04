@@ -1,0 +1,1 @@
+[RUN_CONFIG] layout=1-1-2 config=/home/claude/cfg/tt0.toml seed=1 fix_origin_edge=False fix_pre_x_alternatives=False travel_time_offset=0.0 communication_mode=legacy end_simulation_time=3000 save_raw=True log_sections=False
