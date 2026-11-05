@@ -2,6 +2,7 @@
 # Standard library
 # =========================
 import os
+import json
 import random
 import sys
 from collections import Counter, defaultdict
@@ -197,6 +198,12 @@ PRE_X_SKIP_EDGES = (
     ["E0", "E1", "E20"] if _REV.fix_origin_edge else ["E1", "E20"]
 )
 _routing_module.UTURN_REQUIRE_OPPOSITE_EDGE = _REV.fix_origin_edge
+# 改訂:分岐後の代替経路を原稿の式 (1) どおりに計算する(元は全区間を自由流)。
+_routing_module.ALTERNATIVE_FROM_TABLE = _REV.fix_alternative_from_table
+if _REV.fix_alternative_from_table and _REV.travel_time_offset != 0:
+    print("[RUN_CONFIG_NOTE] fix_alternative_from_table uses table values directly; "
+          f"travel_time_offset={_REV.travel_time_offset} is subtracted from them "
+          "(set travel_time_offset = 0)")
 # B6: 旅行時間から差し引く値(元は 100 s)。
 _arrival_module.TRAVEL_TIME_OFFSET = _REV.travel_time_offset
 # B5: 到着時の記録。
@@ -766,8 +773,89 @@ def run():
         if _REV.log_sections:
             _rev.RAW.maybe_log_sections(traci.simulation.getTime(), traci)
         control_vehicles()
+        if _REV.log_information:
+            _log_information_round(traci.simulation.getTime())
+    _close_information_log()
     traci.close()
     sys.stdout.flush()
+
+
+# =========================
+# 改訂(M3): 情報伝達の記録(log_information = true のときだけ。シミュレーションの状態は変えない)
+#   通信ラウンドの時刻(10 s ごと)に、全車両について 1 行ずつ JSON で書く:
+#   {"t": 時刻, "mode": 通信方式,
+#    "v": [[sumo_id, edge, lane_pos, x, y, comm, info_t, n_routes, direct, comp], ...],
+#    "comps": [連結成分の大きさ, ...]}
+#     info_t   : 持っている経路情報の元の時刻(避難所で受け取った時刻)。なければ null
+#     n_routes : その情報に入っている経路の数(2 未満なら判断に入らない)
+#     direct   : このラウンドで避難所から直接受け取ったか(round 単位の通信のときだけ)
+#     comp     : このラウンドの連結成分の番号(round 単位の通信のときだけ)
+# =========================
+_INFORMATION_LOG = None
+
+
+def _information_log_path() -> str:
+    if _REV.information_output:
+        return _REV.information_output
+    return str(Path(_REV.raw_output).resolve().parent / "information.jsonl.gz")
+
+
+def _log_information_round(current_time: float) -> None:
+    global _INFORMATION_LOG
+    if not _is_interval_step(current_time, COMMUNICATION_INTERVAL):
+        return
+    if _INFORMATION_LOG is None:
+        import gzip
+        path = _information_log_path()
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        _INFORMATION_LOG = gzip.open(path, "wt", encoding="utf-8")
+        print(f"[INFORMATION_LOG] path={path}")
+
+    comp_by_vehicle: dict[str, int] = {}
+    comps: list[int] = []
+    result = LAST_COMMUNICATION_ROUND_RESULT if ROUND_BASED_COMMUNICATION else None
+    communication_round = int(round(current_time / COMMUNICATION_INTERVAL))
+    if result is not None and getattr(result, "communication_round", None) == communication_round:
+        for idx, comp in enumerate(result.connected_components):
+            comps.append(len(comp))
+            for vid in comp:
+                comp_by_vehicle[vid] = idx
+
+    rows = []
+    for vid in traci.vehicle.getIDList():
+        vi = vehInfo_by_vehID_dict.get(vid)
+        if vi is None:
+            continue
+        try:
+            edge = traci.vehicle.getRoadID(vid)
+            lane_pos = traci.vehicle.getLanePosition(vid)
+            x, y = traci.vehicle.getPosition(vid)
+        except Exception:
+            continue
+        info = vi.get_avg_evac_time_by_route_by_recive_time() or {}
+        info_t, n_routes = None, 0
+        if info:
+            latest = max(info)
+            n_routes = len(info.get(latest) or {})
+            if n_routes:
+                info_t = float(latest)
+        direct = None
+        if ROUND_BASED_COMMUNICATION and hasattr(vi, "get_forwardable_information_records"):
+            direct = bool(vi.get_forwardable_information_records(
+                communication_round, information_kinds={"route_average_time"}))
+        rows.append([vid, edge, round(lane_pos, 1), round(x, 1), round(y, 1),
+                     bool(vi.get_vehicle_comm_enabled_flag()), info_t, n_routes,
+                     direct, comp_by_vehicle.get(vid)])
+    _INFORMATION_LOG.write(json.dumps(
+        {"t": float(current_time), "mode": _REV.communication_mode, "v": rows, "comps": comps},
+        separators=(",", ":")) + "\n")
+
+
+def _close_information_log() -> None:
+    global _INFORMATION_LOG
+    if _INFORMATION_LOG is not None:
+        _INFORMATION_LOG.close()
+        _INFORMATION_LOG = None
 
 
 # =========================
@@ -1800,11 +1888,13 @@ if __name__ == "__main__":
         f"seed={RUN_SEED}",
         f"fix_origin_edge={_REV.fix_origin_edge}",
         f"fix_pre_x_alternatives={_REV.fix_pre_x_alternatives}",
+        f"fix_alternative_from_table={_REV.fix_alternative_from_table}",
         f"travel_time_offset={_REV.travel_time_offset}",
         f"communication_mode={_REV.communication_mode}",
         f"end_simulation_time={END_SIMULATION_TIME}",
         f"save_raw={_REV.save_raw}",
         f"log_sections={_REV.log_sections}",
+        f"log_information={_REV.log_information}",
     )
     if _REV.fix_pre_x_alternatives:
         # 2 経路構成では代替経路が 1 本しかないため、元の固定 ID と同じ結果になる。

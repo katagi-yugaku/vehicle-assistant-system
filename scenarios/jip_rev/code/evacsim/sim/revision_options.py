@@ -12,6 +12,10 @@
 #   log_sections            (M1/R2-3) 30 s ごとの道路区間ごとの車両数と平均速度
 #   travel_time_offset      (B6) 旅行時間から差し引く値(元は 100 s)
 #   communication_mode      (B2) legacy / v2v_dtn / v2v_only
+#   fix_alternative_from_table  分岐後の代替経路の時間を原稿の式 (1) どおり
+#                           「交差点まで自由流 + その先は表」で計算する(E4 で使う修正)
+#   log_information         (M3) 通信ラウンドごとの車両位置・情報の有無と古さ・連結成分を記録する
+#                           (round 単位の通信のときだけ。結果は変えない)
 #
 # 注意:
 #   - TOML の設定キーで受け取る。--seed と --raw-output はコマンドラインでも
@@ -54,6 +58,7 @@ _BOOL_FALSE = {"0", "false", "no", "off"}
 class RevisionOptions:
     fix_origin_edge: bool = False
     fix_pre_x_alternatives: bool = False
+    fix_alternative_from_table: bool = False
     seed: int | None = None
     save_raw: bool = False
     raw_output: str = "raw.json"
@@ -62,6 +67,8 @@ class RevisionOptions:
     travel_time_offset: float = 100.0
     communication_mode: str = LEGACY
     end_simulation_time: float | None = None
+    log_information: bool = False
+    information_output: str | None = None   # 未指定なら raw_output と同じ場所の information.jsonl.gz
     config_path: str | None = None
 
     @property
@@ -95,6 +102,10 @@ def options_from_config(cfg: dict) -> RevisionOptions:
     opts = RevisionOptions()
     if "fix_origin_edge" in cfg:
         opts.fix_origin_edge = _to_bool("fix_origin_edge", cfg["fix_origin_edge"])
+    if "fix_alternative_from_table" in cfg:
+        opts.fix_alternative_from_table = _to_bool(
+            "fix_alternative_from_table", cfg["fix_alternative_from_table"]
+        )
     if "fix_pre_x_alternatives" in cfg:
         opts.fix_pre_x_alternatives = _to_bool(
             "fix_pre_x_alternatives", cfg["fix_pre_x_alternatives"]
@@ -115,6 +126,10 @@ def options_from_config(cfg: dict) -> RevisionOptions:
         opts.communication_mode = str(cfg["communication_mode"]).strip().lower()
     if cfg.get("end_simulation_time") is not None:
         opts.end_simulation_time = float(cfg["end_simulation_time"])
+    if "log_information" in cfg:
+        opts.log_information = _to_bool("log_information", cfg["log_information"])
+    if cfg.get("information_output"):
+        opts.information_output = str(cfg["information_output"])
     validate(opts)
     return opts
 

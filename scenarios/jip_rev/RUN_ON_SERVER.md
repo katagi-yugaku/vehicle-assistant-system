@@ -50,22 +50,30 @@ tools/run_experiment.sh experiments/E3.toml --ref origin/jip/revision-26S015f --
 - ジョブ配列 1 本(`--array=1-800%32`)と、終了後の集計ジョブ 1 本(`--dependency=afterany`)が入る。
 - パーティションは `ubuntu`(`--partition` / `EVAC_PARTITION` で変更可)。1 タスク 1 コア・4 GB・上限 2 時間。
 
-## 6b. E2(通信方式の比較:V2V only / DTN / 通信なし、600 回)
-E3 と同じ手順で、実験定義だけを変える。集計は `aggregate_e2.py`(E2.toml の `aggregator`)が自動で使われる。
+## 6b. E2(通信方式の比較、μθ の掃引、修正版。2026-11-06 版)
+E3 と同じ手順で、実験定義だけを変える。集計は `aggregate_e2.py` が自動で使われる。
+- `experiments/E2.toml`:μθ = 60–300 s(30 s 刻み、σθ = 50 s)+ μθ = 150 s・σθ = 100 s、P = 0.10、
+  V2V only / DTN、シード 1–50 → 1,000 回(1 回 約 12 分、32 並列で約 6.5 時間)
+- `experiments/E2_none.toml`:通信なし、1 条件 × 50 回(1 回 約 3 分)
+- どちらも fix_origin_edge + fix_alternative_from_table(原稿の式 (1))、travel_time_offset = 0、伝達の記録あり
 ```bash
-# 投入前の確認(600 タスク。tasks.tsv の最後の列 v2v_rate が none の版だけ 0.0 になっていること)
+# 投入前の確認(タスク数が 1000 / 50 になること)
 tools/run_experiment.sh experiments/E2.toml --ref origin/jip/revision-26S015f --print-only
-# 小さい本番確認(1 条件 × 3 版 × 2 シード = 6 回。1 回 6 分前後)
-tools/run_experiment.sh experiments/E2.toml --ref origin/jip/revision-26S015f --seeds 1-2 --conditions mu150_p010 --name E2-smoke
+tools/run_experiment.sh experiments/E2_none.toml --ref origin/jip/revision-26S015f --print-only
+rm -rf runs/*_E2_* runs/*_E2-none_*
+# 小さい本番確認(4 回)
+tools/run_experiment.sh experiments/E2.toml --ref origin/jip/revision-26S015f --seeds 1-1 --conditions mu060_sd050,mu300_sd050 --name E2-smoke2
 # 本実行
 tools/run_experiment.sh experiments/E2.toml --ref origin/jip/revision-26S015f --max-parallel 32
+tools/run_experiment.sh experiments/E2_none.toml --ref origin/jip/revision-26S015f --max-parallel 32
+# 終わったら伝達の分析(条件 × 方式ごとの表と図)
+python3 tools/analyze_information.py runs/<E2 の実験ID> --out results/<E2 の実験ID>/information
+# 避難所が共有した経路ごとの平均旅行時間の推移(経路, 平均所要時間, 時刻)。--window 200 で直近 200 s の平均も並べる
+python3 tools/route_table_timeseries.py runs/<E2 の実験ID> --window 200
 ```
-- E2 だけ(通信なしを除く 400 回)にするときは `--variants v2v_only,v2v_dtn`。
-- メールには版ごとの完了時刻、同じシードの組の差(DTN − V2V only、DTN − 通信なし、V2V only − 通信なし)、
-  「全条件で短いか」のまとめ、Fig.12 の下書き(`figs/arrival_cdf*.png`)が付く。E4 の判定は出ない。
-- 終了時刻は 3500 s。到着がそろわない回があれば decision.md の先頭に警告が出る(その回の完了時刻は短く出る)。
 
-試験用の絞り込み(E3 でも使える):`--seeds 1-2`、`--conditions mu150_p010,mu350_p030`、`--variants v2v_dtn`、`--layouts 1-1-2`。
+試験用の絞り込み(E3 でも使える):`--seeds 1-2`、`--conditions mu150_sd050,mu150_sd100`、`--variants v2v_dtn`、`--layouts 1-1-2`。
+同じ分に同じ名前の実験を作ると ID が重なって止まるので、`--name` で名前を変える。
 
 ## 7. 進み具合・取り消し
 ```bash

@@ -1,0 +1,29 @@
+# E2':通信なし(情報がまったくない場合の参照)。修正版。
+#   通信なし = どの車両も通信できない(避難所からも受け取らない)ので経路変更が起きず、θ によらず同じ結果になる。
+#   そのため条件は 1 つ(μθ = 150 s・σθ = 100 s)だけ。シード 1–50 → 50 回(1 回 約 3 分)
+name = "E2-none"
+description = "通信なし(参照)、修正版"
+seed_start = 1
+seed_end = 50
+early_rate = 1.0
+v2v_rate = 1.0
+layouts = ["1-1-2"]
+aggregator = "aggregate_e2.py"
+
+[conditions.mu150_sd100]
+config = "scenarios/JIP/configs/rev_e2/config_e2_mu150_sd100.toml"
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[variants.none]
+communication_mode = "v2v_dtn"
+v2v_rate = 0.0
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+end_simulation_time = 3500
+save_raw = true
+log_information = true
+
+[compare]
+pairs = []
+labels = { none = "No communication" }

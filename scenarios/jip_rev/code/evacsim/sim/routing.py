@@ -48,6 +48,18 @@ FREE_FLOW_SPEED = 11.0
 # 同じ edge を返す)場合に U ターン候補を作らない。既定 False は元の動作。
 UTURN_REQUIRE_OPPOSITE_EDGE: bool = False
 
+# 改訂(fix_alternative_from_table): True のとき、分岐後の代替経路の時間を原稿 3.3 節の
+# 式 (1) T_alt = T_access + T_cand どおりに計算する。既定 False は元の動作。
+#   - U ターン候補:候補経路に入る交差点までは自由流(T_access)、そこから避難所までは
+#     共有された表の平均を距離の比で按分した値(T_cand。自由流より速くはしない)。
+#     表にその経路がなければ、元の動作(全区間を自由流)に戻る。
+#   - 前進の候補:表から求めた値(分岐まで + 按分した表の値)を採用する。
+#     元の動作は max(表, 自由流) と自由流の小さいほうを取るため、常に自由流になっていた。
+#   表の経路として使うのは、出発地の edge(ORIGIN_EDGE_ID)から始まる経路だけ
+#   (U ターン後に再生成された車の経路は使わない)。
+ALTERNATIVE_FROM_TABLE: bool = False
+ORIGIN_EDGE_ID: str = "E0"
+
 V2V_PREFIX_INITIAL_COMMON_PREFIX = ("E0", "E1", "E20")
 
 V2V_ROUTE_FAMILY_MARKERS = {
@@ -2847,7 +2859,13 @@ def _evaluate_forward_route(
             time_to_divergence + v2v_time_after_divergence
         )
 
-    if (
+    if ALTERNATIVE_FROM_TABLE and _is_valid_positive_time(
+        v2v_prefix_adjusted_time
+    ):
+        # 改訂:表から求めた値を採用する(自由流より遅いときも)。
+        best_time = v2v_prefix_adjusted_time
+        best_source = "v2v_prefix_adjusted"
+    elif (
         _is_valid_positive_time(v2v_prefix_adjusted_time)
         and v2v_prefix_adjusted_time
         < forward_free_flow_time - TIME_COMPARISON_EPSILON
@@ -2937,12 +2955,75 @@ def _evaluate_best_forward_candidate(
     return _sort_candidates(candidates)[0]
 
 
+def _table_time_after_merge(
+    *,
+    u_turn_route_edges: tuple[str, ...],
+    candidate_edge_id: str,
+    route_options: Optional[dict],
+    dprint: Callable[[str], None],
+) -> Optional[dict]:
+    """
+    改訂(fix_alternative_from_table):U ターン経路が表の経路に合流する位置を探し、
+    T_access(合流まで、自由流)と T_cand(合流後、表の平均を距離で按分)を返す。
+    合流する表の経路がなければ None。
+    """
+    if not route_options:
+        return None
+    best = None
+    for key, info in route_options.items():
+        key = tuple(key)
+        if not key or key[0] != ORIGIN_EDGE_ID or key[-1] != candidate_edge_id:
+            continue
+        avg_time = (info or {}).get("avg_time")
+        if not isinstance(avg_time, (int, float)) or not _is_valid_positive_time(float(avg_time)):
+            continue
+        # U ターン経路の後半 u_turn_route_edges[k:] が表の経路の末尾と一致する最小の k
+        merge_index = None
+        for k in range(1, len(u_turn_route_edges)):
+            suffix = u_turn_route_edges[k:]
+            if len(suffix) <= len(key) and key[len(key) - len(suffix):] == suffix:
+                merge_index = k
+                break
+        if merge_index is None:
+            continue
+        if best is None or merge_index < best[0]:
+            best = (merge_index, key, float(avg_time))
+    if best is None:
+        return None
+    merge_index, key, avg_time = best
+    access_edges = u_turn_route_edges[:merge_index]
+    cand_edges = u_turn_route_edges[merge_index:]
+    access_distance = _calculate_route_distance_from_edges(access_edges, dprint)
+    cand_distance = _calculate_route_distance_from_edges(cand_edges, dprint)
+    key_distance = _calculate_route_distance_from_edges(key, dprint)
+    if not (
+        _is_valid_positive_time(access_distance)
+        and _is_valid_positive_time(cand_distance)
+        and _is_valid_positive_time(key_distance)
+    ):
+        return None
+    t_access = access_distance / FREE_FLOW_SPEED
+    t_cand_raw = avg_time * cand_distance / key_distance
+    t_cand = max(t_cand_raw, cand_distance / FREE_FLOW_SPEED)
+    return {
+        "table_route": key,
+        "merge_edge": cand_edges[0],
+        "access_distance": access_distance,
+        "cand_distance": cand_distance,
+        "t_access": t_access,
+        "t_cand_raw": t_cand_raw,
+        "t_cand": t_cand,
+        "time": t_access + t_cand,
+    }
+
+
 def _evaluate_u_turn_candidate(
     *,
     current_edge_id: str,
     candidate_shelter_id: str,
     candidate_edge_id: str,
     dprint: Callable[[str], None],
+    route_options: Optional[dict] = None,
 ) -> Optional[CandidateEvaluation]:
     try:
         u_turn_start_edge = get_opposite_edgeID_by_edgeID(
@@ -2984,6 +3065,16 @@ def _evaluate_u_turn_candidate(
         return None
 
     u_turn_time = route_distance / FREE_FLOW_SPEED
+    table_detail = None
+    if ALTERNATIVE_FROM_TABLE:
+        table_detail = _table_time_after_merge(
+            u_turn_route_edges=route_edges,
+            candidate_edge_id=candidate_edge_id,
+            route_options=route_options,
+            dprint=dprint,
+        )
+        if table_detail is not None:
+            u_turn_time = table_detail["time"]
     if not _is_valid_positive_time(u_turn_time):
         return None
 
@@ -2993,6 +3084,7 @@ def _evaluate_u_turn_candidate(
         "u_turn_route": route_edges,
         "u_turn_route_distance": route_distance,
         "u_turn_time": u_turn_time,
+        "u_turn_table": table_detail,
     }
     return CandidateEvaluation(
         best_time=u_turn_time,
@@ -3115,6 +3207,7 @@ def _evaluate_all_candidates(
             candidate_shelter_id=candidate_shelter_id,
             candidate_edge_id=candidate_edge_id,
             dprint=dprint,
+            route_options=route_options,
         )
         if u_turn is not None:
             results.append(u_turn)

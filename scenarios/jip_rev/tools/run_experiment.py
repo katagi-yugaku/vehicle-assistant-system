@@ -221,6 +221,7 @@ def build(args) -> tuple[Path, dict]:
             condition_meta[cond] = {
                 "config": cinfo["config"],
                 "mu_theta": base_cfg.get("active_route_change_threshold_center"),
+                "sigma_theta": base_cfg.get("active_route_change_threshold_spread"),
                 "p_follow": base_cfg.get("p_follow"),
             }
             for variant, flags in variants.items():

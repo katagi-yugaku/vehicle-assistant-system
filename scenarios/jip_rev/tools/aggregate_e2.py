@@ -49,7 +49,8 @@ from aggregate_experiment import (  # noqa: E402  共通部分は E3 と同じ�
 
 PAIR_METRICS = ("completion_time", "mean_arrival_time", "route_changes", "rc_majority", "rc_uturn")
 LINESTYLES = {"v2v_dtn": "-", "dtn": "-", "v2v_only": "--", "none": ":", "no_comm": ":"}
-COND_COLORS = ["#1f77b4", "#d62728", "#2ca02c", "#9467bd", "#ff7f0e", "#8c564b"]
+COND_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b",
+               "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
 
 
 # ---------------------------------------------------------------- 比べる組
@@ -69,6 +70,14 @@ def resolve_pairs(comp: dict, variants: list[str]) -> list[tuple[str, str]]:
             continue
         out.append((a, b))
     return out
+
+
+def cond_label(rec) -> str:
+    """条件の表示名。σθ が分かれば入れる(μθ が同じで σθ が違う条件を区別するため)。"""
+    text = f"μθ={rec['mu_theta']:g}"
+    if rec.get("sigma_theta") is not None:
+        text += f", σθ={rec['sigma_theta']:g}"
+    return text + f", P={rec['p_follow']:g}"
 
 
 def label_of(variant: str, labels: dict) -> str:
@@ -98,6 +107,7 @@ def paired_multi(rows, pairs, labels):
             rec = {"pair": f"{treat} - {base}", "baseline": base, "treatment": treat,
                    "label": f"{label_of(treat, labels)} − {label_of(base, labels)}",
                    "layout": layout, "condition": cond, "mu_theta": meta["mu_theta"],
+                   "sigma_theta": meta.get("sigma_theta"),
                    "p_follow": meta["p_follow"], "n_pairs": len(prs),
                    # 到着が全員そろわなかった回を含む組の数(終了時刻で打ち切られた可能性)
                    "n_pairs_incomplete": sum(1 for a, b in prs if a.get("note") or b.get("note"))}
@@ -163,6 +173,7 @@ def make_cdf_figures(vm, summary, out: Path, title: str, labels: dict, variants:
     figs = out / "figs"
     figs.mkdir(parents=True, exist_ok=True)
     conds = sorted({(s["mu_theta"], s["p_follow"], s["condition"]) for s in summary})
+    clabel = {s["condition"]: cond_label(s) for s in summary}
     color = {c[2]: COND_COLORS[i % len(COND_COLORS)] for i, c in enumerate(conds)}
     other_styles = iter(["-.", (0, (1, 1)), (0, (5, 1))])
     style = {v: LINESTYLES.get(v) or next(other_styles, "-") for v in variants}
@@ -177,7 +188,7 @@ def make_cdf_figures(vm, summary, out: Path, title: str, labels: dict, variants:
         ys = np.arange(1, xs.size + 1) / xs.size
         lab = label_of(v, labels)
         if with_cond_label:
-            lab = f"μθ={mu:g}, P={p:g} / {lab}"
+            lab = f"{clabel[cond]} / {lab}"
         ax.plot(xs, ys, color=color[cond], linestyle=style[v], linewidth=2.0, label=lab)
 
     # 1) 全条件を 1 枚に重ねる(論文 Fig.12 と同じ形)
@@ -210,7 +221,7 @@ def make_cdf_figures(vm, summary, out: Path, title: str, labels: dict, variants:
             ax = axes[i // ncol][i % ncol]
             for v in variants:
                 curve(ax, layout, cond, v, mu, p, False)
-            ax.set_title(f"μθ={mu:g}, P={p:g}", fontsize=10)
+            ax.set_title(clabel[cond], fontsize=10)
             ax.grid(alpha=0.3)
             ax.set_ylim(0, 1.0)
             ax.legend(fontsize=8)
@@ -285,7 +296,7 @@ def main() -> int:
     if incomplete:
         lines += ["**注意:到着がそろわなかった回があります(終了時刻で打ち切られた可能性)。"
                   "その回の完了時刻は実際より短く出ます。**", ""]
-        lines += [f"- {s['layout']} μθ={s['mu_theta']:g}, P={s['p_follow']:g} {s['variant']}: "
+        lines += [f"- {s['layout']} {cond_label(s)} {s['variant']}: "
                   f"{s['n_not_all_arrived']} / {s['n_success']} 回" for s in incomplete]
         lines += [""]
     lines += ["## 完了時刻(平均 [95% CI]、s)と経路変更(平均回数)", "",
@@ -295,7 +306,7 @@ def main() -> int:
               "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for s in summary:
         lines.append(
-            f"| {s['layout']} | μθ={s['mu_theta']:g}, P={s['p_follow']:g} | {label_of(s['variant'], labels)} | "
+            f"| {s['layout']} | {cond_label(s)} | {label_of(s['variant'], labels)} | "
             f"{s['n_success']} | {fmt(s['completion_time_mean'])} [{fmt(s['completion_time_ci95_low'])}, "
             f"{fmt(s['completion_time_ci95_high'])}] | {fmt(s['completion_time_paperdef'])} | "
             f"{fmt(s['mean_arrival_time_mean'])} | {fmt(s['route_changes_mean'])} | {fmt(s['rc_majority_mean'])} | "
@@ -311,7 +322,7 @@ def main() -> int:
         for r in rs:
             a, b = pd.get((r["layout"], r["condition"], base)), pd.get((r["layout"], r["condition"], treat))
             lines.append(
-                f"| {r['layout']} | μθ={r['mu_theta']:g}, P={r['p_follow']:g} | {r['n_pairs']} | "
+                f"| {r['layout']} | {cond_label(r)} | {r['n_pairs']} | "
                 f"{fmt(r['diff_completion_time_mean'])} [{fmt(r['diff_completion_time_ci95_low'])}, "
                 f"{fmt(r['diff_completion_time_ci95_high'])}] | {r['completion_time_verdict']} | "
                 f"{'' if a is None or b is None else f'{b - a:+.1f}'} | "

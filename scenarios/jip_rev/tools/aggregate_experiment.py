@@ -78,6 +78,7 @@ def load_runs(run_root: Path, manifest: dict) -> list[dict]:
             row = {
                 "task_id": int(t["task_id"]), "layout": t["layout"], "condition": t["condition"],
                 "mu_theta": cond.get("mu_theta"), "p_follow": cond.get("p_follow"),
+                "sigma_theta": cond.get("sigma_theta"),
                 "variant": t["variant"], "seed": int(t["seed"]),
                 "status": st.get("status", "MISSING"),
                 "elapsed_s": float(st["elapsed_s"]) if st.get("elapsed_s") else None,
@@ -159,6 +160,7 @@ def summarize(rows):
     for (layout, cond, variant), rs in sorted(groups.items()):
         ok = [r for r in rs if r["status"] == "SUCCESS"]
         rec = {"layout": layout, "condition": cond, "mu_theta": rs[0]["mu_theta"],
+               "sigma_theta": rs[0].get("sigma_theta"),
                "p_follow": rs[0]["p_follow"], "variant": variant, "n_planned": len(rs),
                "n_success": len(ok), "n_not_all_arrived": sum(1 for r in ok if r.get("note"))}
         rec["completion_time_paperdef"], rec["mean_arrival_time_paperdef"] = paper_completion(ok)
@@ -262,7 +264,9 @@ def make_figures(summary, out: Path, title: str):
                 ys.append(m); lo.append(m - l); hi.append(h - m)
             ax.errorbar(xs, ys, yerr=[lo, hi], fmt=markers[vi % len(markers)], capsize=3, label=v)
         ax.set_xticks(range(len(conds)))
-        ax.set_xticklabels([f"μθ={mu:g}\nP={p:g}" for mu, p, _ in conds])
+        sig = {s["condition"]: s.get("sigma_theta") for s in summary}
+        ax.set_xticklabels([f"μθ={mu:g}\nP={p:g}" + (f"\nσθ={sig[c]:g}" if sig.get(c) is not None else "")
+                            for mu, p, c in conds], fontsize=7 if len(conds) > 5 else 10)
         ax.set_title({"1-1-2": "1-1-2 (2 routes)", "1-1-4": "1-1-4 (4 routes)"}.get(layout, layout))
         ax.grid(axis="y", alpha=0.3)
     axes[0][0].set_ylabel("Evacuation completion time [s]\n(mean ± 95% CI)")

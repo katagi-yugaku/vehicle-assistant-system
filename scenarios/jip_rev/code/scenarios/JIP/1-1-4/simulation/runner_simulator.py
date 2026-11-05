@@ -193,6 +193,12 @@ PRE_X_SKIP_EDGES = (
     ["E0", "E1", "E20"] if _REV.fix_origin_edge else ["E1", "E20"]
 )
 _routing_module.UTURN_REQUIRE_OPPOSITE_EDGE = _REV.fix_origin_edge
+# 改訂:分岐後の代替経路を原稿の式 (1) どおりに計算する(元は全区間を自由流)。
+_routing_module.ALTERNATIVE_FROM_TABLE = _REV.fix_alternative_from_table
+if _REV.fix_alternative_from_table and _REV.travel_time_offset != 0:
+    print("[RUN_CONFIG_NOTE] fix_alternative_from_table uses table values directly; "
+          f"travel_time_offset={_REV.travel_time_offset} is subtracted from them "
+          "(set travel_time_offset = 0)")
 # B6: 旅行時間から差し引く値(元は 100 s)。
 _arrival_module.TRAVEL_TIME_OFFSET = _REV.travel_time_offset
 # B5: 到着時の記録。
@@ -1947,6 +1953,7 @@ if __name__ == "__main__":
         f"seed_from_option={_REV.seed is not None}",
         f"fix_origin_edge={_REV.fix_origin_edge}",
         f"fix_pre_x_alternatives={_REV.fix_pre_x_alternatives}",
+        f"fix_alternative_from_table={_REV.fix_alternative_from_table}",
         f"travel_time_offset={_REV.travel_time_offset}",
         f"communication_mode={_REV.communication_mode}",
         f"end_simulation_time={END_SIMULATION_TIME}",
