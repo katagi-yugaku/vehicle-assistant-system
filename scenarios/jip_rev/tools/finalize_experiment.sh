@@ -3,7 +3,8 @@
 #   finalize_experiment.sh RUN_ROOT [--dry-run-mail]
 #
 # 1. status.txt を数え、予定数と成功数を比べる
-# 2. aggregate_experiment.py で results/<実験ID>/ に summary.csv・図などを作る
+# 2. 集計スクリプトで results/<実験ID>/ に summary.csv・図などを作る
+#    既定は aggregate_experiment.py。実験定義に aggregator = "aggregate_e2.py" などと書けばそれを使う
 # 3. 生データ(runs/<実験ID>、凍結コードを含む)を archive/<実験ID>.tar.zst(なければ .tar.gz)に固め、
 #    tar -t で中身を確認し、sha256 を付けて NAS(EVAC_ARCHIVE_DEST)へコピーして照合する
 # 4. 結果をメールで送る(件名の末尾: SUCCESS / INCOMPLETE / FAILED)
@@ -17,7 +18,6 @@ for a in "$@"; do [[ "$a" == --dry-run-mail ]] && DRY_RUN_MAIL=1; done
 # sbatch はスクリプトを /var/spool/slurm/... にコピーして実行するので、自分の場所からは探さない。
 # 凍結した tools(RUN_ROOT/frozen/tools)を使う。
 TOOLS="${EVAC_TOOLS:-${RUN_ROOT}/frozen/tools}"
-[[ -f "${TOOLS}/aggregate_experiment.py" ]] || { echo "ERROR: ${TOOLS}/aggregate_experiment.py not found" >&2; exit 2; }
 JIP_REV="${EVAC_JIP_REV:-$(cd -- "${RUN_ROOT}/../.." && pwd -P)}"   # scenarios/jip_rev
 PY="${EVAC_PYTHON:-python3}"
 EXP_ID="$(basename "${RUN_ROOT}")"
@@ -41,8 +41,14 @@ FAILED="$(find "${RUN_ROOT}" -name status.txt -path '*/r[0-9]*' -exec grep -L '^
 MISSING=$(( PLANNED - SUCCESS - FAILED ))
 echo "planned=${PLANNED} success=${SUCCESS} failed=${FAILED} missing=${MISSING}"
 
-"${PY}" "${TOOLS}/aggregate_experiment.py" "${RUN_ROOT}" --out "${RESULTS}"
-echo "aggregate exit=$?"
+# 集計スクリプト(manifest の aggregator。tools 直下のファイル名だけを受け付ける)
+AGGREGATOR="$("${PY}" -c "import json;m=json.load(open('${RUN_ROOT}/manifest.json'));print(m.get('aggregator') or 'aggregate_experiment.py')")"
+if [[ "${AGGREGATOR}" == */* || ! -f "${TOOLS}/${AGGREGATOR}" ]]; then
+  echo "ERROR: aggregator '${AGGREGATOR}' not found in ${TOOLS}; aggregate_experiment.py を使います" >&2
+  AGGREGATOR=aggregate_experiment.py
+fi
+"${PY}" "${TOOLS}/${AGGREGATOR}" "${RUN_ROOT}" --out "${RESULTS}"
+echo "aggregate (${AGGREGATOR}) exit=$?"
 
 if [[ "${SUCCESS}" -eq "${PLANNED}" && -s "${RESULTS}/summary.csv" ]]; then OUTCOME=SUCCESS
 elif [[ "${SUCCESS}" -gt 0 && -s "${RESULTS}/summary.csv" ]]; then OUTCOME=INCOMPLETE

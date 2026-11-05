@@ -38,7 +38,10 @@ else:
 
 ROOT = Path(__file__).resolve().parent.parent          # .../scenarios/jip_rev
 FROZEN_PATHS = ["code", "tools", "experiments"]
-TASK_FIELDS = ["task_id", "layout", "condition", "variant", "seed", "config", "run_dir"]
+TASK_FIELDS = ["task_id", "layout", "condition", "variant", "seed", "config", "run_dir",
+               "early_rate", "v2v_rate"]
+# 設定ファイルではなく runner の位置引数で渡す値。実験全体(spec 直下)でも、版ごと([variants.X])でも書ける。
+RUN_ARG_KEYS = ("early_rate", "v2v_rate")
 
 
 def sh(cmd: list[str], **kw) -> str:
@@ -170,9 +173,35 @@ def build(args) -> tuple[Path, dict]:
     if run_root.exists():
         sys.exit(f"ERROR: {run_root} already exists")
 
+    aggregator = spec.get("aggregator", "aggregate_experiment.py")
+    if "/" in aggregator or not (ROOT / "tools" / aggregator).is_file():
+        sys.exit(f"ERROR: aggregator {aggregator!r} が tools/ にありません")
+
     seeds = parse_seeds(args.seeds) if args.seeds else list(range(spec["seed_start"], spec["seed_end"] + 1))
     layouts = args.layouts.split(",") if args.layouts else spec["layouts"]
     extra = parse_set(args.set or [])
+    conditions = spec["conditions"]
+    if args.conditions:
+        wanted = args.conditions.split(",")
+        unknown = [c for c in wanted if c not in conditions]
+        if unknown:
+            sys.exit(f"ERROR: --conditions の {unknown} が実験定義にありません({sorted(conditions)})")
+        conditions = {c: conditions[c] for c in wanted}
+    variants = spec["variants"]
+    if args.variants:
+        wanted = args.variants.split(",")
+        unknown = [v for v in wanted if v not in variants]
+        if unknown:
+            sys.exit(f"ERROR: --variants の {unknown} が実験定義にありません({sorted(variants)})")
+        variants = {v: variants[v] for v in wanted}
+    # 版ごとの位置引数(早期避難率、通信可能な車両の割合)。版に書けばそれを、なければ実験全体の値を使う。
+    run_args = {}
+    for variant, flags in variants.items():
+        ra = {k: float(flags.get(k, extra.get(k, spec.get(k, 1.0)))) for k in RUN_ARG_KEYS}
+        for k, v in ra.items():
+            if not 0.0 <= v <= 1.0:
+                sys.exit(f"ERROR: {variant}: {k}={v} は 0〜1 にしてください")
+        run_args[variant] = ra
 
     frozen = run_root / "frozen"
     freeze(frozen, commit, dirty, prefix)
@@ -183,7 +212,7 @@ def build(args) -> tuple[Path, dict]:
     tasks: list[dict] = []
     condition_meta = {}
     for layout in layouts:
-        for cond, cinfo in spec["conditions"].items():
+        for cond, cinfo in conditions.items():
             base_text = (frozen / "code" / cinfo["config"]).read_text()
             base_cfg = toml_loader.loads(base_text)
             for key, val in (cinfo.get("expect") or {}).items():
@@ -194,8 +223,8 @@ def build(args) -> tuple[Path, dict]:
                 "mu_theta": base_cfg.get("active_route_change_threshold_center"),
                 "p_follow": base_cfg.get("p_follow"),
             }
-            for variant, flags in spec["variants"].items():
-                merged = {**flags, **extra}
+            for variant, flags in variants.items():
+                merged = {k: v for k, v in {**flags, **extra}.items() if k not in RUN_ARG_KEYS}
                 overlap = set(merged) & set(base_cfg)
                 if overlap:
                     sys.exit(f"ERROR: flags already defined in {cinfo['config']}: {sorted(overlap)}")
@@ -208,6 +237,8 @@ def build(args) -> tuple[Path, dict]:
                         "task_id": len(tasks) + 1, "layout": layout, "condition": cond,
                         "variant": variant, "seed": seed, "config": str(cfg_file),
                         "run_dir": str(run_root / layout / cond / variant / f"r{seed:03d}"),
+                        "early_rate": run_args[variant]["early_rate"],
+                        "v2v_rate": run_args[variant]["v2v_rate"],
                     })
 
     with open(run_root / "tasks.tsv", "w", newline="") as f:
@@ -228,12 +259,14 @@ def build(args) -> tuple[Path, dict]:
         "backend": args.backend,
         "layouts": layouts,
         "conditions": condition_meta,
-        "variants": spec["variants"],
+        "variants": variants,
+        "run_args": run_args,
         "extra_flags": extra,
         "seeds": [seeds[0], seeds[-1]] if seeds else [],
         "early_rate": spec.get("early_rate", 1.0),
         "v2v_rate": spec.get("v2v_rate", 1.0),
         "compare": spec.get("compare", {}),
+        "aggregator": spec.get("aggregator", "aggregate_experiment.py"),
         "planned_runs": len(tasks),
         "host": socket.gethostname(),
         "submitted_at": dt.datetime.now().isoformat(timespec="seconds"),
@@ -314,6 +347,8 @@ def main() -> int:
     p.add_argument("--allow-dirty", action="store_true", help="未コミットの変更を許す(試験用)")
     p.add_argument("--seeds", help="例: 1-2(試験用にシード範囲を上書き)")
     p.add_argument("--layouts", help="例: 1-1-2(試験用に構成を絞る)")
+    p.add_argument("--conditions", help="例: mu150_p010(試験用に条件を絞る)")
+    p.add_argument("--variants", help="例: v2v_only,v2v_dtn(試験用に版を絞る)")
     p.add_argument("--set", action="append", help="全実行に追加する設定 KEY=VALUE(試験用)")
     p.add_argument("--max-parallel", type=int, default=int(os.environ.get("EVAC_MAX_PARALLEL", "32")))
     p.add_argument("--partition", default=os.environ.get("EVAC_PARTITION", "ubuntu"))

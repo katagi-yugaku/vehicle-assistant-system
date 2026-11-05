@@ -1,0 +1,61 @@
+# E2:通信方式の比較(M3、Fig.12 の差し替え)+ E2' 通信なし
+#   構成   : 2 経路 (1-1-2) のみ(通信方式の切り替えは 1-1-2 の runner だけが対応)
+#   条件   : (μθ, P) = (150, 0.10), (350, 0.10), (150, 0.30), (350, 0.30)
+#   版     : v2v_only / v2v_dtn / none(通信なし、v2v_rate = 0)
+#            3 版とも同じコード・同じシード・同じ終了時刻で、違いは通信方式だけ。
+#            E0 の不具合(D2)は直した版で実行する(fix_origin_edge = true)。
+#   回数   : シード 1–50。3 版は同じシードで組にする。
+#   合計   : 1 × 4 × 3 × 50 = 600 回(E2 = 400 回、E2' = 200 回)
+name = "E2"
+description = "通信方式の比較 (V2V only / DTN / 通信なし)"
+seed_start = 1
+seed_end = 50
+early_rate = 1.0
+v2v_rate = 1.0          # 版で上書きしない限りこの値
+layouts = ["1-1-2"]
+aggregator = "aggregate_e2.py"
+
+# 条件ラベル = 元にする設定ファイル(scenarios/jip_rev/code からの相対パス)。E3 と同じ。
+[conditions.mu150_p010]
+config = "scenarios/JIP/configs/config_scenario_1.toml"
+expect = { active_route_change_threshold_center = 150.0, p_follow = 0.1 }
+
+[conditions.mu350_p010]
+config = "scenarios/JIP/configs/config_scenario_5.toml"
+expect = { active_route_change_threshold_center = 350.0, p_follow = 0.1 }
+
+[conditions.mu150_p030]
+config = "scenarios/JIP/configs/config_scenario_21.toml"
+expect = { active_route_change_threshold_center = 150.0, p_follow = 0.3 }
+
+[conditions.mu350_p030]
+config = "scenarios/JIP/configs/config_scenario_25.toml"
+expect = { active_route_change_threshold_center = 350.0, p_follow = 0.3 }
+
+# 版ごとの設定(code/evacsim/sim/revision_options.py)。
+# early_rate / v2v_rate は設定ファイルではなく runner の位置引数で渡す(run_experiment.py が振り分ける)。
+[variants.v2v_only]
+communication_mode = "v2v_only"
+fix_origin_edge = true
+end_simulation_time = 3500
+save_raw = true
+
+[variants.v2v_dtn]
+communication_mode = "v2v_dtn"
+fix_origin_edge = true
+end_simulation_time = 3500
+save_raw = true
+
+[variants.none]
+# 通信なし:どの車両も通信できない(V2Shelter も V2V もしない)。
+# 通信方式は DTN と同じラウンド単位の実装にしておく(使われないが、コードの経路をそろえる)。
+communication_mode = "v2v_dtn"
+v2v_rate = 0.0
+fix_origin_edge = true
+end_simulation_time = 3500
+save_raw = true
+
+# 比べる組(aggregate_e2.py)。差は「後 − 前」(負なら後の方が短い)。
+[compare]
+pairs = [["v2v_only", "v2v_dtn"], ["none", "v2v_dtn"], ["none", "v2v_only"]]
+labels = { v2v_dtn = "Vehicular DTN", v2v_only = "V2V only", none = "No communication" }

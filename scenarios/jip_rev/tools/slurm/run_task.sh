@@ -14,14 +14,17 @@ PY="${EVAC_PYTHON:-python3}"
 
 LINE="$(awk -F'\t' -v id="${TASK_ID}" 'NR > 1 && $1 == id' "${RUN_ROOT}/tasks.tsv")"
 [[ -n "${LINE}" ]] || { echo "ERROR: task ${TASK_ID} not found in ${RUN_ROOT}/tasks.tsv" >&2; exit 2; }
-IFS=$'\t' read -r _ LAYOUT COND VARIANT SEED CONFIG RUN_DIR <<< "${LINE%$'\r'}"
-read -r EARLY_RATE V2V_RATE < <("${PY}" -c "import json;m=json.load(open('${RUN_ROOT}/manifest.json'));print(m['early_rate'],m['v2v_rate'])")
+IFS=$'\t' read -r _ LAYOUT COND VARIANT SEED CONFIG RUN_DIR EARLY_RATE V2V_RATE <<< "${LINE%$'\r'}"
+# 早期避難率と通信可能な車両の割合は版ごとに tasks.tsv に入っている(古い tasks.tsv なら manifest の値)
+if [[ -z "${EARLY_RATE:-}" || -z "${V2V_RATE:-}" ]]; then
+  read -r EARLY_RATE V2V_RATE < <("${PY}" -c "import json;m=json.load(open('${RUN_ROOT}/manifest.json'));print(m['early_rate'],m['v2v_rate'])")
+fi
 
 mkdir -p "${RUN_DIR}"
 cd "${RUN_DIR}"   # tripinfo.xml は作業ディレクトリに書かれるので、実行ごとに分ける
 
 START_EPOCH="$(date +%s)"; START="$(date '+%Y-%m-%dT%H:%M:%S')"
-echo "task=${TASK_ID} layout=${LAYOUT} condition=${COND} variant=${VARIANT} seed=${SEED} host=$(hostname) start=${START}"
+echo "task=${TASK_ID} layout=${LAYOUT} condition=${COND} variant=${VARIANT} seed=${SEED} early_rate=${EARLY_RATE} v2v_rate=${V2V_RATE} host=$(hostname) start=${START}"
 
 export PYTHONPATH="${RUN_ROOT}/frozen/code"
 export PYTHONHASHSEED=0
@@ -41,7 +44,8 @@ fi
 {
   echo "status=${STATUS}"; echo "exit_code=${RC}"; echo "reason=${REASON}"
   echo "task_id=${TASK_ID}"; echo "layout=${LAYOUT}"; echo "condition=${COND}"
-  echo "variant=${VARIANT}"; echo "seed=${SEED}"; echo "host=$(hostname)"
+  echo "variant=${VARIANT}"; echo "seed=${SEED}"; echo "early_rate=${EARLY_RATE}"; echo "v2v_rate=${V2V_RATE}"
+  echo "host=$(hostname)"
   echo "slurm_job=${SLURM_ARRAY_JOB_ID:-}_${SLURM_ARRAY_TASK_ID:-}"
   echo "start=${START}"; echo "end=$(date '+%Y-%m-%dT%H:%M:%S')"
   echo "elapsed_s=$(( $(date +%s) - START_EPOCH ))"
