@@ -200,6 +200,31 @@ PRE_X_SKIP_EDGES = (
 _routing_module.UTURN_REQUIRE_OPPOSITE_EDGE = _REV.fix_origin_edge
 # 改訂:分岐後の代替経路を原稿の式 (1) どおりに計算する(元は全区間を自由流)。
 _routing_module.ALTERNATIVE_FROM_TABLE = _REV.fix_alternative_from_table
+# 改訂: 判断の見積もりに使う自由流速度(元は 11.0)
+_routing_module.FREE_FLOW_SPEED = _REV.free_flow_speed
+# 改訂(log_decisions): 経路変更の判断の記録(結果は変えない)
+_DECISIONS: list = []
+
+
+def _log_decision(rec: dict) -> None:
+    rec.setdefault("t", float(traci.simulation.getTime()))
+    _DECISIONS.append(rec)
+
+
+def _write_decisions() -> None:
+    if not _REV.log_decisions:
+        return
+    import gzip
+    path = Path(_REV.raw_output).resolve().parent / "decisions.jsonl.gz"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(path, "wt", encoding="utf-8") as f:
+        for rec in _DECISIONS:
+            f.write(json.dumps(rec, ensure_ascii=False, default=str, separators=(",", ":")) + "\n")
+    print(f"[DECISION_LOG] path={path} n={len(_DECISIONS)}")
+
+
+if _REV.log_decisions:
+    _routing_module.DECISION_LOGGER = _log_decision
 if _REV.fix_alternative_from_table and _REV.travel_time_offset != 0:
     print("[RUN_CONFIG_NOTE] fix_alternative_from_table uses table values directly; "
           f"travel_time_offset={_REV.travel_time_offset} is subtracted from them "
@@ -776,6 +801,7 @@ def run():
         if _REV.log_information:
             _log_information_round(traci.simulation.getTime())
     _close_information_log()
+    _write_decisions()
     traci.close()
     sys.stdout.flush()
 
@@ -1149,7 +1175,10 @@ def control_vehicles():
                     )
                 )
             )<2:
-                    
+            if _REV.log_decisions and current_edgeID in PRE_X_DECISION_EDGES:
+                _log_decision({"kind": "pre_x_no_info", "veh": logical_vehicle_id,
+                               "edge": current_edgeID,
+                               "theta": float(agent_by_current_vehID.get_route_change_threshold())})
             continue
         # 改訂(B1): fix_origin_edge のとき E0 も含める(元は {"E1"})
         if current_edgeID in PRE_X_DECISION_EDGES:
@@ -1231,6 +1260,17 @@ def control_vehicles():
                     .get_route_change_threshold()
                 )
 
+                if _REV.log_decisions:
+                    _log_decision({
+                        "kind": "pre_x", "veh": logical_vehicle_id, "edge": current_edgeID,
+                        "info_time": latest_receive_time,
+                        "info": {"|".join(r): round(float((v or {}).get("avg_time", float("nan"))), 1)
+                                 for r, v in latest_route_info.items()},
+                        "cur_route": "|".join(current_route), "t_cur": current_route_avg_time,
+                        "alt_route": alternative_route_id, "t_alt": alternative_route_avg_time,
+                        "gain": time_gap, "theta": route_change_threshold,
+                        "approved": bool(time_gap > route_change_threshold),
+                    })
                 # 代替経路の時間短縮量が閾値以下なら変更しない
                 if time_gap <= route_change_threshold:
                     continue
@@ -1890,6 +1930,8 @@ if __name__ == "__main__":
         f"fix_pre_x_alternatives={_REV.fix_pre_x_alternatives}",
         f"fix_alternative_from_table={_REV.fix_alternative_from_table}",
         f"travel_time_offset={_REV.travel_time_offset}",
+        f"vehicle_max_speed={_REV.vehicle_max_speed}",
+        f"free_flow_speed={_REV.free_flow_speed}",
         f"communication_mode={_REV.communication_mode}",
         f"end_simulation_time={END_SIMULATION_TIME}",
         f"save_raw={_REV.save_raw}",
@@ -1965,6 +2007,10 @@ if __name__ == "__main__":
                 # traceGetters=False,
 
                 )
+    # 改訂: 車両の最高速度(原稿 Table 1)。全車両が DEFAULT_VEHTYPE で生成される
+    if _REV.vehicle_max_speed is not None:
+        traci.vehicletype.setMaxSpeed("DEFAULT_VEHTYPE", float(_REV.vehicle_max_speed))
+        print(f"[RUN_CONFIG_NOTE] DEFAULT_VEHTYPE maxSpeed={traci.vehicletype.getMaxSpeed('DEFAULT_VEHTYPE')}")
 
     # 避難地の情報をもとに、Shelter一覧を生成
     shelter_capacity_by_ID:dict = {"ShelterA_1": 200, "ShelterA_2": 200}

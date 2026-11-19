@@ -58,6 +58,8 @@ UTURN_REQUIRE_OPPOSITE_EDGE: bool = False
 #   表の経路として使うのは、出発地の edge(ORIGIN_EDGE_ID)から始まる経路だけ
 #   (U ターン後に再生成された車の経路は使わない)。
 ALTERNATIVE_FROM_TABLE: bool = False
+# 改訂(log_decisions): 判断の記録先。None なら何もしない(結果は変えない)。
+DECISION_LOGGER = None
 ORIGIN_EDGE_ID: str = "E0"
 
 V2V_PREFIX_INITIAL_COMMON_PREFIX = ("E0", "E1", "E20")
@@ -1018,7 +1020,7 @@ def find_alternative_better_choice_fixed(
             print(f"[find_alternative_better_choice] {message}")
 
     # --- 0. 定数・初期化 ---
-    FREE_FLOW_SPEED = 11.0
+    # 改訂: 自由流速度はモジュールの FREE_FLOW_SPEED(free_flow_speed)を使う
 
     shelterID = ""
     shelterID_to_return = vehInfo.get_target_shelter()
@@ -1530,7 +1532,7 @@ def find_alternative_better_choice(current_edgeID: str,
     より良い選択肢があれば経路変更情報を返す。
     """
     # --- 0. 定数・初期化 ---
-    FREE_FLOW_SPEED = 11.0
+    # 改訂: 自由流速度はモジュールの FREE_FLOW_SPEED(free_flow_speed)を使う
     shelterID = ""
     shelterID_to_return = vehInfo.get_target_shelter() # 最初は現在の避難地
     to_edge_list_to_return = []
@@ -1746,7 +1748,7 @@ def find_alternative_shelter_choice(
                                         agent: Agent
                                     ) -> tuple: # (str, str, list) のタプルを返す
     
-    FREE_FLOW_SPEED = 11.0
+    # 改訂: 自由流速度はモジュールの FREE_FLOW_SPEED(free_flow_speed)を使う
     shelterID_to_return = vehInfo.get_target_shelter() # 最初は現在の避難地
     to_edge_list_to_return = []
     # ここはOK
@@ -3421,6 +3423,33 @@ def evaluate_route_maneuver_decision(
         and time_gain > threshold
     )
     corridor_family = classify_corridor(current_edgeID)
+
+    if DECISION_LOGGER is not None:
+        try:
+            held = vehInfo.get_avg_evac_time_by_route_by_recive_time() or {}
+            held_t = max(held) if held else None
+            DECISION_LOGGER({
+                "kind": "post_x" if apply_normalcy_threshold else "post_x_majority",
+                "veh": logical_id,
+                "edge": current_edgeID,
+                "info_time": held_t,
+                "info": {"|".join(r): round(float((v or {}).get("avg_time", float("nan"))), 1)
+                         for r, v in (held.get(held_t) or {}).items()} if held_t is not None else {},
+                "t_cur": current_route.estimated_time,
+                "cur_dest": current_route.destination_edge_id,
+                "candidates": [
+                    {"type": c.maneuver_type, "shelter": c.shelter_id, "edge": c.edge_id,
+                     "time": c.best_time, "source": c.best_source,
+                     "start": (c.route_edges_for_sumo[0] if c.route_edges_for_sumo else "")}
+                    for c in candidates
+                ],
+                "gain": time_gain,
+                "theta": threshold,
+                "approved": bool(best_candidate is not None and
+                                 (threshold_exceeded or not apply_normalcy_threshold)),
+            })
+        except Exception as exc:  # 記録の失敗で判断を止めない
+            print(f"[DECISION_LOG_WARNING] {exc}")
 
     _debug_route_maneuver_comparison(
         debug=debug,

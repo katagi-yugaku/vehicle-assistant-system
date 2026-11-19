@@ -1,0 +1,38 @@
+# E2E-A:パイプライン全体と修正フラグの確認(2 経路・4 経路、legacy 通信)
+#   目的 : E4(全条件の再実行)の前に、投入 → 実行 → 集計 → 保存 → メールが最後まで通ること、
+#          修正フラグ(E4 で使う一式)が両構成で有効になっていることを確かめる
+#   版   : off   = 元の動作(記録だけ on。save_raw は結果を変えないことを確認済み)
+#          fixed = E4 で使う修正一式(fix_origin_edge + fix_pre_x_alternatives + fix_alternative_from_table、
+#                  travel_time_offset = 0、最高速度・自由流速度 9 m/s、終了 3500 s)+ 区間ログ
+#   回数 : 2 構成 × 1 条件 × 2 版 × シード 1–2 = 8 回(1 回 5–12 分)
+#   判定 : tools/e2e_check.py(revision/E2E_TEST_PLAN.md)
+name = "E2E-layouts"
+description = "e2e: 投入〜メールの通し確認と修正フラグ(2 経路・4 経路)"
+seed_start = 1
+seed_end = 2
+early_rate = 1.0
+v2v_rate = 1.0
+layouts = ["1-1-2", "1-1-4"]
+
+[conditions.mu150_p010]
+config = "scenarios/JIP/configs/config_scenario_1.toml"
+expect = { active_route_change_threshold_center = 150.0, p_follow = 0.1 }
+
+[variants.off]
+save_raw = true
+
+[variants.fixed]
+fix_origin_edge = true
+fix_pre_x_alternatives = true          # 1-1-2 では効果なし(注意が出るだけ)
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0             # 原稿 Table 1
+free_flow_speed = 9.0
+end_simulation_time = 3500
+save_raw = true
+log_sections = true
+
+[compare]
+baseline = "off"
+treatment = "fixed"
+e4_threshold_s = 40.0

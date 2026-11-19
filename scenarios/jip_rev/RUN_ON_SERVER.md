@@ -75,6 +75,28 @@ python3 tools/route_table_timeseries.py runs/<E2 の実験ID> --window 200
 試験用の絞り込み(E3 でも使える):`--seeds 1-2`、`--conditions mu150_sd050,mu150_sd100`、`--variants v2v_dtn`、`--layouts 1-1-2`。
 同じ分に同じ名前の実験を作ると ID が重なって止まるので、`--name` で名前を変える。
 
+## 6c. 小実験 E2s(9 m/s 版の V2V only / DTN、2026-11-19)
+Mac でコミット・push したあと、計算機では次の 1 行で「取り込み → 確認 → 投入」まで行う。
+```bash
+cd ~/vehicle-assistant-system/scenarios/jip_rev
+tools/server_run.sh experiments/E2s_9ms.toml --print-only   # 初回だけ:タスク数 60 を確認(作られた runs/ は消してよい)
+tools/server_run.sh experiments/E2s_9ms.toml                # 投入(60 回、32 並列で 30 分前後)
+```
+- 条件:μθ = 60(σθ 50)/ 150(σθ 100、論文の条件)/ 300(σθ 50)× V2V only / DTN × シード 1–10。
+  最高速度・自由流速度 9 m/s、終了 4,000 s、伝達ログと判断ログあり。
+- 終わると集計ジョブがメールを送る。本文に「完了時刻の差」「情報伝達の比較」「判断の記録(短縮時間と θ)」、
+  添付に図・summary.csv・paired.csv・decisions_summary.csv・decisions_timeline.csv。
+- 解析をやり直すとき:
+  `python3 tools/analyze_decisions.py runs/<実験ID> --out results/<実験ID>/decisions`、
+  `python3 tools/analyze_information.py runs/<実験ID> --out results/<実験ID>/information`。
+
+### メールの宛先
+宛先は計算機の `~/.config/evac-mail/gmail.ini` の `to`。アドレスはリポジトリに入れない。
+```bash
+sed -i 's/^to *=.*/to = <宛先のアドレス>/' ~/.config/evac-mail/gmail.ini && grep '^to' ~/.config/evac-mail/gmail.ini
+```
+一時的に変えるだけなら `export EVAC_MAIL_TO=<宛先>` してから投入する(集計ジョブにも引き継がれる)。
+
 ## 7. 進み具合・取り消し
 ```bash
 tools/experiment_status.sh runs/<実験ID>

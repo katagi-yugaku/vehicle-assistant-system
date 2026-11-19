@@ -1,0 +1,54 @@
+# E2E-B:通信方式の切り替えと伝達ログの確認(2 経路のみ。4 経路の runner は legacy 通信だけ)
+#   版   : none / v2v_only / v2v_dtn(E2 と同じ修正一式。違いは通信だけ)
+#   条件 : μθ = 60 s・σθ = 50 s(E2 で方式の差がいちばん大きく出た条件)
+#   回数 : 1 条件 × 3 版 × シード 1–2 = 6 回(1 回 3–12 分)
+name = "E2E-comm"
+description = "e2e: 通信方式(なし / V2V only / DTN)と伝達ログ"
+seed_start = 1
+seed_end = 2
+early_rate = 1.0
+v2v_rate = 1.0
+layouts = ["1-1-2"]
+aggregator = "aggregate_e2.py"
+
+[conditions.mu060_sd050]
+config = "scenarios/JIP/configs/rev_e2/config_e2_mu060_sd050.toml"
+expect = { active_route_change_threshold_center = 60.0, active_route_change_threshold_spread = 50.0, p_follow = 0.1 }
+
+[variants.none]
+communication_mode = "v2v_dtn"
+v2v_rate = 0.0
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0             # 原稿 Table 1
+free_flow_speed = 9.0
+end_simulation_time = 3500
+save_raw = true
+log_information = true
+
+[variants.v2v_only]
+communication_mode = "v2v_only"
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0             # 原稿 Table 1
+free_flow_speed = 9.0
+end_simulation_time = 3500
+save_raw = true
+log_information = true
+
+[variants.v2v_dtn]
+communication_mode = "v2v_dtn"
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0             # 原稿 Table 1
+free_flow_speed = 9.0
+end_simulation_time = 3500
+save_raw = true
+log_information = true
+
+[compare]
+pairs = [["v2v_only", "v2v_dtn"], ["none", "v2v_dtn"]]
+labels = { none = "No communication", v2v_only = "V2V only", v2v_dtn = "Vehicular DTN" }

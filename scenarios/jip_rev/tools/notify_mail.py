@@ -8,7 +8,7 @@
     [smtp]
     user = 送信に使う Gmail アドレス
     app_password = アプリパスワード
-    to = 受信するアドレス
+    to = 受信するアドレス(環境変数 EVAC_MAIL_TO があればそちらを使う)
 
 - 設定ファイルがない、または --dry-run のときは送らずに、件名・本文・添付名を出力する。
 - 送信に失敗しても終了コードは 0(集計や保存の結果を変えないため)。失敗は標準エラーに出す。
@@ -56,6 +56,7 @@ def main() -> int:
         why = "--dry-run" if args.dry_run else f"{CONFIG} がない"
         print(f"[mail] 送信をスキップ({why})")
         print(f"[mail] Subject: {args.subject}")
+        print(f"[mail] To: {os.environ.get('EVAC_MAIL_TO') or '(gmail.ini の to)'}")
         print("[mail] Attachments: " + ", ".join(p.name for p in attachments))
         print("[mail] ---- body ----\n" + body + "\n[mail] --------------")
         return 0
@@ -70,6 +71,7 @@ def main() -> int:
         print(f"[mail] ERROR: {CONFIG} の [smtp] に {exc} がありません", file=sys.stderr)
         return 0
 
+    to = os.environ.get("EVAC_MAIL_TO") or to
     msg = EmailMessage()
     msg["Subject"], msg["From"], msg["To"] = args.subject, user, to
     msg.set_content(body)

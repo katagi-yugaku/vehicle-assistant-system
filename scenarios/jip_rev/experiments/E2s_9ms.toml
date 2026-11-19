@@ -1,0 +1,57 @@
+# E2s:V2V only と Vehicular DTN の小実験(最高速度・自由流速度 9 m/s の修正版で、差がどう変わるかを見る)
+#   構成   : 2 経路 (1-1-2)
+#   条件   : μθ = 60 s・σθ = 50 s(E2 で差が最大)/ μθ = 150 s・σθ = 100 s(論文の条件)/ μθ = 300 s・σθ = 50 s(差なし側)
+#   版     : v2v_only / v2v_dtn(同じコード・同じシード。違いは通信方式だけ)
+#   修正   : fix_origin_edge + fix_alternative_from_table、travel_time_offset = 0、
+#            vehicle_max_speed = free_flow_speed = 9.0(原稿 Table 1)。
+#            9 m/s で完了が 3,000 s 前後まで延びたので、打ち切りを避けるため終了は 4,000 s。
+#   記録   : save_raw + log_information(伝達)+ log_decisions(判断ごとの情報・短縮時間・θ)
+#   回数   : 3 条件 × 2 版 × シード 1–10 = 60 回(1 回 10–15 分、32 並列で 30 分前後)
+name = "E2s-9ms"
+description = "小実験: V2V only / DTN、9 m/s 版、3 条件 × 10 シード"
+seed_start = 1
+seed_end = 10
+early_rate = 1.0
+v2v_rate = 1.0
+layouts = ["1-1-2"]
+aggregator = "aggregate_e2.py"
+
+[conditions.mu060_sd050]
+config = "scenarios/JIP/configs/rev_e2/config_e2_mu060_sd050.toml"
+expect = { active_route_change_threshold_center = 60.0, active_route_change_threshold_spread = 50.0, p_follow = 0.1 }
+
+[conditions.mu150_sd100]
+config = "scenarios/JIP/configs/rev_e2/config_e2_mu150_sd100.toml"
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu300_sd050]
+config = "scenarios/JIP/configs/rev_e2/config_e2_mu300_sd050.toml"
+expect = { active_route_change_threshold_center = 300.0, active_route_change_threshold_spread = 50.0, p_follow = 0.1 }
+
+[variants.v2v_only]
+communication_mode = "v2v_only"
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0
+free_flow_speed = 9.0
+end_simulation_time = 4000
+save_raw = true
+log_information = true
+log_decisions = true
+
+[variants.v2v_dtn]
+communication_mode = "v2v_dtn"
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0
+free_flow_speed = 9.0
+end_simulation_time = 4000
+save_raw = true
+log_information = true
+log_decisions = true
+
+[compare]
+pairs = [["v2v_only", "v2v_dtn"]]
+labels = { v2v_dtn = "Vehicular DTN", v2v_only = "V2V only" }

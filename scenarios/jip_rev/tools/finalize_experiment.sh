@@ -50,6 +50,17 @@ fi
 "${PY}" "${TOOLS}/${AGGREGATOR}" "${RUN_ROOT}" --out "${RESULTS}"
 echo "aggregate (${AGGREGATOR}) exit=$?"
 
+# 伝達ログ・判断ログがあれば分析する(log_information / log_decisions。結果の判定には使わない)
+EXTRA_MD=()
+if [[ -f "${TOOLS}/analyze_information.py" ]] && find "${RUN_ROOT}" -name information.jsonl.gz -print -quit | grep -q .; then
+  "${PY}" "${TOOLS}/analyze_information.py" "${RUN_ROOT}" --out "${RESULTS}/information" && EXTRA_MD+=("${RESULTS}/information/information.md")
+  echo "analyze_information exit=$?"
+fi
+if [[ -f "${TOOLS}/analyze_decisions.py" ]] && find "${RUN_ROOT}" -name decisions.jsonl.gz -print -quit | grep -q .; then
+  "${PY}" "${TOOLS}/analyze_decisions.py" "${RUN_ROOT}" --out "${RESULTS}/decisions" && EXTRA_MD+=("${RESULTS}/decisions/decisions.md")
+  echo "analyze_decisions exit=$?"
+fi
+
 if [[ "${SUCCESS}" -eq "${PLANNED}" && -s "${RESULTS}/summary.csv" ]]; then OUTCOME=SUCCESS
 elif [[ "${SUCCESS}" -gt 0 && -s "${RESULTS}/summary.csv" ]]; then OUTCOME=INCOMPLETE
 else OUTCOME=FAILED; fi
@@ -93,6 +104,7 @@ BODY="${RUN_ROOT}/mail_body.txt"
   echo "元の生データ: ${RUN_ROOT}(消していません)"
   echo
   cat "${RESULTS}/decision.md" 2>/dev/null || echo "(decision.md がありません)"
+  for md in ${EXTRA_MD[@]+"${EXTRA_MD[@]}"}; do [[ -s "${md}" ]] && { echo; cat "${md}"; }; done
   if [[ "${FAILED}" -gt 0 ]]; then
     echo; echo "== 失敗した実行(最大 10 件)の run.err 末尾 =="
     find "${RUN_ROOT}" -name status.txt -path '*/r[0-9]*' -exec grep -L '^status=SUCCESS$' {} + 2>/dev/null | head -10 |
@@ -102,7 +114,8 @@ BODY="${RUN_ROOT}/mail_body.txt"
 cp "${LOG}" "${RESULTS}/finalize.log" 2>/dev/null || true
 
 MAIL=(--subject "[evac-sim] ${EXP_ID} ${OUTCOME}" --body-file "${BODY}"
-      --attach "${RESULTS}"/figs/*.png "${RESULTS}"/figs/*.pdf "${RESULTS}/summary.csv" "${RESULTS}/paired.csv" "${RESULTS}/decision.md")
+      --attach "${RESULTS}"/figs/*.png "${RESULTS}"/figs/*.pdf "${RESULTS}/summary.csv" "${RESULTS}/paired.csv" "${RESULTS}/decision.md"
+      "${RESULTS}"/information/information.png "${RESULTS}"/decisions/decisions_summary.csv "${RESULTS}"/decisions/decisions_timeline.csv)
 [[ ${DRY_RUN_MAIL} -eq 1 ]] && MAIL+=(--dry-run)
 "${PY}" "${TOOLS}/notify_mail.py" "${MAIL[@]}"
 echo "== finalize done: ${OUTCOME}"

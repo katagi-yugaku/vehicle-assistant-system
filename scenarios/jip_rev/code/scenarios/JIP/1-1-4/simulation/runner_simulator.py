@@ -195,6 +195,8 @@ PRE_X_SKIP_EDGES = (
 _routing_module.UTURN_REQUIRE_OPPOSITE_EDGE = _REV.fix_origin_edge
 # 改訂:分岐後の代替経路を原稿の式 (1) どおりに計算する(元は全区間を自由流)。
 _routing_module.ALTERNATIVE_FROM_TABLE = _REV.fix_alternative_from_table
+# 改訂: 判断の見積もりに使う自由流速度(元は 11.0)
+_routing_module.FREE_FLOW_SPEED = _REV.free_flow_speed
 if _REV.fix_alternative_from_table and _REV.travel_time_offset != 0:
     print("[RUN_CONFIG_NOTE] fix_alternative_from_table uses table values directly; "
           f"travel_time_offset={_REV.travel_time_offset} is subtracted from them "
@@ -1955,6 +1957,8 @@ if __name__ == "__main__":
         f"fix_pre_x_alternatives={_REV.fix_pre_x_alternatives}",
         f"fix_alternative_from_table={_REV.fix_alternative_from_table}",
         f"travel_time_offset={_REV.travel_time_offset}",
+        f"vehicle_max_speed={_REV.vehicle_max_speed}",
+        f"free_flow_speed={_REV.free_flow_speed}",
         f"communication_mode={_REV.communication_mode}",
         f"end_simulation_time={END_SIMULATION_TIME}",
         f"save_raw={_REV.save_raw}",
@@ -2029,6 +2033,10 @@ if __name__ == "__main__":
                 # traceGetters=False,
 
                 )
+    # 改訂: 車両の最高速度(原稿 Table 1)。全車両が DEFAULT_VEHTYPE で生成される
+    if _REV.vehicle_max_speed is not None:
+        traci.vehicletype.setMaxSpeed("DEFAULT_VEHTYPE", float(_REV.vehicle_max_speed))
+        print(f"[RUN_CONFIG_NOTE] DEFAULT_VEHTYPE maxSpeed={traci.vehicletype.getMaxSpeed('DEFAULT_VEHTYPE')}")
 
     # 避難地の情報をもとに、Shelter一覧を生成
     shelter_capacity_by_ID:dict = {"ShelterA_1": 200, "ShelterA_2": 200}
