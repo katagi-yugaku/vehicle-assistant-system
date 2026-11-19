@@ -280,42 +280,62 @@ def build(args) -> tuple[Path, dict]:
 
 
 def submit_slurm(run_root: Path, manifest: dict, args) -> None:
+    """
+    Slurm に投入する。配列ジョブのサイズ上限(MaxArraySize、初期設定 1001 → 番号は 1000 まで)を超えないよう、
+    EVAC_MAX_ARRAY(既定 1000)タスクずつの配列に分ける。k 番目の配列のタスク i は、
+    tasks.tsv の task_id = offset_k + i を実行する(run_task.sh が EVAC_TASK_OFFSET を足す)。
+    集計ジョブはすべての配列が終わってから走る(afterany)。同時実行数 --max-parallel は配列ごとの上限。
+    """
     n = manifest["planned_runs"]
     name = manifest["name"]
     tools = run_root / "frozen" / "tools"     # 凍結したスクリプトを使う
     env = f"ALL,EVAC_PYTHON={args.python}"
-    array = [
-        "sbatch", "--parsable", f"--job-name=va_{name}", f"--partition={args.partition}",
-        f"--array=1-{n}%{args.max_parallel}", "--cpus-per-task=1", f"--mem={args.mem}",
-        f"--time={args.time_limit}",
-        f"--output={run_root}/slurm/task_%A_%a.out", f"--error={run_root}/slurm/task_%A_%a.out",
-        f"--export={env}", str(tools / "slurm/run_task.sh"), str(run_root),
-    ]
+    chunk = max(1, int(os.environ.get("EVAC_MAX_ARRAY", "1000")))
+    arrays = []
+    for k, offset in enumerate(range(0, n, chunk)):
+        size = min(chunk, n - offset)
+        arrays.append([
+            "sbatch", "--parsable", f"--job-name=va_{name}" + (f"_{k + 1}" if n > chunk else ""),
+            f"--partition={args.partition}",
+            f"--array=1-{size}%{args.max_parallel}", "--cpus-per-task=1", f"--mem={args.mem}",
+            f"--time={args.time_limit}",
+            f"--output={run_root}/slurm/task_%A_%a.out", f"--error={run_root}/slurm/task_%A_%a.out",
+            f"--export={env},EVAC_TASK_OFFSET={offset}", str(tools / "slurm/run_task.sh"), str(run_root),
+        ])
     finalize = [
         "sbatch", "--parsable", f"--job-name=va_{name}_finalize", f"--partition={args.partition}",
-        "--dependency=afterany:{ARRAY_JOB_ID}", "--cpus-per-task=1", "--mem=4G", "--time=02:00:00",
+        "--dependency=afterany:{ARRAY_JOB_IDS}", "--cpus-per-task=1", "--mem=4G", "--time=02:00:00",
         f"--output={run_root}/slurm/finalize_%j.out", f"--error={run_root}/slurm/finalize_%j.out",
         f"--export={env},EVAC_JIP_REV={ROOT}", str(tools / "finalize_experiment.sh"), str(run_root),
     ] + (["--dry-run-mail"] if args.dry_run_mail else [])
     cmd_file = run_root / "slurm" / "submit_commands.sh"
     cmd_file.write_text("#!/usr/bin/env bash\n# run_experiment.py が組み立てた投入コマンド\n"
-                        + " ".join(shlex.quote(c) for c in array) + "\n"
+                        + "".join(" ".join(shlex.quote(c) for c in a) + "\n" for a in arrays)
                         + " ".join(shlex.quote(c) for c in finalize) + "\n")
-    print(f"[experiment] {manifest['experiment_id']}  runs={n}")
-    print(" ".join(shlex.quote(c) for c in array))
+    print(f"[experiment] {manifest['experiment_id']}  runs={n}  arrays={len(arrays)} (最大 {chunk} タスクずつ)")
+    for a in arrays:
+        print(" ".join(shlex.quote(c) for c in a))
     print(" ".join(shlex.quote(c) for c in finalize))
     if args.print_only:
         print(f"[print-only] 投入していません({cmd_file})。不要なら {run_root} を削除してください。")
         return
-    array_id = sh(array).split(";")[0]
-    finalize = [c.replace("{ARRAY_JOB_ID}", array_id) for c in finalize]
+    array_ids = []
+    for a in arrays:
+        try:
+            array_ids.append(sh(a).split(";")[0])
+        except subprocess.CalledProcessError as exc:
+            if array_ids:
+                print(f"[error] 途中まで投入した配列を取り消してください: scancel {' '.join(array_ids)}", file=sys.stderr)
+            sys.exit(f"ERROR: sbatch が失敗しました: {(exc.stderr or '').strip()}")
+    finalize = [c.replace("{ARRAY_JOB_IDS}", ":".join(array_ids)) for c in finalize]
     fin_id = sh(finalize).split(";")[0]
     m = json.loads((run_root / "manifest.json").read_text())
-    m["slurm"] = {"array_job_id": array_id, "finalize_job_id": fin_id}
+    m["slurm"] = {"array_job_id": array_ids[0], "array_job_ids": array_ids, "finalize_job_id": fin_id}
     (run_root / "manifest.json").write_text(json.dumps(m, indent=2, ensure_ascii=False))
-    print(f"[submitted] array job {array_id} ({n} tasks, max {args.max_parallel} parallel), finalize job {fin_id}")
+    print(f"[submitted] array job(s) {' '.join(array_ids)} ({n} tasks, max {args.max_parallel} parallel each), "
+          f"finalize job {fin_id}")
     print(f"  状況: squeue -u $USER   /   tools/experiment_status.sh {run_root}")
-    print(f"  取消: scancel {array_id} {fin_id}")
+    print(f"  取消: scancel {' '.join(array_ids)} {fin_id}")
 
 
 def run_local(run_root: Path, manifest: dict, args) -> int:

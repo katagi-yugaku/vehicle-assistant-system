@@ -123,6 +123,7 @@ tools/server_run.sh experiments/E4h_heatmap.toml --set avg_window_s=<W> --partit
 - 集計ジョブが `plot_heatmaps.py` でヒートマップ(完了時刻・平均到着・経路変更。V2V only、DTN、差 DTN − V2V only、
   差は 95% CI が 0 をまたがないセルに *)を作り、メール本文に表、添付に図を入れる。
 - bach は srun のステップが起動しない状態だったので(11/19)、当面は `--partition=ubuntu` を付ける。
+- 計算機の MaxArraySize は 1001(配列の番号は 1000 まで)。1,000 回を超える実験は run_experiment.py が 1,000 タスクずつの配列に分けて投入し、集計ジョブは全配列の終了後に走る(`EVAC_MAX_ARRAY` で変更可)。`--max-parallel` は配列ごとの上限。取り消しは表示される番号をすべて scancel する。
 
 ## 7. 進み具合・取り消し
 ```bash

@@ -8,7 +8,11 @@
 set -uo pipefail
 
 RUN_ROOT="${1:?RUN_ROOT is required}"
-TASK_ID="${2:-${SLURM_ARRAY_TASK_ID:-}}"
+TASK_ID="${2:-}"
+if [[ -z "${TASK_ID}" && -n "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+  # 大きい実験は配列を分けて投入する(run_experiment.py)。配列 k の i 番目 = task_id offset_k + i
+  TASK_ID=$(( SLURM_ARRAY_TASK_ID + ${EVAC_TASK_OFFSET:-0} ))
+fi
 [[ -n "${TASK_ID}" ]] || { echo "ERROR: TASK_ID (arg 2) or SLURM_ARRAY_TASK_ID is required" >&2; exit 2; }
 PY="${EVAC_PYTHON:-python3}"
 
