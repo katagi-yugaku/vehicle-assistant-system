@@ -352,7 +352,7 @@ def main() -> int:
     p.add_argument("--variants", help="例: v2v_only,v2v_dtn(試験用に版を絞る)")
     p.add_argument("--set", action="append", help="全実行に追加する設定 KEY=VALUE(試験用)")
     p.add_argument("--max-parallel", type=int, default=int(os.environ.get("EVAC_MAX_PARALLEL", "32")))
-    p.add_argument("--partition", default=os.environ.get("EVAC_PARTITION", "ubuntu"))
+    p.add_argument("--partition", default=os.environ.get("EVAC_PARTITION", "ubuntu"))   # basic は bach が不調(11/19)なので当面 ubuntu
     p.add_argument("--mem", default="4G")
     p.add_argument("--time-limit", default="02:00:00")
     p.add_argument("--runs-root", default="runs")

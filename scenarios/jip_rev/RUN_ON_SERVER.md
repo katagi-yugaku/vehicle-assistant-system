@@ -48,7 +48,7 @@ tools/run_experiment.sh experiments/E3.toml --ref origin/jip/revision-26S015f --
 tools/run_experiment.sh experiments/E3.toml --ref origin/jip/revision-26S015f --max-parallel 32
 ```
 - ジョブ配列 1 本(`--array=1-800%32`)と、終了後の集計ジョブ 1 本(`--dependency=afterany`)が入る。
-- パーティションは `ubuntu`(`--partition` / `EVAC_PARTITION` で変更可)。1 タスク 1 コア・4 GB・上限 2 時間。
+- パーティションは `ubuntu`(`--partition` / `EVAC_PARTITION` で変更可。basic は bach が不調のため当面使わない)。1 タスク 1 コア・4 GB・上限 2 時間。
 
 ## 6b. E2(通信方式の比較、μθ の掃引、修正版。2026-11-06 版)
 E3 と同じ手順で、実験定義だけを変える。集計は `aggregate_e2.py` が自動で使われる。
@@ -108,6 +108,21 @@ tools/server_run.sh experiments/E2w_window.toml --partition=ubuntu --max-paralle
 - メールの「差」の表は、各 W での V2V only → DTN と、DTN での累積 → 各 W の 7 組。判断の記録に、窓を入れたときの分岐前の短縮と θ が出る。
 - `--partition=basic` を使う場合は、先に bach・wagner で `srun -p basic -w <ノード> python3 -c "import traci,sumolib,tomli,numpy"` と `sumo --version` が通ることを確認する。
 - 投入中の実験(E2s など)は投入時のコードで凍結されているので、push しても影響しない。
+
+## 6e. 本実験 E4h(μθ × P のヒートマップ、V2V only / DTN、2026-11-19)
+E2w のメールで W を 1 つ決めてから投入する(実験定義の既定は 300 s。`--set` で上書き)。
+```bash
+cd ~/vehicle-assistant-system/scenarios/jip_rev
+df -h ~                                                     # 生データ約 5 GB(1 回 約 1.9 MB × 2,500)が入るか確認
+tools/server_run.sh experiments/E4h_heatmap.toml --set avg_window_s=<W> --print-only   # タスク 2,500 を確認
+rm -rf runs/*_E4h-heatmap_*
+tools/server_run.sh experiments/E4h_heatmap.toml --set avg_window_s=<W> --partition=ubuntu --max-parallel 72
+```
+- 条件:論文 Fig.8/9 と同じ 5×5(μθ = 150〜350 s、σθ = 100 s × P = 0.10〜0.30)× V2V only / DTN × シード 1–50 = 2,500 回。
+  9 m/s、時間窓(最低 3 台)、終了 4,000 s、伝達・判断ログあり。ubuntu の 56 並列で 9〜11 時間。
+- 集計ジョブが `plot_heatmaps.py` でヒートマップ(完了時刻・平均到着・経路変更。V2V only、DTN、差 DTN − V2V only、
+  差は 95% CI が 0 をまたがないセルに *)を作り、メール本文に表、添付に図を入れる。
+- bach は srun のステップが起動しない状態だったので(11/19)、当面は `--partition=ubuntu` を付ける。
 
 ## 7. 進み具合・取り消し
 ```bash

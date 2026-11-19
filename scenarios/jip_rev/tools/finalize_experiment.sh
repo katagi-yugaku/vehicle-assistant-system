@@ -52,6 +52,11 @@ echo "aggregate (${AGGREGATOR}) exit=$?"
 
 # 伝達ログ・判断ログがあれば分析する(log_information / log_decisions。結果の判定には使わない)
 EXTRA_MD=()
+# μθ × P の格子ならヒートマップ(summary.csv / paired.csv から。格子でなければ何もしない)
+if [[ -f "${TOOLS}/plot_heatmaps.py" && -s "${RESULTS}/summary.csv" ]]; then
+  "${PY}" "${TOOLS}/plot_heatmaps.py" "${RESULTS}" && [[ -s "${RESULTS}/heatmaps.md" ]] && EXTRA_MD+=("${RESULTS}/heatmaps.md")
+  echo "plot_heatmaps exit=$?"
+fi
 if [[ -f "${TOOLS}/analyze_information.py" ]] && find "${RUN_ROOT}" -name information.jsonl.gz -print -quit | grep -q .; then
   "${PY}" "${TOOLS}/analyze_information.py" "${RUN_ROOT}" --out "${RESULTS}/information" && EXTRA_MD+=("${RESULTS}/information/information.md")
   echo "analyze_information exit=$?"
@@ -59,6 +64,11 @@ fi
 if [[ -f "${TOOLS}/analyze_decisions.py" ]] && find "${RUN_ROOT}" -name decisions.jsonl.gz -print -quit | grep -q .; then
   "${PY}" "${TOOLS}/analyze_decisions.py" "${RUN_ROOT}" --out "${RESULTS}/decisions" && EXTRA_MD+=("${RESULTS}/decisions/decisions.md")
   echo "analyze_decisions exit=$?"
+fi
+# 格子実験の補助図(完了時刻の折れ線、CDF の格子、伝達の要約)。伝達の分析の後に作る
+if [[ -f "${TOOLS}/plot_grid_figures.py" && -s "${RESULTS}/summary.csv" ]]; then
+  "${PY}" "${TOOLS}/plot_grid_figures.py" "${RESULTS}"
+  echo "plot_grid_figures exit=$?"
 fi
 
 if [[ "${SUCCESS}" -eq "${PLANNED}" && -s "${RESULTS}/summary.csv" ]]; then OUTCOME=SUCCESS

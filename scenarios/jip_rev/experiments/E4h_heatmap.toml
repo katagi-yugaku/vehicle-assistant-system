@@ -1,0 +1,149 @@
+# E4h:本実験。μθ × P のヒートマップ(2 経路)を V2V only / Vehicular DTN の両方で作り、差(DTN − V2V only)も出す
+#   構成   : 2 経路 (1-1-2)
+#   条件   : 論文 Fig.8/9 と同じ 5×5 = 25 条件。μθ = 150/200/250/300/350 s(σθ = 100 s)× P = 0.10/0.15/0.20/0.25/0.30
+#            (config_scenario_1〜25。値は下の expect で確認)
+#   版     : v2v_only / v2v_dtn(同じコード・同じシード。違いは通信方式だけ)
+#   修正   : fix_origin_edge + fix_alternative_from_table、offset 0、最高速度・自由流速度 9 m/s、
+#            経路別平均は時間窓(W は E2w の結果で 1 つに決める。既定 300 s、最低 3 台)、終了 4,000 s
+#   回数   : 25 条件 × 2 版 × シード 1–50 = 2,500 回(1 回 10–15 分。56 並列で 9〜11 時間)
+#   出力   : これまでの集計 + ヒートマップ(完了時刻・平均到着・経路変更、方式ごと + 差)
+name = "E4h-heatmap"
+description = "本実験: μθ × P ヒートマップ(2 経路)、V2V only / DTN、9 m/s、時間窓"
+seed_start = 1
+seed_end = 50
+early_rate = 1.0
+v2v_rate = 1.0
+layouts = ["1-1-2"]
+aggregator = "aggregate_e2.py"
+
+[conditions.mu150_p010]
+config = "scenarios/JIP/configs/config_scenario_1.toml"
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu200_p010]
+config = "scenarios/JIP/configs/config_scenario_2.toml"
+expect = { active_route_change_threshold_center = 200.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu250_p010]
+config = "scenarios/JIP/configs/config_scenario_3.toml"
+expect = { active_route_change_threshold_center = 250.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu300_p010]
+config = "scenarios/JIP/configs/config_scenario_4.toml"
+expect = { active_route_change_threshold_center = 300.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu350_p010]
+config = "scenarios/JIP/configs/config_scenario_5.toml"
+expect = { active_route_change_threshold_center = 350.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu150_p015]
+config = "scenarios/JIP/configs/config_scenario_6.toml"
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.15 }
+
+[conditions.mu200_p015]
+config = "scenarios/JIP/configs/config_scenario_7.toml"
+expect = { active_route_change_threshold_center = 200.0, active_route_change_threshold_spread = 100.0, p_follow = 0.15 }
+
+[conditions.mu250_p015]
+config = "scenarios/JIP/configs/config_scenario_8.toml"
+expect = { active_route_change_threshold_center = 250.0, active_route_change_threshold_spread = 100.0, p_follow = 0.15 }
+
+[conditions.mu300_p015]
+config = "scenarios/JIP/configs/config_scenario_9.toml"
+expect = { active_route_change_threshold_center = 300.0, active_route_change_threshold_spread = 100.0, p_follow = 0.15 }
+
+[conditions.mu350_p015]
+config = "scenarios/JIP/configs/config_scenario_10.toml"
+expect = { active_route_change_threshold_center = 350.0, active_route_change_threshold_spread = 100.0, p_follow = 0.15 }
+
+[conditions.mu150_p020]
+config = "scenarios/JIP/configs/config_scenario_11.toml"
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.2 }
+
+[conditions.mu200_p020]
+config = "scenarios/JIP/configs/config_scenario_12.toml"
+expect = { active_route_change_threshold_center = 200.0, active_route_change_threshold_spread = 100.0, p_follow = 0.2 }
+
+[conditions.mu250_p020]
+config = "scenarios/JIP/configs/config_scenario_13.toml"
+expect = { active_route_change_threshold_center = 250.0, active_route_change_threshold_spread = 100.0, p_follow = 0.2 }
+
+[conditions.mu300_p020]
+config = "scenarios/JIP/configs/config_scenario_14.toml"
+expect = { active_route_change_threshold_center = 300.0, active_route_change_threshold_spread = 100.0, p_follow = 0.2 }
+
+[conditions.mu350_p020]
+config = "scenarios/JIP/configs/config_scenario_15.toml"
+expect = { active_route_change_threshold_center = 350.0, active_route_change_threshold_spread = 100.0, p_follow = 0.2 }
+
+[conditions.mu150_p025]
+config = "scenarios/JIP/configs/config_scenario_16.toml"
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.25 }
+
+[conditions.mu200_p025]
+config = "scenarios/JIP/configs/config_scenario_17.toml"
+expect = { active_route_change_threshold_center = 200.0, active_route_change_threshold_spread = 100.0, p_follow = 0.25 }
+
+[conditions.mu250_p025]
+config = "scenarios/JIP/configs/config_scenario_18.toml"
+expect = { active_route_change_threshold_center = 250.0, active_route_change_threshold_spread = 100.0, p_follow = 0.25 }
+
+[conditions.mu300_p025]
+config = "scenarios/JIP/configs/config_scenario_19.toml"
+expect = { active_route_change_threshold_center = 300.0, active_route_change_threshold_spread = 100.0, p_follow = 0.25 }
+
+[conditions.mu350_p025]
+config = "scenarios/JIP/configs/config_scenario_20.toml"
+expect = { active_route_change_threshold_center = 350.0, active_route_change_threshold_spread = 100.0, p_follow = 0.25 }
+
+[conditions.mu150_p030]
+config = "scenarios/JIP/configs/config_scenario_21.toml"
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.3 }
+
+[conditions.mu200_p030]
+config = "scenarios/JIP/configs/config_scenario_22.toml"
+expect = { active_route_change_threshold_center = 200.0, active_route_change_threshold_spread = 100.0, p_follow = 0.3 }
+
+[conditions.mu250_p030]
+config = "scenarios/JIP/configs/config_scenario_23.toml"
+expect = { active_route_change_threshold_center = 250.0, active_route_change_threshold_spread = 100.0, p_follow = 0.3 }
+
+[conditions.mu300_p030]
+config = "scenarios/JIP/configs/config_scenario_24.toml"
+expect = { active_route_change_threshold_center = 300.0, active_route_change_threshold_spread = 100.0, p_follow = 0.3 }
+
+[conditions.mu350_p030]
+config = "scenarios/JIP/configs/config_scenario_25.toml"
+expect = { active_route_change_threshold_center = 350.0, active_route_change_threshold_spread = 100.0, p_follow = 0.3 }
+
+[variants.v2v_only]
+communication_mode = "v2v_only"
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0
+free_flow_speed = 9.0
+avg_window_s = 300.0                 # ← E2w の結果で決める。投入時に --set avg_window_s=200 などで上書きできる
+avg_window_min_samples = 3
+end_simulation_time = 4000
+save_raw = true
+log_information = true
+log_decisions = true
+
+[variants.v2v_dtn]
+communication_mode = "v2v_dtn"
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0
+free_flow_speed = 9.0
+avg_window_s = 300.0                 # ← E2w の結果で決める。投入時に --set avg_window_s=200 などで上書きできる
+avg_window_min_samples = 3
+end_simulation_time = 4000
+save_raw = true
+log_information = true
+log_decisions = true
+
+[compare]
+pairs = [["v2v_only", "v2v_dtn"]]
+labels = { v2v_dtn = "Vehicular DTN", v2v_only = "V2V only" }
