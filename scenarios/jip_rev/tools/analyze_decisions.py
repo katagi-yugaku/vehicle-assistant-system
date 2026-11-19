@@ -142,6 +142,8 @@ def main() -> int:
 
     for name, rows in (("decisions_summary.csv", summary), ("decisions_timeline.csv", timeline_rows)):
         with open(out / name, "w", newline="") as f:
+            if not rows:          # 分岐前の判断が一度もない(短い試験など)
+                continue
             w = csv.DictWriter(f, fieldnames=list(rows[0]))
             w.writeheader()
             w.writerows(rows)

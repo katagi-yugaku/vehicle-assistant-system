@@ -97,6 +97,18 @@ sed -i 's/^to *=.*/to = <宛先のアドレス>/' ~/.config/evac-mail/gmail.ini 
 ```
 一時的に変えるだけなら `export EVAC_MAIL_TO=<宛先>` してから投入する(集計ジョブにも引き継がれる)。
 
+## 6d. 時間窓の感度 E2w(2026-11-19)
+経路別平均を「直近 W 秒の到着(窓内が 3 台未満なら直近 3 台まで広げる)」で計算する版(フラグ `avg_window_s`・`avg_window_min_samples`)。
+```bash
+cd ~/vehicle-assistant-system/scenarios/jip_rev
+tools/server_run.sh experiments/E2w_window.toml --print-only                       # タスク 160 を確認 → runs/ の確認用ディレクトリは消す
+tools/server_run.sh experiments/E2w_window.toml --partition=ubuntu --max-parallel 72  # 投入
+```
+- 版:`{only,dtn}_{cum,w200,w300,w600}`(V2V only / DTN × 累積・W=200/300/600 s)、条件 μθ = 60(σθ 50)/ 150(σθ 100)、シード 1–10。9 m/s、終了 4,000 s。
+- メールの「差」の表は、各 W での V2V only → DTN と、DTN での累積 → 各 W の 7 組。判断の記録に、窓を入れたときの分岐前の短縮と θ が出る。
+- `--partition=basic` を使う場合は、先に bach・wagner で `srun -p basic -w <ノード> python3 -c "import traci,sumolib,tomli,numpy"` と `sumo --version` が通ることを確認する。
+- 投入中の実験(E2s など)は投入時のコードで凍結されているので、push しても影響しない。
+
 ## 7. 進み具合・取り消し
 ```bash
 tools/experiment_status.sh runs/<実験ID>

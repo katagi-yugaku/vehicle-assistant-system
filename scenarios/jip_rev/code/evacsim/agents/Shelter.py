@@ -28,8 +28,9 @@ class Shelter:
             self.congestion_rate = len(self.arrival_vehID_list) / self._capacity
     
     # 車両周辺の車両情報を更新
-    def update_evac_time_default_dict(self, vehID:str, route:list, evac_time:double):
-        self.evacuation_time_from_junction_multidict[vehID] = [route, evac_time]
+    def update_evac_time_default_dict(self, vehID:str, route:list, evac_time:double, arrival_time=None):
+        # 改訂: 時間窓の平均のため到着時刻も残す(読み出し側は 2 要素目までを使う)
+        self.evacuation_time_from_junction_multidict[vehID] = [route, evac_time, arrival_time]
 
     # 避難所IDのgetter/setter
     def get_shelterID(self):

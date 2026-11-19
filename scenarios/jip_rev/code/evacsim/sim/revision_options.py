@@ -18,6 +18,8 @@
 #                           (round 単位の通信のときだけ。結果は変えない)
 #   vehicle_max_speed       車両の最高速度 [m/s](未指定なら SUMO の既定 = 道路の制限速度まで出る)。原稿 Table 1 は 9.0
 #   free_flow_speed         判断の見積もりに使う自由流速度 [m/s](元は 11.0)
+#   avg_window_s            経路別平均を直近 W 秒の到着だけで計算する(未指定なら元の累積平均)
+#   avg_window_min_samples  窓内の台数がこれ未満なら、その経路の直近 n 台まで広げる(既定 3)
 #   log_decisions           経路変更の判断ごとに、持っていた情報・見積もった短縮時間・閾値 θ・結果を記録する
 #                           (decisions.jsonl.gz。結果は変えない)
 #
@@ -75,6 +77,8 @@ class RevisionOptions:
     log_decisions: bool = False
     vehicle_max_speed: float | None = None
     free_flow_speed: float = 11.0
+    avg_window_s: float | None = None
+    avg_window_min_samples: int = 3
     information_output: str | None = None   # 未指定なら raw_output と同じ場所の information.jsonl.gz
     config_path: str | None = None
 
@@ -139,6 +143,10 @@ def options_from_config(cfg: dict) -> RevisionOptions:
         opts.vehicle_max_speed = float(cfg["vehicle_max_speed"])
     if "free_flow_speed" in cfg:
         opts.free_flow_speed = float(cfg["free_flow_speed"])
+    if cfg.get("avg_window_s") is not None:
+        opts.avg_window_s = float(cfg["avg_window_s"])
+    if "avg_window_min_samples" in cfg:
+        opts.avg_window_min_samples = int(cfg["avg_window_min_samples"])
     if "log_decisions" in cfg:
         opts.log_decisions = _to_bool("log_decisions", cfg["log_decisions"])
     if cfg.get("information_output"):
@@ -161,6 +169,10 @@ def validate(opts: RevisionOptions) -> None:
         raise ValueError("travel_time_offset must be finite")
     if opts.vehicle_max_speed is not None and not opts.vehicle_max_speed > 0:
         raise ValueError("vehicle_max_speed must be positive")
+    if opts.avg_window_s is not None and not opts.avg_window_s > 0:
+        raise ValueError("avg_window_s must be positive")
+    if opts.avg_window_min_samples < 1:
+        raise ValueError("avg_window_min_samples must be >= 1")
     if not opts.free_flow_speed > 0:
         raise ValueError("free_flow_speed must be positive")
     if opts.end_simulation_time is not None and opts.end_simulation_time <= 0:

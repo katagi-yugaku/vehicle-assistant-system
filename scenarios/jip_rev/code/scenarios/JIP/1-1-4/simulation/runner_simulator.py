@@ -197,6 +197,10 @@ _routing_module.UTURN_REQUIRE_OPPOSITE_EDGE = _REV.fix_origin_edge
 _routing_module.ALTERNATIVE_FROM_TABLE = _REV.fix_alternative_from_table
 # 改訂: 判断の見積もりに使う自由流速度(元は 11.0)
 _routing_module.FREE_FLOW_SPEED = _REV.free_flow_speed
+# 改訂: 経路別平均の時間窓(未指定なら累積平均)
+import evacsim.metrics.evacuation_time as _evac_time_module  # noqa: E402
+_evac_time_module.AVG_WINDOW_S = _REV.avg_window_s
+_evac_time_module.AVG_WINDOW_MIN_SAMPLES = _REV.avg_window_min_samples
 if _REV.fix_alternative_from_table and _REV.travel_time_offset != 0:
     print("[RUN_CONFIG_NOTE] fix_alternative_from_table uses table values directly; "
           f"travel_time_offset={_REV.travel_time_offset} is subtracted from them "
@@ -1839,7 +1843,7 @@ def control_vehicles():
         )
 
     # SHELTER: 避難地の混雑率を計算する
-    calculate_avg_evac_time_by_route(shelter_list=shelter_list)
+    calculate_avg_evac_time_by_route(shelter_list=shelter_list, current_time=current_time)
     if len(shelter_list) >= 2:
         merge_route_info_within_shelters(shelter_list[0], shelter_list[1])
     merge_arrival_vehs_of_shelter(shelter_list=shelter_list)
@@ -1959,6 +1963,8 @@ if __name__ == "__main__":
         f"travel_time_offset={_REV.travel_time_offset}",
         f"vehicle_max_speed={_REV.vehicle_max_speed}",
         f"free_flow_speed={_REV.free_flow_speed}",
+        f"avg_window_s={_REV.avg_window_s}",
+        f"avg_window_min_samples={_REV.avg_window_min_samples}",
         f"communication_mode={_REV.communication_mode}",
         f"end_simulation_time={END_SIMULATION_TIME}",
         f"save_raw={_REV.save_raw}",

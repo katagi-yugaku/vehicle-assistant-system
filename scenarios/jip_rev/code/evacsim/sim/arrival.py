@@ -79,6 +79,7 @@ def handle_arrival(
         vehID=current_vehID,
         route=traci.vehicle.getRoute(current_vehID),
         evac_time=vehInfo_by_current_vehID.get_evac_end_time() - departure_time,
+        arrival_time=float(traci.simulation.getTime()),
     )
 
     # 到着フラグと駐車フラグを更新

@@ -325,7 +325,7 @@ def run_local(run_root: Path, manifest: dict, args) -> int:
 
     def one(i: int) -> int:
         with open(run_root / "slurm" / f"task_local_{i}.out", "w") as out:
-            return subprocess.run([str(tools / "slurm/run_task.sh"), str(run_root), str(i)],
+            return subprocess.run(["bash", str(tools / "slurm/run_task.sh"), str(run_root), str(i)],
                                   stdout=out, stderr=subprocess.STDOUT, env=env).returncode
 
     print(f"[local] {manifest['experiment_id']}  runs={n}  parallel={args.max_parallel}")
@@ -334,7 +334,7 @@ def run_local(run_root: Path, manifest: dict, args) -> int:
     with ThreadPoolExecutor(max_workers=args.max_parallel) as ex:
         codes = list(ex.map(one, range(1, n + 1)))
     print(f"[local] finished: {codes.count(0)}/{n} exit 0")
-    fin = [str(tools / "finalize_experiment.sh"), str(run_root)] + (["--dry-run-mail"] if args.dry_run_mail else [])
+    fin = ["bash", str(tools / "finalize_experiment.sh"), str(run_root)]   # 実行権限がなくても動くように + (["--dry-run-mail"] if args.dry_run_mail else [])
     return subprocess.run(fin, env=env).returncode
 
 

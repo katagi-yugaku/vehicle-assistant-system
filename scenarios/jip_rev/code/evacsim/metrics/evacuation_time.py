@@ -29,13 +29,53 @@ def create_arrival_time_list(vehInfo_list: list):
     return sorted(arrival_time_list)
 
 
-def calculate_avg_evac_time_by_route(shelter_list: list):
+# 改訂(時間窓): None なら元の累積平均。runner が revision_options から設定する。
+AVG_WINDOW_S = None
+AVG_WINDOW_MIN_SAMPLES = 3
+
+
+def windowed_route_average(records, current_time, window_s, min_samples):
+    """
+    1 つの経路の記録 [(evac_time, arrival_time), ...] から、時間窓 + 最低台数の平均を返す。
+
+    S = 到着時刻が (current_time - window_s, current_time] の記録。
+    |S| < min_samples なら、到着時刻が新しい順に min_samples 件(全体がそれ未満なら全件)。
+    戻り値: (平均, 使った台数, 使った記録の最新の到着時刻)。記録が空なら None。
+    """
+    recs = [(float(e), float(a)) for e, a in records if a is not None and a <= current_time + 1e-9]
+    if not recs:
+        return None
+    in_window = [r for r in recs if r[1] > current_time - window_s]
+    if len(in_window) < min_samples:
+        in_window = sorted(recs, key=lambda r: r[1])[-min_samples:]
+    avg = sum(e for e, _ in in_window) / len(in_window)
+    return avg, len(in_window), max(a for _, a in in_window)
+
+
+def calculate_avg_evac_time_by_route(shelter_list: list, current_time=None):
     """
     shelter_list 内の各避難所について、
     各ルートの平均避難時間と通過車両数を計算して各避難所に設定する。
 
     既存 utilities.py の calculate_avg_evac_time_by_route の挙動を維持する。
+    改訂: AVG_WINDOW_S が設定され current_time が渡されたときだけ、時間窓 + 最低台数で計算する。
     """
+    if AVG_WINDOW_S is not None and current_time is not None:
+        for shelter in shelter_list:
+            by_route: dict = {}
+            for rec in shelter.get_evacuation_time_from_junction_multidict().values():
+                arrival_time = rec[2] if len(rec) > 2 else None
+                by_route.setdefault(rec[0], []).append((rec[1], arrival_time))
+            final = {}
+            for route, records in by_route.items():
+                res = windowed_route_average(records, float(current_time),
+                                             float(AVG_WINDOW_S), int(AVG_WINDOW_MIN_SAMPLES))
+                if res is None:
+                    continue
+                avg, n, latest = res
+                final[route] = {"avg_time": avg, "vehicles": n, "latest_arrival": latest}
+            shelter.set_avg_evac_time_by_route(final)
+        return
     # TODO: shelter 同士で近いなら情報を共有するように変更する
     for shelter in shelter_list:
         avg_evac_time_by_route = {}
