@@ -1,0 +1,112 @@
+# E4h-ext:E4h(μθ=150〜350 × P=0.10〜0.30)に μθ=50 / 100 を足す追加分 + μθ=150 の切断ありの確認(2 経路)
+#   条件   : μθ = 50/100 s(σθ = 100 s)× P = 0.10/0.15/0.20/0.25/0.30 = 10 条件(configs/rev_e4h_ext/)
+#            + μθ = 150 の 5 条件(mu150tn_*、E4h 本体と同じ config_scenario_1/6/11/16/21)。
+#              本体の mu150_*(切断なし)と同じシードで比べ、切断の影響を確かめる。名前を変えてあるので本体と衝突しない
+#   版・修正: E4h_heatmap.toml と同じ(9 m/s、時間窓 既定 300 s・最低 3 台、終了 4,000 s、伝達・判断ログ)
+#   回数   : 15 条件 × 2 版 × シード 1–50 = 1,500 回(56 並列で 6〜7 時間の見込み)。W は 300 だけ
+#   θ      : 0 で切った切断正規分布 TN(μθ, σθ², 0, ∞)(theta_truncate_min = 0)。μθ・σθ は元の正規分布の値。
+#            切断前に θ<0 だった割合は μθ=50 で約 31%、μθ=100 で約 16%。実際の平均は約 101 s / 129 s。
+#            E4h 本体(μθ≥150)は切断なしなので、つないだ図ではその旨を注記する
+#   本体との統合: tools/merge_grid_results.py(7×5 の図と、μθ=150 の切断あり/なしの比較)
+name = "E4h-ext"
+description = "E4h の追加: μθ=50/100/150 × P(2 経路)、θ は 0 で切断した正規分布、V2V only / DTN、9 m/s、時間窓"
+seed_start = 1
+seed_end = 50
+early_rate = 1.0
+v2v_rate = 1.0
+layouts = ["1-1-2"]
+aggregator = "aggregate_e2.py"
+
+[conditions.mu050_p010]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu050_p010.toml"
+expect = { active_route_change_threshold_center = 50.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu100_p010]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu100_p010.toml"
+expect = { active_route_change_threshold_center = 100.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu050_p015]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu050_p015.toml"
+expect = { active_route_change_threshold_center = 50.0, active_route_change_threshold_spread = 100.0, p_follow = 0.15 }
+
+[conditions.mu100_p015]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu100_p015.toml"
+expect = { active_route_change_threshold_center = 100.0, active_route_change_threshold_spread = 100.0, p_follow = 0.15 }
+
+[conditions.mu050_p020]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu050_p020.toml"
+expect = { active_route_change_threshold_center = 50.0, active_route_change_threshold_spread = 100.0, p_follow = 0.2 }
+
+[conditions.mu100_p020]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu100_p020.toml"
+expect = { active_route_change_threshold_center = 100.0, active_route_change_threshold_spread = 100.0, p_follow = 0.2 }
+
+[conditions.mu050_p025]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu050_p025.toml"
+expect = { active_route_change_threshold_center = 50.0, active_route_change_threshold_spread = 100.0, p_follow = 0.25 }
+
+[conditions.mu100_p025]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu100_p025.toml"
+expect = { active_route_change_threshold_center = 100.0, active_route_change_threshold_spread = 100.0, p_follow = 0.25 }
+
+[conditions.mu050_p030]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu050_p030.toml"
+expect = { active_route_change_threshold_center = 50.0, active_route_change_threshold_spread = 100.0, p_follow = 0.3 }
+
+[conditions.mu100_p030]
+config = "scenarios/JIP/configs/rev_e4h_ext/config_e4h_mu100_p030.toml"
+expect = { active_route_change_threshold_center = 100.0, active_route_change_threshold_spread = 100.0, p_follow = 0.3 }
+
+[conditions.mu150tn_p010]
+config = "scenarios/JIP/configs/config_scenario_1.toml"   # E4h 本体の mu150_p010 と同じ設定(θ だけ切断)
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.1 }
+
+[conditions.mu150tn_p015]
+config = "scenarios/JIP/configs/config_scenario_6.toml"   # E4h 本体の mu150_p015 と同じ設定(θ だけ切断)
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.15 }
+
+[conditions.mu150tn_p020]
+config = "scenarios/JIP/configs/config_scenario_11.toml"   # E4h 本体の mu150_p020 と同じ設定(θ だけ切断)
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.2 }
+
+[conditions.mu150tn_p025]
+config = "scenarios/JIP/configs/config_scenario_16.toml"   # E4h 本体の mu150_p025 と同じ設定(θ だけ切断)
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.25 }
+
+[conditions.mu150tn_p030]
+config = "scenarios/JIP/configs/config_scenario_21.toml"   # E4h 本体の mu150_p030 と同じ設定(θ だけ切断)
+expect = { active_route_change_threshold_center = 150.0, active_route_change_threshold_spread = 100.0, p_follow = 0.3 }
+
+[variants.v2v_only]
+communication_mode = "v2v_only"
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0
+free_flow_speed = 9.0
+avg_window_s = 300.0                 # ← E2w の結果で決める。投入時に --set avg_window_s=200 などで上書きできる
+avg_window_min_samples = 3
+theta_truncate_min = 0.0              # θ ~ TN(μθ, σθ², 0, ∞)(E4h 本体は切断なし)
+end_simulation_time = 4000
+save_raw = true
+log_information = true
+log_decisions = true
+
+[variants.v2v_dtn]
+communication_mode = "v2v_dtn"
+fix_origin_edge = true
+fix_alternative_from_table = true
+travel_time_offset = 0.0
+vehicle_max_speed = 9.0
+free_flow_speed = 9.0
+avg_window_s = 300.0                 # ← E2w の結果で決める。投入時に --set avg_window_s=200 などで上書きできる
+avg_window_min_samples = 3
+theta_truncate_min = 0.0              # θ ~ TN(μθ, σθ², 0, ∞)(E4h 本体は切断なし)
+end_simulation_time = 4000
+save_raw = true
+log_information = true
+log_decisions = true
+
+[compare]
+pairs = [["v2v_only", "v2v_dtn"]]
+labels = { v2v_dtn = "Vehicular DTN", v2v_only = "V2V only" }

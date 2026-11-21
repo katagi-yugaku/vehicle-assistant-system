@@ -20,6 +20,9 @@
 #   free_flow_speed         判断の見積もりに使う自由流速度 [m/s](元は 11.0)
 #   avg_window_s            経路別平均を直近 W 秒の到着だけで計算する(未指定なら元の累積平均)
 #   avg_window_min_samples  窓内の台数がこれ未満なら、その経路の直近 n 台まで広げる(既定 3)
+#   theta_truncate_min      経路変更の閾値 θ を下限で切った切断正規分布 TN(μθ, σθ², min, ∞) にする
+#                           (未指定なら元の正規分布。μθ・σθ は元の正規分布の値のまま。
+#                           1 人 1 個の乱数を逆関数法で写すので、他の乱数の並びは元と同じ)
 #   log_decisions           経路変更の判断ごとに、持っていた情報・見積もった短縮時間・閾値 θ・結果を記録する
 #                           (decisions.jsonl.gz。結果は変えない)
 #
@@ -79,6 +82,7 @@ class RevisionOptions:
     free_flow_speed: float = 11.0
     avg_window_s: float | None = None
     avg_window_min_samples: int = 3
+    theta_truncate_min: float | None = None
     information_output: str | None = None   # 未指定なら raw_output と同じ場所の information.jsonl.gz
     config_path: str | None = None
 
@@ -147,6 +151,8 @@ def options_from_config(cfg: dict) -> RevisionOptions:
         opts.avg_window_s = float(cfg["avg_window_s"])
     if "avg_window_min_samples" in cfg:
         opts.avg_window_min_samples = int(cfg["avg_window_min_samples"])
+    if cfg.get("theta_truncate_min") is not None:
+        opts.theta_truncate_min = float(cfg["theta_truncate_min"])
     if "log_decisions" in cfg:
         opts.log_decisions = _to_bool("log_decisions", cfg["log_decisions"])
     if cfg.get("information_output"):
@@ -173,6 +179,8 @@ def validate(opts: RevisionOptions) -> None:
         raise ValueError("avg_window_s must be positive")
     if opts.avg_window_min_samples < 1:
         raise ValueError("avg_window_min_samples must be >= 1")
+    if opts.theta_truncate_min is not None and not math.isfinite(opts.theta_truncate_min):
+        raise ValueError("theta_truncate_min must be finite")
     if not opts.free_flow_speed > 0:
         raise ValueError("free_flow_speed must be positive")
     if opts.end_simulation_time is not None and opts.end_simulation_time <= 0:

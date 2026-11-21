@@ -36,7 +36,7 @@ FINAL_FIXES = {"fix_origin_edge": True, "fix_alternative_from_table": True, "tra
                "vehicle_max_speed": 9.0, "free_flow_speed": 9.0}
 FIX_KEYS = ["fix_origin_edge", "fix_pre_x_alternatives", "fix_alternative_from_table",
             "travel_time_offset", "vehicle_max_speed", "free_flow_speed", "avg_window_s", "communication_mode",
-            "end_simulation_time"]
+            "end_simulation_time", "theta_truncate_min"]
 
 
 def option_fields() -> set[str]:
@@ -151,7 +151,7 @@ def main() -> int:
             for var, fl in summ["flags"].items():
                 rows.append((summ["name"], var, *[str(fl[k]) for k in FIX_KEYS]))
     print("\n修正フラグの一覧(- は未指定 = 元の動作)")
-    head = ("実験", "版", "origin_edge", "pre_x", "alt_table", "offset", "vmax", "v_free", "window", "comm", "end")
+    head = ("実験", "版", "origin_edge", "pre_x", "alt_table", "offset", "vmax", "v_free", "window", "comm", "end", "θ_min")
     print(" | ".join(head))
     for r in rows:
         print(" | ".join(r))

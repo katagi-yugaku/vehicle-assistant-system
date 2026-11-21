@@ -201,6 +201,9 @@ _routing_module.FREE_FLOW_SPEED = _REV.free_flow_speed
 import evacsim.metrics.evacuation_time as _evac_time_module  # noqa: E402
 _evac_time_module.AVG_WINDOW_S = _REV.avg_window_s
 _evac_time_module.AVG_WINDOW_MIN_SAMPLES = _REV.avg_window_min_samples
+# 改訂: 経路変更の閾値 θ を切断正規分布にする(未指定なら元の正規分布)
+import evacsim.sim.initialization as _init_module  # noqa: E402
+_init_module.THETA_TRUNCATE_MIN = _REV.theta_truncate_min
 if _REV.fix_alternative_from_table and _REV.travel_time_offset != 0:
     print("[RUN_CONFIG_NOTE] fix_alternative_from_table uses table values directly; "
           f"travel_time_offset={_REV.travel_time_offset} is subtracted from them "
@@ -1965,6 +1968,7 @@ if __name__ == "__main__":
         f"free_flow_speed={_REV.free_flow_speed}",
         f"avg_window_s={_REV.avg_window_s}",
         f"avg_window_min_samples={_REV.avg_window_min_samples}",
+        f"theta_truncate_min={_REV.theta_truncate_min}",
         f"communication_mode={_REV.communication_mode}",
         f"end_simulation_time={END_SIMULATION_TIME}",
         f"save_raw={_REV.save_raw}",

@@ -27,6 +27,35 @@ from evacsim.agents.Agent import Agent
 from evacsim.agents.VehicleInfo import VehicleInfo
 from evacsim.utils.random_utils import random_true
 
+from statistics import NormalDist as _NormalDist
+
+# 経路変更の閾値 θ を切断正規分布にするときの下限(runner が revision_options.theta_truncate_min を設定する)。
+# None なら元の正規分布のまま。
+THETA_TRUNCATE_MIN: float | None = None
+_STD_NORMAL = _NormalDist()
+
+
+def truncate_theta(x: float, mu: float, sigma: float, lower: float | None = None) -> float:
+    """
+    正規分布 N(mu, sigma²) から引いた値 x を、下限 lower の切断正規分布 TN(mu, sigma², lower, ∞) の値に写す。
+
+    逆関数法:u = Φ((x − mu)/σ) を [Φ(a), 1) に写して θ = mu + σ Φ⁻¹(Φ(a) + u (1 − Φ(a)))、a = (lower − mu)/σ。
+    乱数を新たに使わないので、他のパラメータの乱数の並びは元と同じになる。
+    単調な写像なので、同じシードでの θ の大小の順番も元と同じ(下限より上の値も少し上がる)。
+    """
+    if lower is None:
+        lower = THETA_TRUNCATE_MIN
+    if lower is None:
+        return x
+    if not sigma > 0:
+        return max(x, lower)
+    fa = _STD_NORMAL.cdf((lower - mu) / sigma)
+    u = _STD_NORMAL.cdf((x - mu) / sigma)
+    q = fa + u * (1.0 - fa)
+    eps = 1e-15
+    q = min(max(q, eps), 1.0 - eps)
+    return max(mu + sigma * _STD_NORMAL.inv_cdf(q), lower)
+
 if TYPE_CHECKING:
     from evacsim.agents.Shelter import Shelter
 
@@ -231,9 +260,13 @@ def init_agent_list(
             agent: Agent = Agent(
                 vehID=vehID,
                 target_shelter=target_shelter,
-                route_change_threshold=np.random.normal(
-                    loc=ACTIVE_ROUTE_CHANGE_THRESHOLD_CENTER,
-                    scale=ACTIVE_ROUTE_CHANGE_THRESHOLD_SPREAD,
+                route_change_threshold=truncate_theta(
+                    np.random.normal(
+                        loc=ACTIVE_ROUTE_CHANGE_THRESHOLD_CENTER,
+                        scale=ACTIVE_ROUTE_CHANGE_THRESHOLD_SPREAD,
+                    ),
+                    ACTIVE_ROUTE_CHANGE_THRESHOLD_CENTER,
+                    ACTIVE_ROUTE_CHANGE_THRESHOLD_SPREAD,
                 ),
                 wrong_way_driving_threshold=np.random.normal(
                     ACTIVE_WRONG_WAY_DRIVING_THRESHOLD_CENTER,
@@ -282,7 +315,11 @@ def init_agent_list(
             agent: Agent = Agent(
                 vehID=vehID,
                 target_shelter=target_shelter,
-                route_change_threshold=np.random.normal(
+                route_change_threshold=truncate_theta(
+                    np.random.normal(
+                        CAUTIOUS_ROUTE_CHANGE_THRESHOLD_CENTER,
+                        CAUTIOUS_ROUTE_CHANGE_THRESHOLD_SPREAD,
+                    ),
                     CAUTIOUS_ROUTE_CHANGE_THRESHOLD_CENTER,
                     CAUTIOUS_ROUTE_CHANGE_THRESHOLD_SPREAD,
                 ),
